@@ -24,7 +24,7 @@ from pathlib import Path
 
 def parse_tsv_response(raw_response: str):
     """
-    Parse la réponse brute de Claude (format TSV : QUESTION\\tRÉPONSE).
+    Parse la réponse brute de Claude (format CSV : QUESTION,RÉPONSE).
     Retourne une liste de (question, réponse).
     Ignore les lignes vides et les artefacts markdown.
     """
@@ -35,17 +35,14 @@ def parse_tsv_response(raw_response: str):
         # Ignore lignes vides et blocs markdown
         if not line or line.startswith("```"):
             continue
-        # Sépare sur la première tabulation
-        parts = line.split("\t", 1)
+        # Sépare sur la première virgule
+        parts = line.split(",", 1)
         if len(parts) == 2:
             question, reponse = parts
-            cards.append((question.strip(), reponse.strip()))
-        else:
-            # Pas de tabulation : peut-être séparateur alternatif ";"
-            parts = line.split(";", 1)
-            if len(parts) == 2:
-                question, reponse = parts
-                cards.append((question.strip(), reponse.strip()))
+            reponse = reponse.strip()
+            if reponse.startswith('"') and reponse.endswith('"'):
+                reponse = reponse[1:-1].strip()
+            cards.append((question.strip(), reponse))
     return cards
 
 
@@ -89,7 +86,7 @@ def main():
                 skipped += 1
                 continue
 
-            cards = parse_tsv_response(response)
+            cards = parse_csv_response(response)
             for question, reponse in cards:
                 writer.writerow([deck, question, reponse])
                 total_cards += 1

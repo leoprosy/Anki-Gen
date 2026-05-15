@@ -21,14 +21,15 @@ from docx import Document
 
 # Styles Google Docs / Word typiques
 STYLE_LEVELS = {
-    "heading 1": 1,
-    "heading 2": 2,
-    "heading 3": 3,
-    "heading 4": 4,
-    "titre 1": 1,
-    "titre 2": 2,
-    "titre 3": 3,
-    "titre 4": 4,
+    "title": 1,
+    "heading 1": 2,
+    "heading 2": 3,
+    "heading 3": 4,
+    "heading 4": 5,
+    "titre 1": 2,
+    "titre 2": 3,
+    "titre 3": 4,
+    "titre 4": 5,
 }
 
 # Patterns de numérotation : I. / II. → niveau 1, A) / B) → 2, 1) / 2) → 3, a) → 4
@@ -70,15 +71,6 @@ def detect_level(para):
     if style_name in STYLE_LEVELS:
         return STYLE_LEVELS[style_name], text
 
-    # 2. Numérotation romaine / lettres / chiffres
-    for pattern, level in NUMBERING_PATTERNS:
-        if pattern.match(text):
-            return level, text
-
-    # 3. Tout en majuscules courts → probable titre niveau 1
-    if text.isupper() and 3 < len(text) < 120:
-        return 1, text
-
     return 0, text  # 0 = contenu normal
 
 
@@ -91,6 +83,7 @@ def build_deck_path(stack, prefix):
 def parse_docx(path: Path, deck_prefix: str):
     """Parse le docx et retourne une liste de chunks avec leur deck path."""
     title = path.stem
+    chap, title = title.split("_ ")
     doc = Document(path)
     chunks = []
     # stack = [(level, titre), ...]
@@ -121,7 +114,7 @@ def parse_docx(path: Path, deck_prefix: str):
             stack = [(l, t) for l, t in stack if l < level]
             if level == 1:
                 chapter_counter += 1
-                clean_text = f"CH{chapter_counter:02d}: {title}::{clean_text}"
+                clean_text = f"{chap}: {title}::{clean_text}"
             stack.append((level, clean_text))
             current_deck = build_deck_path(stack, deck_prefix)
         else:
@@ -130,6 +123,35 @@ def parse_docx(path: Path, deck_prefix: str):
     # Dernier flush
     flush(current_deck)
     return chunks
+
+
+def print_structure(chunks):
+    """Affiche la structure hiérarchique du cours sous forme d'arbre indenté."""
+    if not chunks:
+        print("(aucun chunk détecté)")
+        return
+
+    # Collect deck paths with their chunk counts
+    deck_counts: dict[str, int] = {}
+    for chunk in chunks:
+        deck_counts[chunk["deck"]] = deck_counts.get(chunk["deck"], 0) + 1
+
+    # Track which nodes have already been printed to avoid duplicates
+    printed: set[str] = set()
+
+    print("\n🗂️  Structure du cours :")
+    for deck in deck_counts:
+        parts = deck.split("::")
+        for depth, _ in enumerate(parts):
+            node = "::".join(parts[: depth + 1])
+            if node in printed:
+                continue
+            printed.add(node)
+            indent = "   " * depth
+            is_leaf = (depth == len(parts) - 1)
+            count_str = f"  ({deck_counts[deck]} chunk(s))" if is_leaf else ""
+            prefix = "└─ " if depth > 0 else "📘 "
+            print(f"{indent}{prefix}{parts[depth]}{count_str}")
 
 
 def build_prompts(chunks):
@@ -152,6 +174,11 @@ def main():
     parser.add_argument("docx", help="Chemin vers le fichier .docx")
     parser.add_argument("--output", default="prompts.json", help="Fichier JSON de sortie")
     parser.add_argument("--deck-prefix", default="*ESH*", help="Nom du deck racine Anki")
+    parser.add_argument(
+        "--structure",
+        action="store_true",
+        help="Affiche uniquement la structure hiérarchique du cours sans générer de fichier JSON",
+    )
     args = parser.parse_args()
 
     docx_path = Path(args.docx)
@@ -162,6 +189,10 @@ def main():
     print(f"📖 Lecture de {docx_path.name} ...")
     chunks = parse_docx(docx_path, args.deck_prefix)
     print(f"✅ {len(chunks)} chunks détectés")
+
+    if args.structure:
+        print_structure(chunks)
+        return
 
     prompts = build_prompts(chunks)
     output_path = Path(args.output)

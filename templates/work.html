@@ -5,9 +5,15 @@
 <div class="progress-wrap">
   <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
   <div class="progress-bar"><div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div></div>
-  <a class="btn" href="{{ url_for('export_csv') }}">⬇ CSV</a>
+  <a class="btn" href="{{ url_for('export_csv') }}" style="display: flex; align-items: center; gap: 6px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+    CSV
+  </a>
   <form action="{{ url_for('reset') }}" method="post" onsubmit="return confirm('Effacer prompts.json et recommencer ?');" style="display:inline">
-    <button type="submit" class="btn ghost">Reset</button>
+    <button type="submit" class="btn ghost" style="display: flex; align-items: center; gap: 6px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      Reset
+    </button>
   </form>
 </div>
 {% endblock %}
@@ -20,7 +26,10 @@
       {% for p in prompts %}
         <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
           <button type="button" class="chunk-btn">
-            <span class="dot"></span>
+            <span class="dot-wrapper">
+              <svg class="icon-pending" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
+              <svg class="icon-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </span>
             <span class="chunk-id">#{{ p.id }}</span>
             <span class="chunk-deck">{{ p.deck }}</span>
           </button>
@@ -31,8 +40,15 @@
 
   <section class="workspace">
     <details class="system-prompt">
-      <summary>System prompt (à coller une fois dans ton projet Claude)
-        <button type="button" class="copy-btn" data-copy-target="#system-prompt-text">Copier</button>
+      <summary>
+        <span style="display: flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          System prompt (à coller une fois dans ton projet Claude)
+        </span>
+        <button type="button" class="copy-btn" data-copy-target="#system-prompt-text">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <span>Copier</span>
+        </button>
       </summary>
       <pre id="system-prompt-text">{{ system_prompt }}</pre>
     </details>
@@ -44,15 +60,24 @@
           <div class="deck-name" id="cur-deck"></div>
         </div>
         <div class="nav-btns">
-          <button type="button" id="prev-btn">← Précédent</button>
-          <button type="button" id="next-btn">Suivant →</button>
+          <button type="button" id="prev-btn" style="display: flex; align-items: center; gap: 4px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            Précédent
+          </button>
+          <button type="button" id="next-btn" style="display: flex; align-items: center; gap: 4px;">
+            Suivant
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
         </div>
       </header>
 
       <section class="block">
         <div class="block-head">
           <h4>Paragraphe à envoyer à Claude</h4>
-          <button type="button" class="copy-btn" data-copy-target="#cur-prompt">Copier</button>
+          <button type="button" class="copy-btn" data-copy-target="#cur-prompt">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <span>Copier</span>
+          </button>
         </div>
         <pre id="cur-prompt" class="prompt-text"></pre>
       </section>
@@ -62,10 +87,44 @@
           <h4>Réponse de Claude (TSV : QUESTION&#9;RÉPONSE)</h4>
           <span class="muted" id="cards-info"></span>
         </div>
-        <textarea id="response" placeholder="Colle ici la réponse de Claude pour ce paragraphe..."></textarea>
+        <div class="response-container" id="response-container">
+          <textarea id="response" placeholder="Colle ici la réponse de Claude pour ce paragraphe... ou dépose un fichier texte"></textarea>
+          <div class="response-overlay">
+            <span class="drop-zone__icon" style="color: var(--accent); margin-bottom: 8px;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <polyline points="9 15 12 12 15 15"></polyline>
+              </svg>
+            </span>
+            <span>Déposez le fichier TSV/TXT ici</span>
+          </div>
+        </div>
         <div class="actions">
-          <button type="button" id="save-btn" class="primary">💾 Enregistrer</button>
-          <button type="button" id="save-next-btn" class="primary">💾 Enregistrer & Suivant</button>
+          <button type="button" id="paste-btn" class="btn ghost" title="Coller depuis le presse-papier">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Coller
+          </button>
+          <button type="button" id="save-btn" class="primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Enregistrer
+          </button>
+          <button type="button" id="save-next-btn" class="primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            Enregistrer & Suivant
+          </button>
           <span id="save-status" class="muted"></span>
         </div>
       </section>

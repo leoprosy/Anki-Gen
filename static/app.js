@@ -16,10 +16,21 @@
     progressLabel: document.getElementById("progress-label"),
     progressFill: document.getElementById("progress-fill"),
     cardsInfo: document.getElementById("cards-info"),
+    chunkView: document.getElementById("chunk-view"),
   };
 
   const firstPending = prompts.findIndex(p => p.status !== "done");
   let currentIdx = firstPending >= 0 ? firstPending : 0;
+
+  // ── Chunk transition (cross-fade) ──────────────────────────
+  function transitionChunkView(callback) {
+    if (!els.chunkView) { callback(); return; }
+    els.chunkView.classList.add("switching");
+    setTimeout(() => {
+      callback();
+      els.chunkView.classList.remove("switching");
+    }, 150);
+  }
 
   function render() {
     const p = prompts[currentIdx];
@@ -40,7 +51,15 @@
     els.nextBtn.disabled = currentIdx === prompts.length - 1;
 
     const activeLi = els.list.querySelector(".chunk-item.active");
-    if (activeLi) activeLi.scrollIntoView({ block: "nearest" });
+    if (activeLi) activeLi.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function navigateTo(idx) {
+    if (idx < 0 || idx >= prompts.length || idx === currentIdx) return;
+    transitionChunkView(() => {
+      currentIdx = idx;
+      render();
+    });
   }
 
   function updateProgress() {
@@ -83,12 +102,17 @@
       if (li) li.dataset.status = p.status;
 
       updateProgress();
+
+      // Save feedback with pulse animation
       els.saveStatus.textContent = `✓ enregistré (${data.cards_detected} cartes)`;
       els.saveStatus.className = "ok";
+      els.saveStatus.style.animation = "none";
+      // Force reflow to restart animation
+      void els.saveStatus.offsetWidth;
+      els.saveStatus.style.animation = "";
 
       if (advance && currentIdx < prompts.length - 1) {
-        currentIdx += 1;
-        render();
+        navigateTo(currentIdx + 1);
       }
     } catch (e) {
       els.saveStatus.textContent = `✗ ${e.message}`;
@@ -96,22 +120,18 @@
     }
   }
 
-  // Event listeners
+  // ── Event listeners ────────────────────────────────────────
   els.list.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".chunk-btn");
     if (!btn) return;
     const li = btn.closest(".chunk-item");
     const id = parseInt(li.dataset.id, 10);
     const idx = prompts.findIndex(p => p.id === id);
-    if (idx >= 0) { currentIdx = idx; render(); }
+    if (idx >= 0) navigateTo(idx);
   });
 
-  els.prevBtn.addEventListener("click", () => {
-    if (currentIdx > 0) { currentIdx -= 1; render(); }
-  });
-  els.nextBtn.addEventListener("click", () => {
-    if (currentIdx < prompts.length - 1) { currentIdx += 1; render(); }
-  });
+  els.prevBtn.addEventListener("click", () => navigateTo(currentIdx - 1));
+  els.nextBtn.addEventListener("click", () => navigateTo(currentIdx + 1));
 
   els.saveBtn.addEventListener("click", () => save({ advance: false }));
   els.saveNextBtn.addEventListener("click", () => save({ advance: true }));
@@ -125,9 +145,55 @@
     }
   });
 
+  // Paste button
+  const pasteBtn = document.getElementById('paste-btn');
+  if (pasteBtn) {
+    pasteBtn.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          els.response.value = text;
+          updateCardsInfo();
+        }
+      } catch (err) {
+        console.error('Failed to read clipboard: ', err);
+      }
+    });
+  }
+
+  // Response container drag and drop
+  const responseContainer = document.getElementById('response-container');
+  if (responseContainer) {
+    responseContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      responseContainer.classList.add('drag-over');
+    });
+
+    ['dragleave', 'dragend'].forEach(type => {
+      responseContainer.addEventListener(type, () => {
+        responseContainer.classList.remove('drag-over');
+      });
+    });
+
+    responseContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      responseContainer.classList.remove('drag-over');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          els.response.value = event.target.result;
+          updateCardsInfo();
+        };
+        reader.readAsText(file);
+      }
+    });
+  }
+
   // Copy buttons
   document.querySelectorAll(".copy-btn").forEach(btn => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
       const sel = btn.dataset.copyTarget;
       const target = sel ? document.querySelector(sel) : null;
       if (!target) return;

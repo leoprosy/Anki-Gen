@@ -2,7 +2,7 @@
 {% block content %}
 <section class="card">
   <h2>Importer un cours</h2>
-  <p class="muted">
+  <p class="muted" style="margin-bottom: var(--space-lg);">
     Choisis un fichier <code>.docx</code>. Le document sera découpé en paragraphes
     selon les titres et la numérotation (I. / A) / 1)). Chaque chunk donnera
     lieu à un prompt à coller dans Claude.
@@ -10,16 +10,76 @@
 
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
-  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
-    <label class="field">
+  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
+    <div class="field">
       <span>Fichier .docx</span>
-      <input type="file" name="docx" accept=".docx" required>
-    </label>
+      <div class="drop-zone" id="drop-zone">
+        <span class="drop-zone__icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <polyline points="9 15 12 12 15 15"></polyline>
+          </svg>
+        </span>
+        <span class="drop-zone__prompt">Glissez-déposez votre fichier ici, ou cliquez pour parcourir</span>
+        <input type="file" name="docx" accept=".docx" id="file-input" required class="drop-zone__input">
+      </div>
+    </div>
+    
     <label class="field">
       <span>Préfixe de deck Anki</span>
-      <input type="text" name="deck_prefix" value="*ESH*" required>
+      <div style="position: relative;">
+        <input type="text" name="deck_prefix" value="*ESH*" required>
+      </div>
     </label>
-    <button type="submit" class="primary">Parser et continuer</button>
+
+    <button type="submit" class="primary w-full">Parser et continuer</button>
   </form>
 </section>
+
+<script>
+  const dropZone = document.getElementById('drop-zone');
+  const fileInput = document.getElementById('file-input');
+  const promptText = dropZone.querySelector('.drop-zone__prompt');
+  const icon = dropZone.querySelector('.drop-zone__icon');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drop-zone--over');
+  });
+
+  ['dragleave', 'dragend'].forEach(type => {
+    dropZone.addEventListener(type, () => {
+      dropZone.classList.remove('drop-zone--over');
+    });
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      updateFileNameDisplay();
+    }
+    dropZone.classList.remove('drop-zone--over');
+  });
+
+  fileInput.addEventListener('change', updateFileNameDisplay);
+
+  function updateFileNameDisplay() {
+    if (fileInput.files.length > 0) {
+      promptText.textContent = fileInput.files[0].name;
+      promptText.classList.add('selected');
+      icon.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+      icon.style.color = "var(--success)";
+    } else {
+      promptText.textContent = "Glissez-déposez votre fichier ici, ou cliquez pour parcourir";
+      promptText.classList.remove('selected');
+      icon.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 12 15 15"></polyline></svg>';
+      icon.style.color = "var(--text-tertiary)";
+    }
+  }
+</script>
 {% endblock %}

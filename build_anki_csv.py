@@ -71,7 +71,7 @@ def main():
         # En-tête Anki (optionnel, commenté pour import direct)
         # writer.writerow(["#separator:tab"])
         # writer.writerow(["#html:true"])
-        # writer.writerow(["#deck column:1"])
+        writer.writerow(["#deck column:1"])
 
         for prompt in prompts:
             status = prompt.get("status", "pending")

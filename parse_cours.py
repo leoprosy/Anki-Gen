@@ -21,15 +21,15 @@ from docx import Document
 
 # Styles Google Docs / Word typiques
 STYLE_LEVELS = {
-    "title": 1,
-    "heading 1": 2,
-    "heading 2": 3,
-    "heading 3": 4,
-    "heading 4": 5,
-    "titre 1": 2,
-    "titre 2": 3,
-    "titre 3": 4,
-    "titre 4": 5,
+    # "title": 1,
+    "heading 1": 1,
+    "heading 2": 2,
+    "heading 3": 3,
+    "heading 4": 4,
+    "titre 1": 1,
+    "titre 2": 2,
+    "titre 3": 3,
+    "titre 4": 4,
 }
 
 # Patterns de numérotation : I. / II. → niveau 1, A) / B) → 2, 1) / 2) → 3, a) → 4

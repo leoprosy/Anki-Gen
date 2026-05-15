@@ -2,6 +2,13 @@
 /uploads
 /.claude
 /__pycache__
+/dist
+/dist-tauri
+/build
+/node_modules
+/src-tauri/target
+/src-tauri/binaries
 *.csv
 *.tsv
-*.json
+prompts.json
+*.spec

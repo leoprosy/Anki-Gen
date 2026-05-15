@@ -87,7 +87,7 @@
     els.saveStatus.className = "muted";
 
     try {
-      const r = await fetch("/api/save", {
+      const r = await fetch(window.__API_SAVE_URL__ || "/api/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: p.id, response }),

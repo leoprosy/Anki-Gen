@@ -10,6 +10,7 @@ puis ouvre http://127.0.0.1:5000
 import csv
 import io
 import json
+import re
 from pathlib import Path
 
 from flask import (
@@ -28,23 +29,36 @@ from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
 
 ROOT = Path(__file__).parent.resolve()
 UPLOAD_DIR = ROOT / "uploads"
-PROMPTS_PATH = ROOT / "prompts.json"
-CSV_PATH = ROOT / "anki_export.csv"
+PROJECTS_DIR = ROOT / "projects"
 
 UPLOAD_DIR.mkdir(exist_ok=True)
+PROJECTS_DIR.mkdir(exist_ok=True)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 
 
-def load_prompts():
-    if not PROMPTS_PATH.exists():
+def sanitize_filename(filename):
+    """Sanitize a string to be safe for filenames."""
+    filename = Path(filename).stem
+    filename = re.sub(r'[^A-Za-z0-9_ -]', '', filename)
+    return filename.strip() or "course"
+
+
+def get_project_path(project_id):
+    return PROJECTS_DIR / f"{project_id}.json"
+
+
+def load_prompts(project_id):
+    path = get_project_path(project_id)
+    if not path.exists():
         return None
-    return json.loads(PROMPTS_PATH.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def save_prompts(prompts):
-    PROMPTS_PATH.write_text(
+def save_prompts(project_id, prompts):
+    path = get_project_path(project_id)
+    path.write_text(
         json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
@@ -57,19 +71,37 @@ def progress(prompts):
 
 @app.route("/")
 def index():
-    prompts = load_prompts()
-    if prompts:
-        return redirect(url_for("work"))
-    return render_template("upload.html")
+    projects = []
+    for file in PROJECTS_DIR.glob("*.json"):
+        project_id = file.stem
+        p_data = load_prompts(project_id)
+        if p_data:
+            prog = progress(p_data)
+            projects.append({
+                "id": project_id,
+                "progress": prog,
+                "deck": p_data[0].get("deck", "ESH") if p_data else "ESH"
+            })
+    
+    projects.sort(key=lambda x: x["id"])
+    return render_template("upload.html", projects=projects)
 
 
 @app.route("/upload", methods=["POST"])
 def upload():
     file = request.files.get("docx")
     if not file or not file.filename.lower().endswith(".docx"):
-        return render_template("upload.html", error="Merci de fournir un fichier .docx."), 400
+        return render_template("upload.html", error="Merci de fournir un fichier .docx.", projects=[]), 400
 
     deck_prefix = (request.form.get("deck_prefix") or "*ESH*").strip() or "*ESH*"
+    project_id = sanitize_filename(file.filename)
+    
+    # Ensure unique project_id
+    base_id = project_id
+    counter = 1
+    while get_project_path(project_id).exists():
+        project_id = f"{base_id}_{counter}"
+        counter += 1
 
     saved = UPLOAD_DIR / file.filename
     file.save(saved)
@@ -77,40 +109,42 @@ def upload():
     try:
         chunks = parse_docx(saved, deck_prefix)
     except Exception as e:
-        return render_template("upload.html", error=f"Erreur de parsing : {e}"), 500
+        return render_template("upload.html", error=f"Erreur de parsing : {e}", projects=[]), 500
 
     if not chunks:
         return (
             render_template(
                 "upload.html",
                 error="Aucun chunk détecté dans ce document.",
+                projects=[]
             ),
             400,
         )
 
     prompts = build_prompts(chunks)
-    save_prompts(prompts)
-    return redirect(url_for("work"))
+    save_prompts(project_id, prompts)
+    return redirect(url_for("work", project_id=project_id))
 
 
-@app.route("/work")
-def work():
-    prompts = load_prompts()
+@app.route("/work/<project_id>")
+def work(project_id):
+    prompts = load_prompts(project_id)
     if not prompts:
         return redirect(url_for("index"))
     return render_template(
         "work.html",
+        project_id=project_id,
         prompts=prompts,
         system_prompt=SYSTEM_PROMPT,
         progress=progress(prompts),
     )
 
 
-@app.route("/api/save", methods=["POST"])
-def api_save():
-    prompts = load_prompts()
+@app.route("/api/save/<project_id>", methods=["POST"])
+def api_save(project_id):
+    prompts = load_prompts(project_id)
     if not prompts:
-        return jsonify(error="Aucun prompts.json en cours."), 404
+        return jsonify(error="Projet introuvable."), 404
 
     data = request.get_json(silent=True) or {}
     try:
@@ -128,7 +162,7 @@ def api_save():
                 p["status"] = "done"
             elif not response:
                 p["status"] = "pending"
-            save_prompts(prompts)
+            save_prompts(project_id, prompts)
             cards = parse_tsv_response(response) if response else []
             return jsonify(
                 ok=True,
@@ -141,17 +175,17 @@ def api_save():
     return jsonify(error=f"chunk {chunk_id} introuvable"), 404
 
 
-@app.route("/api/state")
-def api_state():
-    prompts = load_prompts()
+@app.route("/api/state/<project_id>")
+def api_state(project_id):
+    prompts = load_prompts(project_id)
     if not prompts:
         return jsonify(prompts=[], progress={"total": 0, "done": 0, "pending": 0})
     return jsonify(prompts=prompts, progress=progress(prompts))
 
 
-@app.route("/export.csv")
-def export_csv():
-    prompts = load_prompts()
+@app.route("/export.csv/<project_id>")
+def export_csv(project_id):
+    prompts = load_prompts(project_id)
     if not prompts:
         abort(404)
 
@@ -172,21 +206,27 @@ def export_csv():
 
     buf.seek(0)
     data = buf.getvalue().encode("utf-8")
-    CSV_PATH.write_bytes(data)
+    
+    # Save a copy locally as well, prefixed with project_id
+    csv_path = ROOT / f"{project_id}_export.csv"
+    csv_path.write_bytes(data)
+    
     return send_file(
         io.BytesIO(data),
         mimetype="text/tab-separated-values; charset=utf-8",
         as_attachment=True,
-        download_name="anki_export.csv",
+        download_name=f"{project_id}_export.csv",
     )
 
 
-@app.route("/reset", methods=["POST"])
-def reset():
-    if PROMPTS_PATH.exists():
-        PROMPTS_PATH.unlink()
+@app.route("/delete/<project_id>", methods=["POST"])
+def delete_project(project_id):
+    path = get_project_path(project_id)
+    if path.exists():
+        path.unlink()
     return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
     app.run(debug=True, host="127.0.0.1", port=5000)
+

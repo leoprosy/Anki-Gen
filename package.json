@@ -1,0 +1,30 @@
+{
+  "name": "anki-gen",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "echo 'Starting Flask...'",
+    "build": "echo 'Build complete'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leoprosy/Anki-Gen.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/leoprosy/Anki-Gen/issues"
+  },
+  "homepage": "https://github.com/leoprosy/Anki-Gen#readme",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.1"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
+    "@tauri-apps/plugin-shell": "^2.3.5"
+  }
+}

@@ -1,42 +1,77 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="card">
-  <h2>Importer un cours</h2>
-  <p class="muted" style="margin-bottom: var(--space-lg);">
-    Choisis un fichier <code>.docx</code>. Le document sera découpé en paragraphes
-    selon les titres et la numérotation (I. / A) / 1)). Chaque chunk donnera
-    lieu à un prompt à coller dans Claude.
-  </p>
 
-  {% if error %}<div class="error">{{ error }}</div>{% endif %}
-
-  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
-    <div class="field">
-      <span>Fichier .docx</span>
-      <div class="drop-zone" id="drop-zone">
-        <span class="drop-zone__icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-            <polyline points="14 2 14 8 20 8"></polyline>
-            <line x1="12" y1="18" x2="12" y2="12"></line>
-            <polyline points="9 15 12 12 15 15"></polyline>
-          </svg>
-        </span>
-        <span class="drop-zone__prompt">Glissez-déposez votre fichier ici, ou cliquez pour parcourir</span>
-        <input type="file" name="docx" accept=".docx" id="file-input" required class="drop-zone__input">
+<div
+  style="display: flex; gap: var(--space-xl); align-items: flex-start; max-width: 1400px; margin: 0 auto; flex-wrap: wrap;">
+  {% if projects %}
+  <section class="card" style="flex: 1; min-width: 350px;">
+    <h2 style="margin-bottom: var(--space-md);">Reprendre un cours</h2>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      {% for proj in projects %}
+      <div
+        style="background: var(--surface-alt); padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h4 style="margin: 0 0 4px; font-size: 15px;">{{ proj.id }}</h4>
+          <div class="muted" style="font-size: 12px;">
+            Deck : {{ proj.deck }} &nbsp;&middot;&nbsp;
+            Progression : {{ proj.progress.done }}/{{ proj.progress.total }} ({{ ((proj.progress.done /
+            proj.progress.total) * 100)|int if proj.progress.total else 0 }}%)
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <a href="{{ url_for('work', project_id=proj.id) }}" class="btn primary"
+            style="padding: 8px 12px; font-size: 13px;">Continuer</a>
+          <form action="{{ url_for('delete_project', project_id=proj.id) }}" method="post"
+            onsubmit="return confirm('Supprimer ce projet définitivement ?');" style="margin: 0;">
+            <button type="submit" class="btn ghost"
+              style="color: var(--error); padding: 8px 12px; font-size: 13px;">Supprimer</button>
+          </form>
+        </div>
       </div>
+      {% endfor %}
     </div>
-    
-    <label class="field">
-      <span>Préfixe de deck Anki</span>
-      <div style="position: relative;">
-        <input type="text" name="deck_prefix" value="*ESH*" required>
-      </div>
-    </label>
+  </section>
+  {% endif %}
 
-    <button type="submit" class="primary w-full">Parser et continuer</button>
-  </form>
-</section>
+  <section class="card" style="flex: 1; min-width: 350px;">
+    <h2>Nouveau cours</h2>
+    <p class="muted" style="margin-bottom: var(--space-lg);">
+      Choisis un fichier <code>.docx</code>. Le document sera découpé en paragraphes
+      selon les titres et la numérotation (I. / A) / 1)). Chaque chunk donnera
+      lieu à un prompt à coller dans Claude.
+    </p>
+
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+    <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
+      <div class="field">
+        <span>Fichier .docx</span>
+        <div class="drop-zone" id="drop-zone">
+          <span class="drop-zone__icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="12" y1="18" x2="12" y2="12"></line>
+              <polyline points="9 15 12 12 15 15"></polyline>
+            </svg>
+          </span>
+          <span class="drop-zone__prompt">Glissez-déposez votre fichier ici, ou cliquez pour parcourir</span>
+          <input type="file" name="docx" accept=".docx" id="file-input" required class="drop-zone__input">
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Préfixe de deck Anki</span>
+        <div style="position: relative;">
+          <input type="text" name="deck_prefix" value="*ESH*" required>
+        </div>
+      </label>
+
+      <button type="submit" class="primary w-full">Parser et continuer</button>
+    </form>
+  </section>
+</div>
 
 <script>
   const dropZone = document.getElementById('drop-zone');

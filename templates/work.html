@@ -5,16 +5,14 @@
 <div class="progress-wrap">
   <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
   <div class="progress-bar"><div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div></div>
-  <a class="btn" href="{{ url_for('export_csv') }}" style="display: flex; align-items: center; gap: 6px;">
+  <a class="btn" href="{{ url_for('export_csv', project_id=project_id) }}" style="display: flex; align-items: center; gap: 6px;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
     CSV
   </a>
-  <form action="{{ url_for('reset') }}" method="post" onsubmit="return confirm('Effacer prompts.json et recommencer ?');" style="display:inline">
-    <button type="submit" class="btn ghost" style="display: flex; align-items: center; gap: 6px;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-      Reset
-    </button>
-  </form>
+  <a class="btn ghost" href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 6px;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    Accueil
+  </a>
 </div>
 {% endblock %}
 
@@ -135,6 +133,7 @@
 <script>
   const PROMPTS = {{ prompts | tojson }};
   window.__INIT_PROGRESS__ = {{ progress | tojson }};
+  window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 {% endblock %}

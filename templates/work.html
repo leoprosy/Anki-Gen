@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Travail — Anki ESH{% endblock %}
+
+{% block header_extra %}
+<div class="progress-wrap">
+  <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
+  <div class="progress-bar"><div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div></div>
+  <a class="btn" href="{{ url_for('export_csv') }}">⬇ CSV</a>
+  <form action="{{ url_for('reset') }}" method="post" onsubmit="return confirm('Effacer prompts.json et recommencer ?');" style="display:inline">
+    <button type="submit" class="btn ghost">Reset</button>
+  </form>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="layout">
+  <aside class="sidebar">
+    <h3>Chunks</h3>
+    <ol class="chunk-list" id="chunk-list">
+      {% for p in prompts %}
+        <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
+          <button type="button" class="chunk-btn">
+            <span class="dot"></span>
+            <span class="chunk-id">#{{ p.id }}</span>
+            <span class="chunk-deck">{{ p.deck }}</span>
+          </button>
+        </li>
+      {% endfor %}
+    </ol>
+  </aside>
+
+  <section class="workspace">
+    <details class="system-prompt">
+      <summary>System prompt (à coller une fois dans ton projet Claude)
+        <button type="button" class="copy-btn" data-copy-target="#system-prompt-text">Copier</button>
+      </summary>
+      <pre id="system-prompt-text">{{ system_prompt }}</pre>
+    </details>
+
+    <div class="chunk-view" id="chunk-view">
+      <header class="chunk-header">
+        <div>
+          <div class="muted">Chunk <span id="cur-id"></span> / Deck</div>
+          <div class="deck-name" id="cur-deck"></div>
+        </div>
+        <div class="nav-btns">
+          <button type="button" id="prev-btn">← Précédent</button>
+          <button type="button" id="next-btn">Suivant →</button>
+        </div>
+      </header>
+
+      <section class="block">
+        <div class="block-head">
+          <h4>Paragraphe à envoyer à Claude</h4>
+          <button type="button" class="copy-btn" data-copy-target="#cur-prompt">Copier</button>
+        </div>
+        <pre id="cur-prompt" class="prompt-text"></pre>
+      </section>
+
+      <section class="block">
+        <div class="block-head">
+          <h4>Réponse de Claude (TSV : QUESTION&#9;RÉPONSE)</h4>
+          <span class="muted" id="cards-info"></span>
+        </div>
+        <textarea id="response" placeholder="Colle ici la réponse de Claude pour ce paragraphe..."></textarea>
+        <div class="actions">
+          <button type="button" id="save-btn" class="primary">💾 Enregistrer</button>
+          <button type="button" id="save-next-btn" class="primary">💾 Enregistrer & Suivant</button>
+          <span id="save-status" class="muted"></span>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>
+
+<script>
+  const PROMPTS = {{ prompts | tojson }};
+  window.__INIT_PROGRESS__ = {{ progress | tojson }};
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

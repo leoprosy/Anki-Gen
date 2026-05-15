@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>Importer un cours</h2>
+  <p class="muted">
+    Choisis un fichier <code>.docx</code>. Le document sera découpé en paragraphes
+    selon les titres et la numérotation (I. / A) / 1)). Chaque chunk donnera
+    lieu à un prompt à coller dans Claude.
+  </p>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+    <label class="field">
+      <span>Fichier .docx</span>
+      <input type="file" name="docx" accept=".docx" required>
+    </label>
+    <label class="field">
+      <span>Préfixe de deck Anki</span>
+      <input type="text" name="deck_prefix" value="*ESH*" required>
+    </label>
+    <button type="submit" class="primary">Parser et continuer</button>
+  </form>
+</section>
+{% endblock %}

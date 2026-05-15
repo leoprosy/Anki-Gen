@@ -1,0 +1,7 @@
+/.venv
+/uploads
+/.claude
+/__pycache__
+*.csv
+*.tsv
+*.json

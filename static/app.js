@@ -1,0 +1,149 @@
+(() => {
+  const prompts = window.PROMPTS || PROMPTS;
+  if (!prompts || !prompts.length) return;
+
+  const els = {
+    list: document.getElementById("chunk-list"),
+    curId: document.getElementById("cur-id"),
+    curDeck: document.getElementById("cur-deck"),
+    curPrompt: document.getElementById("cur-prompt"),
+    response: document.getElementById("response"),
+    saveBtn: document.getElementById("save-btn"),
+    saveNextBtn: document.getElementById("save-next-btn"),
+    saveStatus: document.getElementById("save-status"),
+    prevBtn: document.getElementById("prev-btn"),
+    nextBtn: document.getElementById("next-btn"),
+    progressLabel: document.getElementById("progress-label"),
+    progressFill: document.getElementById("progress-fill"),
+    cardsInfo: document.getElementById("cards-info"),
+  };
+
+  const firstPending = prompts.findIndex(p => p.status !== "done");
+  let currentIdx = firstPending >= 0 ? firstPending : 0;
+
+  function render() {
+    const p = prompts[currentIdx];
+    els.curId.textContent = `#${p.id}`;
+    els.curDeck.textContent = p.deck;
+    els.curPrompt.textContent = p.prompt;
+    els.response.value = p.response || "";
+    updateCardsInfo();
+    els.saveStatus.textContent = "";
+    els.saveStatus.className = "muted";
+
+    for (const li of els.list.querySelectorAll(".chunk-item")) {
+      const id = parseInt(li.dataset.id, 10);
+      li.classList.toggle("active", id === p.id);
+    }
+
+    els.prevBtn.disabled = currentIdx === 0;
+    els.nextBtn.disabled = currentIdx === prompts.length - 1;
+
+    const activeLi = els.list.querySelector(".chunk-item.active");
+    if (activeLi) activeLi.scrollIntoView({ block: "nearest" });
+  }
+
+  function updateProgress() {
+    const total = prompts.length;
+    const done = prompts.filter(p => p.status === "done").length;
+    els.progressLabel.textContent = `${done}/${total}`;
+    els.progressFill.style.width = total ? `${(100 * done / total).toFixed(1)}%` : "0%";
+  }
+
+  function updateCardsInfo() {
+    const text = els.response.value.trim();
+    if (!text) {
+      els.cardsInfo.textContent = "";
+      return;
+    }
+    const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.startsWith("```"));
+    const cards = lines.filter(l => l.includes("\t") || l.includes(";"));
+    els.cardsInfo.textContent = `${cards.length} carte(s) détectée(s)`;
+  }
+
+  async function save({ advance = false } = {}) {
+    const p = prompts[currentIdx];
+    const response = els.response.value;
+    els.saveStatus.textContent = "…";
+    els.saveStatus.className = "muted";
+
+    try {
+      const r = await fetch("/api/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, response }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Erreur");
+
+      p.response = response;
+      p.status = data.status;
+
+      const li = els.list.querySelector(`.chunk-item[data-id="${p.id}"]`);
+      if (li) li.dataset.status = p.status;
+
+      updateProgress();
+      els.saveStatus.textContent = `✓ enregistré (${data.cards_detected} cartes)`;
+      els.saveStatus.className = "ok";
+
+      if (advance && currentIdx < prompts.length - 1) {
+        currentIdx += 1;
+        render();
+      }
+    } catch (e) {
+      els.saveStatus.textContent = `✗ ${e.message}`;
+      els.saveStatus.className = "err";
+    }
+  }
+
+  // Event listeners
+  els.list.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".chunk-btn");
+    if (!btn) return;
+    const li = btn.closest(".chunk-item");
+    const id = parseInt(li.dataset.id, 10);
+    const idx = prompts.findIndex(p => p.id === id);
+    if (idx >= 0) { currentIdx = idx; render(); }
+  });
+
+  els.prevBtn.addEventListener("click", () => {
+    if (currentIdx > 0) { currentIdx -= 1; render(); }
+  });
+  els.nextBtn.addEventListener("click", () => {
+    if (currentIdx < prompts.length - 1) { currentIdx += 1; render(); }
+  });
+
+  els.saveBtn.addEventListener("click", () => save({ advance: false }));
+  els.saveNextBtn.addEventListener("click", () => save({ advance: true }));
+  els.response.addEventListener("input", updateCardsInfo);
+
+  // Ctrl+Enter = Save & next
+  els.response.addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
+      ev.preventDefault();
+      save({ advance: true });
+    }
+  });
+
+  // Copy buttons
+  document.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const sel = btn.dataset.copyTarget;
+      const target = sel ? document.querySelector(sel) : null;
+      if (!target) return;
+      const text = target.textContent || target.value || "";
+      try {
+        await navigator.clipboard.writeText(text);
+        const orig = btn.textContent;
+        btn.textContent = "✓ Copié";
+        btn.classList.add("copied");
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1200);
+      } catch {
+        btn.textContent = "✗ Échec";
+      }
+    });
+  });
+
+  render();
+  updateProgress();
+})();

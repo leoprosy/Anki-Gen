@@ -660,3 +660,52 @@ textarea#response:focus {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.2);
 }
+
+/* ── Update banner ─────────────────────────────────────────── */
+.update-banner {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 28px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeUp 0.3s cubic-bezier(0.25, 1, 0.5, 1) both;
+}
+
+.update-banner svg {
+  flex-shrink: 0;
+}
+
+.update-banner button {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+.update-banner .update-apply {
+  background: var(--accent);
+  color: white;
+}
+.update-banner .update-apply:hover {
+  background: var(--accent-hover);
+}
+.update-banner .update-apply:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.update-banner .update-dismiss {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  font-size: 14px;
+  line-height: 1;
+}
+.update-banner .update-dismiss:hover {
+  color: var(--text-primary);
+}

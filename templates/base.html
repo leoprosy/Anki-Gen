@@ -27,9 +27,63 @@
       </h1>
       {% block header_extra %}{% endblock %}
     </header>
+
+    <!-- Bandeau de mise à jour (masqué par défaut) -->
+    <div id="update-banner" class="update-banner">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+      </svg>
+      <span id="update-message"></span>
+      <button id="update-btn" class="update-apply" onclick="applyUpdate()">Mettre à jour</button>
+      <button class="update-dismiss" onclick="document.getElementById('update-banner').style.display='none'">✕</button>
+    </div>
+
     <main>
       {% block content %}{% endblock %}
     </main>
+
+    <script>
+    // ── Vérification silencieuse des mises à jour au démarrage ──
+    async function checkUpdate() {
+      try {
+        const res = await fetch('/api/update/check');
+        const data = await res.json();
+        if (data.update_available) {
+          document.getElementById('update-message').textContent =
+            `Version ${data.remote_version} disponible`;
+          document.getElementById('update-banner').style.display = 'flex';
+        }
+      } catch (_) {} // Silencieux si hors-ligne
+    }
+
+    async function applyUpdate() {
+      const btn = document.getElementById('update-btn');
+      btn.textContent = 'Mise à jour…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/update/apply', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'updated') {
+          document.getElementById('update-message').textContent = data.message;
+          btn.textContent = 'Redémarrer';
+          btn.disabled = false;
+          btn.onclick = () => location.reload();
+        } else {
+          document.getElementById('update-message').textContent = data.message;
+          btn.textContent = 'Réessayer';
+          btn.disabled = false;
+        }
+      } catch (e) {
+        document.getElementById('update-message').textContent = 'Erreur réseau.';
+        btn.textContent = 'Réessayer';
+        btn.disabled = false;
+      }
+    }
+
+    window.addEventListener('load', () => setTimeout(checkUpdate, 1500));
+    </script>
   </body>
 
 </html>

@@ -12,3 +12,5 @@
 *.tsv
 prompts.json
 *.spec
+/projects
+version.json

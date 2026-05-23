@@ -27,14 +27,41 @@ from flask import (
 from build_anki_csv import parse_tsv_response
 from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
 
-ROOT = Path(__file__).parent.resolve()
-UPLOAD_DIR = ROOT / "uploads"
-PROJECTS_DIR = ROOT / "projects"
+
+# ── Résolution dynamique des dossiers ─────────────────────────
+
+def _resolve_dirs():
+    """Résout les dossiers selon le mode d'exécution.
+
+    En mode frozen (PyInstaller via launcher.py) :
+      APP_DIR  → %APPDATA%/AnkiGen/app/   (code, templates, static)
+      DATA_DIR → %APPDATA%/AnkiGen/       (projects, uploads)
+
+    En mode dev (python app.py directement) :
+      Les deux pointent vers le dossier du script.
+    """
+    try:
+        from launcher import APP_DIR, DATA_DIR
+        return Path(APP_DIR), Path(DATA_DIR)
+    except ImportError:
+        # Fallback mode dev direct (python app.py)
+        root = Path(__file__).parent.resolve()
+        return root, root
+
+
+_APP_DIR, _DATA_DIR = _resolve_dirs()
+
+UPLOAD_DIR = _DATA_DIR / "uploads"
+PROJECTS_DIR = _DATA_DIR / "projects"
 
 UPLOAD_DIR.mkdir(exist_ok=True)
 PROJECTS_DIR.mkdir(exist_ok=True)
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=str(_APP_DIR / "templates"),
+    static_folder=str(_APP_DIR / "static"),
+)
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 
 
@@ -208,7 +235,7 @@ def export_csv(project_id):
     data = buf.getvalue().encode("utf-8")
     
     # Save a copy locally as well, prefixed with project_id
-    csv_path = ROOT / f"{project_id}_export.csv"
+    csv_path = _DATA_DIR / f"{project_id}_export.csv"
     csv_path.write_bytes(data)
     
     return send_file(
@@ -225,6 +252,42 @@ def delete_project(project_id):
     if path.exists():
         path.unlink()
     return redirect(url_for("index"))
+
+
+# ── Auto-update endpoints ─────────────────────────────────────
+
+@app.route("/api/update/check")
+def api_update_check():
+    """Vérifie si une mise à jour est disponible (sans l'appliquer)."""
+    try:
+        from updater import fetch_latest_release, get_local_version
+        release = fetch_latest_release()
+        remote = release["tag_name"].lstrip("v")
+        local = get_local_version()
+        return jsonify({
+            "update_available": remote != local,
+            "local_version": local,
+            "remote_version": remote,
+            "release_notes": release.get("body", ""),
+        })
+    except Exception as e:
+        return jsonify({"update_available": False, "error": str(e)}), 500
+
+
+@app.route("/api/update/apply", methods=["POST"])
+def api_update_apply():
+    """Applique la mise à jour depuis GitHub Releases."""
+    from updater import check_and_update
+    result = check_and_update()
+    status_code = 200 if result["status"] != "error" else 500
+    return jsonify(result), status_code
+
+
+@app.route("/api/version")
+def api_version():
+    """Retourne la version locale courante."""
+    from updater import get_local_version
+    return jsonify({"version": get_local_version()})
 
 
 if __name__ == "__main__":

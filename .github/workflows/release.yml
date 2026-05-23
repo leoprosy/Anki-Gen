@@ -1,0 +1,35 @@
+name: Release app bundle
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Créer app.zip (fichiers Python + templates + static)
+        run: |
+          mkdir -p release/app
+
+          # Copier les fichiers applicatifs
+          cp app.py parse_cours.py build_anki_csv.py launcher.py updater.py release/app/
+          cp -r templates static release/app/
+
+          # Générer version.json depuis le tag
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "{\"version\": \"${VERSION}\"}" > release/app/version.json
+
+          # Créer l'archive
+          cd release && zip -r ../app.zip app/
+
+      - name: Créer le GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app.zip
+          generate_release_notes: true

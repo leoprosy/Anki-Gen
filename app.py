@@ -210,8 +210,8 @@ def api_state(project_id):
     return jsonify(prompts=prompts, progress=progress(prompts))
 
 
-@app.route("/export.csv/<project_id>")
-def export_csv(project_id):
+@app.route("/export.tsv/<project_id>")
+def export_tsv(project_id):
     prompts = load_prompts(project_id)
     if not prompts:
         abort(404)
@@ -220,6 +220,8 @@ def export_csv(project_id):
 
     buf = io.StringIO()
     writer = csv.writer(buf, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(["#deck column:1"])
+    writer.writerow(["#html:true"])
     total = 0
     for p in prompts:
         response = (p.get("response") or "").strip()
@@ -235,14 +237,14 @@ def export_csv(project_id):
     data = buf.getvalue().encode("utf-8")
     
     # Save a copy locally as well, prefixed with project_id
-    csv_path = _DATA_DIR / f"{project_id}_export.csv"
+    csv_path = _DATA_DIR / f"{project_id}_export.tsv"
     csv_path.write_bytes(data)
     
     return send_file(
         io.BytesIO(data),
         mimetype="text/tab-separated-values; charset=utf-8",
         as_attachment=True,
-        download_name=f"{project_id}_export.csv",
+        download_name=f"{project_id}_export.tsv",
     )
 
 

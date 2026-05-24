@@ -83,7 +83,10 @@ def build_deck_path(stack, prefix):
 def parse_docx(path: Path, deck_prefix: str):
     """Parse le docx et retourne une liste de chunks avec leur deck path."""
     title = path.stem
-    chap, title = title.split("_ ")
+    if "_ " in title:
+        chap, title = title.split("_ ", 1)
+    else:
+        chap, title = title, title
     doc = Document(path)
     chunks = []
     # stack = [(level, titre), ...]
@@ -95,7 +98,7 @@ def parse_docx(path: Path, deck_prefix: str):
     def flush(deck):
         nonlocal current_paragraphs
         text = "\n".join(current_paragraphs).strip()
-        if text:
+        if text and deck != deck_prefix:
             chunks.append({"deck": deck, "text": text})
         current_paragraphs = []
 
@@ -114,7 +117,7 @@ def parse_docx(path: Path, deck_prefix: str):
             stack = [(l, t) for l, t in stack if l < level]
             if level == 1:
                 chapter_counter += 1
-                clean_text = f"{chap}: {title}::{clean_text}"
+                clean_text = f"{chap}::{clean_text}"
             stack.append((level, clean_text))
             current_deck = build_deck_path(stack, deck_prefix)
         else:

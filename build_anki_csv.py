@@ -4,9 +4,9 @@ build_anki_csv.py — Étape 3 du pipeline Anki ESH
 Lit prompts.json (avec les réponses remplies) et génère le CSV final Anki.
 
 Usage:
-    python build_anki_csv.py [--prompts prompts.json] [--output anki_export.csv]
+    python build_anki_csv.py [--prompts prompts.json] [--output anki_export.tsv]
 
-Format CSV de sortie (import Anki) :
+Format TSV de sortie (import Anki) :
     Colonne 1 : Deck (ex: ESH::I - Croissance::A) Modèles)
     Colonne 2 : Recto (question HTML)
     Colonne 3 : Verso (réponse HTML)
@@ -24,7 +24,7 @@ from pathlib import Path
 
 def parse_tsv_response(raw_response: str):
     """
-    Parse la réponse brute de Claude (format CSV : QUESTION,RÉPONSE).
+    Parse la réponse brute de Claude (format TSV : QUESTION[TAB]RÉPONSE).
     Retourne une liste de (question, réponse).
     Ignore les lignes vides et les artefacts markdown.
     """
@@ -35,8 +35,8 @@ def parse_tsv_response(raw_response: str):
         # Ignore lignes vides et blocs markdown
         if not line or line.startswith("```"):
             continue
-        # Sépare sur la première virgule
-        parts = line.split(",", 1)
+        # Sépare sur la première tabulation
+        parts = line.split("\t", 1)
         if len(parts) == 2:
             question, reponse = parts
             reponse = reponse.strip()
@@ -47,11 +47,20 @@ def parse_tsv_response(raw_response: str):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Assemble le CSV Anki depuis prompts.json")
-    parser.add_argument("--prompts", default="prompts.json", help="Fichier JSON des prompts/réponses")
-    parser.add_argument("--output", default="anki_export.csv", help="Fichier CSV de sortie")
-    parser.add_argument("--only-done", action="store_true",
-                        help="N'inclure que les prompts avec status=done (ignore les pending)")
+    parser = argparse.ArgumentParser(
+        description="Assemble le TSV Anki depuis prompts.json"
+    )
+    parser.add_argument(
+        "--prompts", default="prompts.json", help="Fichier JSON des prompts/réponses"
+    )
+    parser.add_argument(
+        "--output", default="anki_export.tsv", help="Fichier TSV de sortie"
+    )
+    parser.add_argument(
+        "--only-done",
+        action="store_true",
+        help="N'inclure que les prompts avec status=done (ignore les pending)",
+    )
     args = parser.parse_args()
 
     prompts_path = Path(args.prompts)
@@ -86,7 +95,7 @@ def main():
                 skipped += 1
                 continue
 
-            cards = parse_csv_response(response)
+            cards = parse_tsv_response(response)
             for question, reponse in cards:
                 writer.writerow([deck, question, reponse])
                 total_cards += 1

@@ -25,7 +25,7 @@ from flask import (
 )
 
 from build_anki_csv import parse_tsv_response
-from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
+from parse_cours import build_prompts, parse_docx
 
 
 # ── Résolution dynamique des dossiers ─────────────────────────
@@ -162,7 +162,6 @@ def work(project_id):
         "work.html",
         project_id=project_id,
         prompts=prompts,
-        system_prompt=SYSTEM_PROMPT,
         progress=progress(prompts),
     )
 

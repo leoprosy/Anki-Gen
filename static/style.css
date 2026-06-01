@@ -108,6 +108,13 @@ main {
   padding: var(--space-lg);
 }
 
+/* Work page: fill viewport so nothing needs scrolling */
+main:has(.layout) {
+  height: calc(100vh - 56px); /* 56px ≈ header height */
+  padding-bottom: var(--space-sm);
+  overflow: hidden;
+}
+
 /* ── Utility text ───────────────────────────────────────────── */
 .muted {
   color: var(--text-secondary);
@@ -316,15 +323,116 @@ button.ghost:hover, .btn.ghost:hover {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: var(--space-lg);
+  height: 100%;
 }
 
+/* ── Responsive: medium screens (sidebar shrinks) ───────────── */
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 220px 1fr;
+  }
+  .sidebar {
+    padding: var(--space-sm);
+  }
+  .chunk-deck {
+    font-size: 12px;
+  }
+}
+
+/* ── Responsive: small screens (sidebar hidden) ──────────────── */
 @media (max-width: 900px) {
   .layout {
     grid-template-columns: 1fr;
+    gap: 0;
   }
+
+  /* Hide entire sidebar — chunk nav is already in the workspace header */
   .sidebar {
-    position: static !important;
-    max-height: 300px;
+    display: none;
+  }
+
+  /* Tighter workspace */
+  .chunk-view {
+    padding: var(--space-md);
+    border-radius: 12px;
+  }
+
+  /* Reduce prompt text max-height */
+  .prompt-text {
+    max-height: 150px;
+  }
+
+  main:has(.layout) {
+    padding: var(--space-sm);
+  }
+}
+
+/* ── Responsive: very small screens ─────────────────────────── */
+@media (max-width: 700px) {
+  header {
+    padding: 10px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 { font-size: 17px; }
+
+  .progress-wrap {
+    gap: 6px;
+  }
+  .progress-bar {
+    width: 100px;
+  }
+  .progress-wrap .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  /* Navigation buttons stack */
+  .chunk-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+  .nav-btns {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .nav-btns button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .chunk-view {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  textarea#response {
+    font-size: 12px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .actions button {
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+
+  .prompt-text {
+    padding: 12px;
+    max-height: 120px;
+    font-size: 13px;
+  }
+
+  main:has(.layout) {
+    padding: var(--space-xs);
+  }
+
+  .block-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }
 
@@ -334,12 +442,13 @@ button.ghost:hover, .btn.ghost:hover {
   border: none;
   border-radius: 16px;
   padding: var(--space-md);
-  max-height: calc(100vh - 120px);
-  overflow-y: auto;
-  position: sticky;
-  top: 80px;
   box-shadow: var(--shadow-sm);
   animation: fadeUp 0.4s cubic-bezier(0.25, 1, 0.5, 1) both;
+  /* Fill grid height and use flex so title stays pinned */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 .sidebar h3 {
   margin: 0 0 12px;
@@ -349,12 +458,16 @@ button.ghost:hover, .btn.ghost:hover {
   color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  flex-shrink: 0;
 }
 
 .chunk-list {
   list-style: none;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 .chunk-item { margin-bottom: 2px; }
 
@@ -430,59 +543,9 @@ button.ghost:hover, .btn.ghost:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+  min-height: 0; /* Allow flex children to shrink */
+  overflow: hidden;
   animation: fadeUp 0.4s cubic-bezier(0.25, 1, 0.5, 1) 0.06s both;
-}
-
-/* ── System prompt (collapsible) ────────────────────────────── */
-.system-prompt {
-  background: var(--surface);
-  border: none;
-  border-radius: 16px;
-  padding: 0 var(--space-md);
-  box-shadow: var(--shadow-sm);
-}
-.system-prompt summary {
-  padding: 14px 0;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  list-style: none;
-  transition: color 0.15s ease;
-}
-.system-prompt summary::-webkit-details-marker { display: none; }
-.system-prompt summary::before {
-  content: "▸";
-  font-size: 12px;
-  color: var(--text-tertiary);
-  transition: transform 0.2s ease;
-  margin-right: 6px;
-}
-.system-prompt[open] summary::before {
-  transform: rotate(90deg);
-}
-.system-prompt summary:hover {
-  color: var(--text-primary);
-}
-
-.system-prompt pre {
-  margin: 0 0 var(--space-md);
-  padding: 14px;
-  background: var(--surface-alt);
-  border-radius: 12px;
-  border: none;
-  white-space: pre-wrap;
-  word-break: break-word;
-  max-height: 350px;
-  overflow-y: auto;
-  font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--text-primary);
 }
 
 /* ── Chunk view ─────────────────────────────────────────────── */
@@ -493,6 +556,12 @@ button.ghost:hover, .btn.ghost:hover {
   padding: var(--space-lg);
   box-shadow: var(--shadow-md);
   transition: opacity 0.15s ease;
+  /* Fill available space and allow internal scrolling */
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 .chunk-view.switching {
   opacity: 0;
@@ -502,8 +571,9 @@ button.ghost:hover, .btn.ghost:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-lg);
-  padding-bottom: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  flex-shrink: 0;
   /* No border-bottom — use spacing only */
 }
 .deck-name {
@@ -522,7 +592,15 @@ button.ghost:hover, .btn.ghost:hover {
 }
 
 /* ── Blocks (prompt / response sections) ────────────────────── */
-.block { margin-top: var(--space-lg); }
+.block { margin-top: var(--space-md); flex-shrink: 0; }
+.block:last-child {
+  /* Response block fills remaining space */
+  flex: 1;
+  flex-shrink: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 .block-head {
   display: flex;
   justify-content: space-between;
@@ -572,7 +650,8 @@ button.ghost:hover, .btn.ghost:hover {
 /* ── Response textarea ──────────────────────────────────────── */
 textarea#response {
   width: 100%;
-  min-height: 260px;
+  min-height: 120px;
+  flex: 1;
   padding: 14px;
   background: var(--surface-alt);
   border: 1.5px solid transparent;
@@ -599,6 +678,10 @@ textarea#response:focus {
 
 .response-container {
   position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .response-overlay {
@@ -635,6 +718,7 @@ textarea#response:focus {
   align-items: center;
   gap: 10px;
   margin-top: 12px;
+  flex-shrink: 0;
 }
 
 #save-status {

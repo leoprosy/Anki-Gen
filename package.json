@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "tauri": "tauri",
-    "dev": "echo 'Starting Flask...'",
-    "build": "echo 'Build complete'"
+    "build:web": "node ./scripts/generate-dist-tauri.js",
+    "build": "npm run build:web && npm run tauri build",
+    "dev": "echo 'Starting Flask...'"
   },
   "repository": {
     "type": "git",

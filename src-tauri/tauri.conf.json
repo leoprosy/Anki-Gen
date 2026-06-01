@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Anki Gen",
   "version": "1.0.0",
-  "identifier": "com.ankiesh.app",
+  "identifier": "ankiesh",
   "build": {
     "frontendDist": "../dist-tauri",
     "devUrl": "http://127.0.0.1:5000",

@@ -51,7 +51,7 @@
     els.nextBtn.disabled = currentIdx === prompts.length - 1;
 
     const activeLi = els.list.querySelector(".chunk-item.active");
-    if (activeLi) activeLi.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (activeLi) activeLi.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
   }
 
   function navigateTo(idx) {

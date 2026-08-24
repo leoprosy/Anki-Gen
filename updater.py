@@ -3,8 +3,11 @@
 updater.py — Module d'auto-mise à jour pour Anki ESH.
 
 Interroge l'API GitHub Releases pour vérifier si une nouvelle version
-est disponible, et remplace les fichiers applicatifs dans %APPDATA%/AnkiGen/app/
-sans toucher aux données utilisateur (projects/, uploads/).
+est disponible, et télécharge les fichiers applicatifs dans un dossier de
+staging (%APPDATA%/AnkiGen/app_staged/) sans toucher au dossier live pendant
+que le serveur tourne. L'échange effectif a lieu au démarrage suivant
+(voir apply_staged_update, appelé par launcher.py), et ne touche jamais
+aux données utilisateur (projects/, uploads/).
 
 Usage interne uniquement — appelé par les endpoints Flask /api/update/*.
 """
@@ -58,19 +61,26 @@ def fetch_latest_release():
         return json.loads(resp.read())
 
 
-def download_and_apply(download_url, target_dir):
-    """Télécharge le zip du release et remplace les fichiers applicatifs.
+def _staging_dir(target_dir):
+    return target_dir + "_staged"
 
-    Effectue un remplacement semi-atomique :
-      1. Backup du dossier actuel → target_dir_backup
-      2. Extraction et copie des nouveaux fichiers
-      3. Suppression du backup en cas de succès
-      4. Restauration du backup en cas d'échec
+
+def download_and_apply(download_url, target_dir):
+    """Télécharge le zip du release et le prépare pour application au prochain démarrage.
+
+    Le dossier applicatif du process en cours d'exécution n'est JAMAIS touché :
+    le nouveau contenu est extrait vers `target_dir + "_staged"`. C'est
+    `apply_staged_update()` (appelé par launcher.py avant de démarrer le serveur)
+    qui effectue l'échange, une fois qu'aucun serveur ne sert de requêtes.
 
     Args:
         download_url: URL de téléchargement de l'asset app.zip.
         target_dir: Chemin du dossier applicatif à mettre à jour.
     """
+    staging_dir = _staging_dir(target_dir)
+    if os.path.exists(staging_dir):
+        shutil.rmtree(staging_dir)
+
     with tempfile.TemporaryDirectory() as tmp:
         zip_path = os.path.join(tmp, "update.zip")
 
@@ -91,37 +101,50 @@ def download_and_apply(download_url, target_dir):
             # Si pas de sous-dossier 'app', utiliser la racine de l'extraction
             extracted_app = extract_dir
 
-        # Remplacement avec backup
-        backup_dir = target_dir + "_backup"
-        try:
-            # 1. Backup
-            if os.path.exists(backup_dir):
-                shutil.rmtree(backup_dir)
-            if os.path.exists(target_dir):
-                shutil.copytree(target_dir, backup_dir)
+        # Copie vers le dossier de staging (le dossier live n'est pas touché)
+        shutil.copytree(extracted_app, staging_dir)
 
-            # 2. Copie des nouveaux fichiers (merge, ne supprime pas le dossier)
-            for item in os.listdir(extracted_app):
-                src = os.path.join(extracted_app, item)
-                dst = os.path.join(target_dir, item)
-                if os.path.isdir(src):
-                    if os.path.exists(dst):
-                        shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
-                else:
-                    shutil.copy2(src, dst)
 
-            # 3. Succès → supprimer le backup
-            if os.path.exists(backup_dir):
-                shutil.rmtree(backup_dir)
+def apply_staged_update(target_dir):
+    """Échange le dossier applicatif live avec la mise à jour en attente, si présente.
 
-        except Exception:
-            # 4. Échec → restaurer le backup
-            if os.path.exists(backup_dir):
-                if os.path.exists(target_dir):
-                    shutil.rmtree(target_dir)
-                shutil.move(backup_dir, target_dir)
-            raise
+    Appelé au tout début du démarrage, avant que le serveur n'écoute sur un port :
+    aucune requête n'est en cours de traitement à ce moment, donc l'opération
+    n'a aucune fenêtre d'indisponibilité perceptible côté utilisateur. Si l'échange
+    échoue en cours de route, `target_dir` n'est jamais supprimé avant que le
+    nouveau contenu ne soit confirmé en place, donc une interruption (crash,
+    coupure de courant) laisse au pire l'ancienne version intacte.
+
+    Returns:
+        bool: True si une mise à jour en attente a été appliquée.
+    """
+    staging_dir = _staging_dir(target_dir)
+    if not os.path.isdir(staging_dir):
+        return False
+
+    backup_dir = target_dir + "_backup"
+    try:
+        if os.path.exists(backup_dir):
+            shutil.rmtree(backup_dir)
+
+        # 1. L'ancien contenu live est déplacé de côté (pas supprimé)
+        if os.path.exists(target_dir):
+            os.rename(target_dir, backup_dir)
+
+        # 2. Le nouveau contenu devient le dossier live
+        os.rename(staging_dir, target_dir)
+
+        # 3. Succès → l'ancienne version n'est plus nécessaire
+        if os.path.exists(backup_dir):
+            shutil.rmtree(backup_dir)
+        return True
+
+    except Exception:
+        # Échec : restaurer l'ancien contenu s'il a été déplacé, et conserver
+        # le staging pour ne pas perdre le téléchargement.
+        if os.path.exists(backup_dir) and not os.path.exists(target_dir):
+            os.rename(backup_dir, target_dir)
+        raise
 
 
 def check_and_update():
@@ -163,9 +186,9 @@ def check_and_update():
 
         download_and_apply(asset_url, _get_app_dir())
         return {
-            "status": "updated",
+            "status": "staged",
             "version": remote_version,
-            "message": f"Mis à jour vers v{remote_version}. Redémarrez l'application.",
+            "message": f"v{remote_version} téléchargée. Redémarrez l'application pour l'appliquer.",
         }
 
     except URLError:

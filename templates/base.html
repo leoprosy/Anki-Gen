@@ -65,11 +65,10 @@
       try {
         const res = await fetch('/api/update/apply', { method: 'POST' });
         const data = await res.json();
-        if (data.status === 'updated') {
+        if (data.status === 'staged') {
           document.getElementById('update-message').textContent = data.message;
-          btn.textContent = 'Redémarrer';
-          btn.disabled = false;
-          btn.onclick = () => location.reload();
+          btn.textContent = 'Quittez et relancez l\'application';
+          btn.disabled = true;
         } else {
           document.getElementById('update-message').textContent = data.message;
           btn.textContent = 'Réessayer';

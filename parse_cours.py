@@ -1,43 +1,33 @@
 #!/usr/bin/env python3
 """
 parse_cours.py — Étape 1 du pipeline Anki ESH
-Lit un .docx, détecte la hiérarchie du plan (I. / A) / 1) + styles Titre),
-découpe en chunks par paragraphe, et génère prompts.json prêt à coller dans Claude.
+Lit un .docx, détecte la hiérarchie du plan (styles Titre), découpe en chunks par
+section, extrait les images (+ leur texte alternatif) et les tableaux, et génère
+le projet JSON prêt à être travaillé dans l'app.
 
 Usage:
     python parse_cours.py <fichier.docx> [--output prompts.json] [--deck-prefix "ESH"]
 """
 
-import re
-import json
 import argparse
+import json
+import re
 import sys
 from pathlib import Path
+
 from docx import Document
 
-# ──────────────────────────────────────────────
-# Détection du niveau hiérarchique d'un paragraphe
-# ──────────────────────────────────────────────
-
-# Styles Google Docs / Word typiques
-STYLE_LEVELS = {
-    # "title": 1,
-    "heading 1": 1,
-    "heading 2": 2,
-    "heading 3": 3,
-    "heading 4": 4,
-    "titre 1": 1,
-    "titre 2": 2,
-    "titre 3": 3,
-    "titre 4": 4,
-}
+from docx_blocks import STYLE_LEVELS, iter_blocks
+from media_store import MediaStore
+from render import render_prompt_text
 
 # Patterns de numérotation : I. / II. → niveau 1, A) / B) → 2, 1) / 2) → 3, a) → 4
+# (conservés pour l'affichage/diagnostic : la détection réelle se fait sur les styles)
 NUMBERING_PATTERNS = [
-    (re.compile(r"^\s*[IVX]+[\.\)]\s+\S"), 1),        # I. ou I) …
-    (re.compile(r"^\s*[A-Z][\.\)]\s+\S"), 2),          # A. ou A) …
-    (re.compile(r"^\s*\d+[\.\)]\s+\S"), 3),            # 1. ou 1) …
-    (re.compile(r"^\s*[a-z][\.\)]\s+\S"), 4),          # a. ou a) …
+    (re.compile(r"^\s*[IVX]+[\.\)]\s+\S"), 1),
+    (re.compile(r"^\s*[A-Z][\.\)]\s+\S"), 2),
+    (re.compile(r"^\s*\d+[\.\)]\s+\S"), 3),
+    (re.compile(r"^\s*[a-z][\.\)]\s+\S"), 4),
 ]
 
 SYSTEM_PROMPT = """Tu es un expert en ESH (Économie, Sociologie et Histoire) pour les classes préparatoires ECG. Ta mission est de convertir chaque paragraphe de cours fourni par l'utilisateur en cartes Anki de manière exhaustive, précise et structurée.
@@ -56,76 +46,151 @@ Tu dois impérativement utiliser les balises HTML et le CSS inline suivants pour
 - Théorie principale : <span style="color: red; font-weight: bold;">Théorie</span>
 - Énumérations: <ul> <li> Texte </li> autres balises li ... </ul>
 Caractères spéciaux et mathématiques : Utiliser la syntaxe MathJax entre des balises latex (ex: [latex]$x = y$[/latex]).
+** Éléments graphiques (images et tableaux) : **
+Le paragraphe peut contenir des marqueurs [IMAGE n] (avec sa description) et [TABLEAU n] (avec son contenu en markdown).
+- Pour afficher une image dans une carte, écris exactement {{IMG:n}} à l'endroit voulu (recto ou verso). N'écris JAMAIS de balise <img> et n'invente JAMAIS de nom de fichier : l'application remplace {{IMG:n}} par l'image correspondante.
+- Pour réutiliser un tableau, écris exactement {{TABLE:n}}. Ne recopie jamais le tableau à la main, l'application injecte le tableau complet en HTML.
+- Un graphique ou un schéma mérite en général une carte dédiée : recto = question sur ce que montre le document, verso = {{IMG:n}} suivi de l'interprétation.
+- Un tableau de données mérite une carte de restitution globale ({{TABLE:n}} au verso) ET des cartes ciblées sur les valeurs ou comparaisons marquantes.
+- Si une image n'a aucune description, ne devine pas son contenu : crée seulement une carte où elle illustre le texte voisin.
 ** Règle de sortie: **
 Ne rends que le résultat sous forme de texte csv, colonnes séparées par des tabulations.
 Chaque ligne = une carte. Format : QUESTION[TAB]RÉPONSE
 Aucune ligne d'intro, aucun commentaire, aucun bloc markdown."""
 
 
-def detect_level(para):
-    """Retourne (niveau:int, texte:str) pour un paragraphe, ou (0, texte) si corps."""
-    style_name = para.style.name.lower() if para.style and para.style.name else ""
-    text = para.text.strip()
-
-    # 1. Style de titre explicite
-    if style_name in STYLE_LEVELS:
-        return STYLE_LEVELS[style_name], text
-
-    return 0, text  # 0 = contenu normal
-
-
+# ──────────────────────────────────────────────
+# Helpers
+# ──────────────────────────────────────────────
 def build_deck_path(stack, prefix):
     """Construit le chemin de deck Anki depuis la pile hiérarchique."""
     parts = [prefix] + [t for _, t in stack]
     return "::".join(parts)
 
 
-def parse_docx(path: Path, deck_prefix: str):
-    """Parse le docx et retourne une liste de chunks avec leur deck path."""
-    title = path.stem
-    if "_ " in title:
-        chap, title = title.split("_ ", 1)
-    else:
-        chap, title = title, title
+def split_chapter_title(stem: str):
+    """
+    'CH8_ La croissance économique' → ('CH8', 'La croissance économique').
+    Tolère l'absence du séparateur '_ '.
+    """
+    if "_ " in stem:
+        chap, title = stem.split("_ ", 1)
+        return chap.strip(), title.strip()
+    return "", stem.strip()
+
+
+def number_blocks(blocks: list) -> list:
+    """
+    Numérote images et tableaux LOCALEMENT au chunk ({{IMG:1}}, {{TABLE:1}}…).
+    Le modèle n'a ainsi jamais à manipuler de nom de fichier.
+    """
+    img_n = table_n = 0
+    for block in blocks:
+        if block.get("type") == "image":
+            img_n += 1
+            block["n"] = img_n
+        elif block.get("type") == "table":
+            table_n += 1
+            block["n"] = table_n
+    return blocks
+
+
+# ──────────────────────────────────────────────
+# Parsing
+# ──────────────────────────────────────────────
+def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
+               media_dir: Path = None, title_stem: str = None):
+    """
+    Parse le .docx et retourne (chunks, assets, warnings).
+
+    chunks : [{"deck": str, "blocks": [...], "assets": [...], "prompt": str}, ...]
+    assets : {"img_1": {...}, ...}  (métadonnées des images extraites)
+
+    `title_stem` sert à nommer chapitre et titre dans les decks : le fichier est
+    stocké sous un nom assaini, mais les decks doivent garder les accents.
+    """
+    path = Path(path)
+    project_id = project_id or path.stem
+    if media_dir is None:
+        from paths import project_media_dir
+        media_dir = project_media_dir(project_id)
+
+    chap, _ = split_chapter_title(title_stem or path.stem)
     doc = Document(path)
+    store = MediaStore(project_id, media_dir)
+
     chunks = []
-    # stack = [(level, titre), ...]
-    stack = []
-    current_paragraphs = []
+    stack = []              # [(level, titre), ...]
+    current_blocks = []
     current_deck = deck_prefix
-    chapter_counter = 0
 
     def flush(deck):
-        nonlocal current_paragraphs
-        text = "\n".join(current_paragraphs).strip()
-        if text and deck != deck_prefix:
-            chunks.append({"deck": deck, "text": text})
-        current_paragraphs = []
+        nonlocal current_blocks
+        blocks = number_blocks(current_blocks)
+        has_content = any(
+            (b["type"] == "text" and b.get("text"))
+            or b["type"] in ("image", "table")
+            for b in blocks
+        )
+        # `deck != deck_prefix` : on ignore le contenu antérieur au premier titre
+        # (ligne de titre du chapitre, intro) — comportement aligné sur main.
+        if has_content and deck != deck_prefix:
+            prompt = render_prompt_text(blocks, store.assets)
+            chunks.append({
+                "deck": deck,
+                "blocks": blocks,
+                "assets": sorted({b["asset"] for b in blocks if b["type"] == "image"}
+                                 | {a for b in blocks if b["type"] == "table"
+                                    for a in b.get("assets", [])}),
+                "prompt": prompt,
+            })
+        current_blocks = []
 
-    for para in doc.paragraphs:
-        text = para.text.strip()
-        if not text:
-            continue
-
-        level, clean_text = detect_level(para)
-
-        if level > 0:
+    for block in iter_blocks(doc, store):
+        if block["type"] == "heading":
+            level, clean_text = block["level"], block["text"]
             # On flush le chunk en cours avant de changer de section
             flush(current_deck)
 
             # Met à jour la pile : retire tout ce qui est ≥ ce niveau
             stack = [(l, t) for l, t in stack if l < level]
             if level == 1:
-                chapter_counter += 1
-                clean_text = f"{chap}::{clean_text}"
+                clean_text = "%s::%s" % (chap, clean_text) if chap else clean_text
             stack.append((level, clean_text))
             current_deck = build_deck_path(stack, deck_prefix)
         else:
-            current_paragraphs.append(text)
+            current_blocks.append(block)
 
-    # Dernier flush
     flush(current_deck)
-    return chunks
+    return chunks, store.assets, store.warnings
+
+
+def build_prompts(chunks, assets=None):
+    """Génère la liste de prompts à partir des chunks."""
+    assets = assets or {}
+    prompts = []
+    for i, chunk in enumerate(chunks):
+        prompts.append({
+            "id": i,
+            "deck": chunk["deck"],
+            "prompt": chunk.get("prompt") or render_prompt_text(chunk.get("blocks", []), assets),
+            "blocks": chunk.get("blocks", []),
+            "assets": chunk.get("assets", []),
+            "system": SYSTEM_PROMPT,
+            "status": "pending",   # pending | done
+            "response": ""
+        })
+    return prompts
+
+
+# ──────────────────────────────────────────────
+# Affichage CLI
+# ──────────────────────────────────────────────
+def chunk_stats(chunks):
+    """(images, tableaux) — les images logées dans une cellule comptent aussi."""
+    images = len({a for c in chunks for a in c.get("assets", [])})
+    tables = sum(1 for c in chunks for b in c["blocks"] if b["type"] == "table")
+    return images, tables
 
 
 def print_structure(chunks):
@@ -134,14 +199,11 @@ def print_structure(chunks):
         print("(aucun chunk détecté)")
         return
 
-    # Collect deck paths with their chunk counts
-    deck_counts: dict[str, int] = {}
+    deck_counts = {}
     for chunk in chunks:
         deck_counts[chunk["deck"]] = deck_counts.get(chunk["deck"], 0) + 1
 
-    # Track which nodes have already been printed to avoid duplicates
-    printed: set[str] = set()
-
+    printed = set()
     print("\n🗂️  Structure du cours :")
     for deck in deck_counts:
         parts = deck.split("::")
@@ -157,26 +219,23 @@ def print_structure(chunks):
             print(f"{indent}{prefix}{parts[depth]}{count_str}")
 
 
-def build_prompts(chunks):
-    """Génère la liste de prompts à partir des chunks."""
-    prompts = []
-    for i, chunk in enumerate(chunks):
-        prompts.append({
-            "id": i,
-            "deck": chunk["deck"],
-            "prompt": chunk["text"],
-            "system": SYSTEM_PROMPT,
-            "status": "pending",   # pending | done
-            "response": ""
-        })
-    return prompts
+def force_utf8_stdout():
+    """La console Windows est en cp1252 : sans ça, les emoji font planter les prints."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 
 
 def main():
+    force_utf8_stdout()
     parser = argparse.ArgumentParser(description="Parse un cours .docx → prompts Anki JSON")
     parser.add_argument("docx", help="Chemin vers le fichier .docx")
     parser.add_argument("--output", default="prompts.json", help="Fichier JSON de sortie")
     parser.add_argument("--deck-prefix", default="*ESH*", help="Nom du deck racine Anki")
+    parser.add_argument("--media-dir", default=None,
+                        help="Dossier de sortie des images (défaut: media/<nom du cours>)")
     parser.add_argument(
         "--structure",
         action="store_true",
@@ -189,20 +248,30 @@ def main():
         print(f"❌ Fichier introuvable : {docx_path}", file=sys.stderr)
         sys.exit(1)
 
+    media_dir = Path(args.media_dir) if args.media_dir else None
     print(f"📖 Lecture de {docx_path.name} ...")
-    chunks = parse_docx(docx_path, args.deck_prefix)
-    print(f"✅ {len(chunks)} chunks détectés")
+    chunks, assets, warnings = parse_docx(docx_path, args.deck_prefix, media_dir=media_dir)
+    images, tables = chunk_stats(chunks)
+    print(f"✅ {len(chunks)} chunks détectés — {images} image(s), {tables} tableau(x)")
+    for w in warnings:
+        print(f"⚠️  {w}")
 
     if args.structure:
         print_structure(chunks)
         return
 
-    prompts = build_prompts(chunks)
+    prompts = build_prompts(chunks, assets)
+    project = {
+        "version": 2,
+        "deck_prefix": args.deck_prefix,
+        "source": docx_path.name,
+        "assets": assets,
+        "prompts": prompts,
+    }
     output_path = Path(args.output)
-    output_path.write_text(json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8")
+    output_path.write_text(json.dumps(project, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"💾 {output_path} généré ({len(prompts)} prompts)")
 
-    # Résumé des decks
     decks = {}
     for p in prompts:
         decks[p["deck"]] = decks.get(p["deck"], 0) + 1

@@ -16,6 +16,12 @@
             Deck : {{ proj.deck }} &nbsp;&middot;&nbsp;
             Progression : {{ proj.progress.done }}/{{ proj.progress.total }} ({{ ((proj.progress.done /
             proj.progress.total) * 100)|int if proj.progress.total else 0 }}%)
+            {% if proj.images or proj.tables %}
+            &nbsp;&middot;&nbsp;
+            {% if proj.images %}🖼️ {{ proj.images }} image(s){% endif %}
+            {% if proj.images and proj.tables %} · {% endif %}
+            {% if proj.tables %}▦ {{ proj.tables }} tableau(x){% endif %}
+            {% endif %}
           </div>
         </div>
         <div style="display: flex; gap: 8px;">

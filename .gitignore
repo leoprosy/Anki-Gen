@@ -12,5 +12,10 @@
 *.tsv
 prompts.json
 *.spec
+!flask-server.spec
 /projects
 version.json
+/media
+/exports
+/tests/fixtures
+/tests/__pycache__

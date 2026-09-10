@@ -5,10 +5,31 @@
 <div class="progress-wrap">
   <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
   <div class="progress-bar"><div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div></div>
-  <a class="btn" href="{{ url_for('export_tsv', project_id=project_id) }}" style="display: flex; align-items: center; gap: 6px;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-    TSV
-  </a>
+
+  <details class="export-menu" id="export-menu">
+    <summary class="btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      Exporter
+    </summary>
+    <div class="export-panel">
+      <div class="export-report" id="export-report">Calcul du rapport…</div>
+      <a class="export-item" href="{{ url_for('export_tsv', project_id=project_id) }}">
+        <strong>TSV seul</strong>
+        <span class="muted">Cartes uniquement (en-têtes Anki inclus)</span>
+      </a>
+      <a class="export-item" href="{{ url_for('export_zip', project_id=project_id) }}">
+        <strong>ZIP (TSV + images)</strong>
+        <span class="muted">À décompresser dans collection.media</span>
+      </a>
+      <button type="button" class="export-item" id="copy-media-btn">
+        <strong>Copier les médias dans Anki</strong>
+        <span class="muted">Directement dans collection.media (Anki fermé)</span>
+      </button>
+      <div class="export-profiles" id="export-profiles" hidden></div>
+      <div class="export-status muted" id="export-status"></div>
+    </div>
+  </details>
+
   <a class="btn ghost" href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 6px;">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
     Accueil
@@ -30,6 +51,10 @@
             </span>
             <span class="chunk-id">#{{ p.id }}</span>
             <span class="chunk-deck">{{ p.deck }}</span>
+            <span class="chunk-badges">
+              {% if p.images %}<span class="badge badge-img" title="{{ p.images|length }} image(s)">🖼️{{ p.images|length }}</span>{% endif %}
+              {% if p.tables %}<span class="badge badge-table" title="{{ p.tables|length }} tableau(x)">▦{{ p.tables|length }}</span>{% endif %}
+            </span>
           </button>
         </li>
       {% endfor %}
@@ -37,6 +62,12 @@
   </aside>
 
   <section class="workspace">
+    {% if warnings %}
+    <div class="warn-banner">
+      {% for w in warnings %}<div>⚠️ {{ w }}</div>{% endfor %}
+    </div>
+    {% endif %}
+
     <div class="chunk-view" id="chunk-view">
       <header class="chunk-header">
         <div>
@@ -58,19 +89,36 @@
       <section class="block">
         <div class="block-head">
           <h4>Paragraphe à envoyer à Claude</h4>
-          <button type="button" class="copy-btn" data-copy-target="#cur-prompt">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            <span>Copier</span>
-          </button>
+          <div class="head-actions">
+            <div class="seg" id="view-toggle">
+              <button type="button" data-view="preview" class="active">Aperçu</button>
+              <button type="button" data-view="text">Texte</button>
+            </div>
+            <button type="button" class="copy-btn" data-copy-target="#cur-prompt">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              <span>Copier</span>
+            </button>
+          </div>
         </div>
-        <pre id="cur-prompt" class="prompt-text"></pre>
+        <div id="cur-preview" class="chunk-preview"></div>
+        <pre id="cur-prompt" class="prompt-text" hidden></pre>
+        <div id="alt-panel" class="alt-panel"></div>
       </section>
 
       <section class="block">
         <div class="block-head">
           <h4>Réponse de Claude (TSV : QUESTION&#9;RÉPONSE)</h4>
-          <span class="muted" id="cards-info"></span>
+          <div class="head-actions">
+            <div class="seg" id="answer-toggle">
+              <button type="button" data-answer="edit" class="active">Réponse</button>
+              <button type="button" data-answer="cards">Aperçu cartes</button>
+            </div>
+            <span class="muted" id="cards-info"></span>
+          </div>
         </div>
+
+        <div id="insert-bar" class="insert-bar"></div>
+
         <div class="response-container" id="response-container">
           <textarea id="response" placeholder="Colle ici la réponse de Claude pour ce paragraphe... ou dépose un fichier texte"></textarea>
           <div class="response-overlay">
@@ -85,6 +133,9 @@
             <span>Déposez le fichier TSV/TXT ici</span>
           </div>
         </div>
+
+        <div id="cards-preview" class="cards-preview" hidden></div>
+
         <div class="actions">
           <button type="button" id="paste-btn" class="btn ghost" title="Coller depuis le presse-papier">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
@@ -119,7 +170,13 @@
 <script>
   const PROMPTS = {{ prompts | tojson }};
   window.__INIT_PROGRESS__ = {{ progress | tojson }};
+  window.__PROJECT_ID__ = {{ project_id | tojson }};
+  window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
+  window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";
+  window.__API_PREVIEW_URL__ = "{{ url_for('api_preview', project_id=project_id) }}";
+  window.__API_REPORT_URL__ = "{{ url_for('api_export_report', project_id=project_id) }}";
+  window.__API_ANKI_MEDIA_URL__ = "{{ url_for('api_export_anki_media', project_id=project_id) }}";
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 {% endblock %}

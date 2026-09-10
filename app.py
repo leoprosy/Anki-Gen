@@ -7,10 +7,9 @@ Lance:
 puis ouvre http://127.0.0.1:5000
 """
 
-import csv
 import io
-import json
 import re
+import zipfile
 from pathlib import Path
 
 from flask import (
@@ -21,46 +20,46 @@ from flask import (
     render_template,
     request,
     send_file,
+    send_from_directory,
     url_for,
 )
 
-from build_anki_csv import parse_tsv_response
-from parse_cours import build_prompts, parse_docx
+import paths
+from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
+from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
+from project_store import (
+    PROJECT_VERSION,
+    copy_media,
+    delete_project,
+    export_rows,
+    list_projects,
+    load_project,
+    media_url_prefix,
+    missing_alt_count,
+    progress,
+    project_path,
+    project_view,
+    prompt_view,
+    save_project,
+    set_asset_alt,
+)
+from render import resolve_placeholders
 
+ROOT = paths.DATA_DIR
+UPLOAD_DIR = paths.UPLOAD_DIR
+PROJECTS_DIR = paths.PROJECTS_DIR
+MEDIA_DIR = paths.MEDIA_DIR
+EXPORT_DIR = paths.EXPORT_DIR
 
-# ── Résolution dynamique des dossiers ─────────────────────────
+paths.ensure_dirs()
+paths.migrate_legacy_data()
 
-def _resolve_dirs():
-    """Résout les dossiers selon le mode d'exécution.
-
-    En mode frozen (PyInstaller via launcher.py) :
-      APP_DIR  → %APPDATA%/AnkiGen/app/   (code, templates, static)
-      DATA_DIR → %APPDATA%/AnkiGen/       (projects, uploads)
-
-    En mode dev (python app.py directement) :
-      Les deux pointent vers le dossier du script.
-    """
-    try:
-        from launcher import APP_DIR, DATA_DIR
-        return Path(APP_DIR), Path(DATA_DIR)
-    except ImportError:
-        # Fallback mode dev direct (python app.py)
-        root = Path(__file__).parent.resolve()
-        return root, root
-
-
-_APP_DIR, _DATA_DIR = _resolve_dirs()
-
-UPLOAD_DIR = _DATA_DIR / "uploads"
-PROJECTS_DIR = _DATA_DIR / "projects"
-
-UPLOAD_DIR.mkdir(exist_ok=True)
-PROJECTS_DIR.mkdir(exist_ok=True)
+SAFE_MEDIA_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 app = Flask(
     __name__,
-    template_folder=str(_APP_DIR / "templates"),
-    static_folder=str(_APP_DIR / "static"),
+    template_folder=str(paths.APP_DIR / "templates"),
+    static_folder=str(paths.APP_DIR / "static"),
 )
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
 
@@ -72,104 +71,152 @@ def sanitize_filename(filename):
     return filename.strip() or "course"
 
 
-def get_project_path(project_id):
-    return PROJECTS_DIR / f"{project_id}.json"
+def require_project(project_id):
+    project = load_project(project_id)
+    if not project:
+        abort(404)
+    return project
 
 
-def load_prompts(project_id):
-    path = get_project_path(project_id)
-    if not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
+def tsv_bytes(rows) -> bytes:
+    import csv
+
+    buf = io.StringIO()
+    for line in ANKI_HEADER_LINES:
+        buf.write(line + "\n")
+    writer = csv.writer(buf, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
+    for row in rows:
+        writer.writerow(row)
+    return buf.getvalue().encode("utf-8")
 
 
-def save_prompts(project_id, prompts):
-    path = get_project_path(project_id)
-    path.write_text(
-        json.dumps(prompts, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-
-
-def progress(prompts):
-    total = len(prompts)
-    done = sum(1 for p in prompts if p.get("status") == "done")
-    return {"total": total, "done": done, "pending": total - done}
-
-
+# ──────────────────────────────────────────────────────────────
+# Pages
+# ──────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    projects = []
-    for file in PROJECTS_DIR.glob("*.json"):
-        project_id = file.stem
-        p_data = load_prompts(project_id)
-        if p_data:
-            prog = progress(p_data)
-            projects.append({
-                "id": project_id,
-                "progress": prog,
-                "deck": p_data[0].get("deck", "ESH") if p_data else "ESH"
-            })
-    
-    projects.sort(key=lambda x: x["id"])
-    return render_template("upload.html", projects=projects)
+    return render_template("upload.html", projects=list_projects())
 
 
 @app.route("/upload", methods=["POST"])
 def upload():
     file = request.files.get("docx")
     if not file or not file.filename.lower().endswith(".docx"):
-        return render_template("upload.html", error="Merci de fournir un fichier .docx.", projects=[]), 400
+        return render_template(
+            "upload.html", error="Merci de fournir un fichier .docx.", projects=list_projects()
+        ), 400
 
     deck_prefix = (request.form.get("deck_prefix") or "*ESH*").strip() or "*ESH*"
     project_id = sanitize_filename(file.filename)
-    
+
     # Ensure unique project_id
     base_id = project_id
     counter = 1
-    while get_project_path(project_id).exists():
+    while project_path(project_id).exists():
         project_id = f"{base_id}_{counter}"
         counter += 1
 
-    saved = UPLOAD_DIR / file.filename
+    # Le nom d'origine ne doit jamais servir tel quel de chemin : on repart de
+    # l'identifiant assaini (le titre du chapitre en est dérivé de la même façon).
+    saved = UPLOAD_DIR / f"{project_id}.docx"
     file.save(saved)
 
     try:
-        chunks = parse_docx(saved, deck_prefix)
+        chunks, assets, warnings = parse_docx(
+            saved, deck_prefix, project_id=project_id,
+            title_stem=Path(file.filename).stem,
+        )
     except Exception as e:
-        return render_template("upload.html", error=f"Erreur de parsing : {e}", projects=[]), 500
+        return render_template(
+            "upload.html", error=f"Erreur de parsing : {e}", projects=list_projects()
+        ), 500
 
     if not chunks:
         return (
             render_template(
                 "upload.html",
                 error="Aucun chunk détecté dans ce document.",
-                projects=[]
+                projects=list_projects(),
             ),
             400,
         )
 
-    prompts = build_prompts(chunks)
-    save_prompts(project_id, prompts)
+    project = {
+        "version": PROJECT_VERSION,
+        "deck_prefix": deck_prefix,
+        "source": file.filename,
+        "assets": assets,
+        "warnings": warnings,
+        "prompts": build_prompts(chunks, assets),
+    }
+    save_project(project_id, project)
     return redirect(url_for("work", project_id=project_id))
 
 
 @app.route("/work/<project_id>")
 def work(project_id):
-    prompts = load_prompts(project_id)
-    if not prompts:
+    project = load_project(project_id)
+    if not project:
         return redirect(url_for("index"))
     return render_template(
         "work.html",
         project_id=project_id,
-        prompts=prompts,
-        progress=progress(prompts),
+        prompts=project_view(project, project_id),
+        system_prompt=project["prompts"][0].get("system") or SYSTEM_PROMPT,
+        progress=progress(project),
+        missing_alt=missing_alt_count(project),
+        warnings=project.get("warnings", []),
     )
 
 
+# ──────────────────────────────────────────────────────────────
+# Médias
+# ──────────────────────────────────────────────────────────────
+@app.route("/media/<project_id>/<filename>")
+def media(project_id, filename):
+    """Sert une image extraite du .docx (aperçu dans l'app)."""
+    if not SAFE_MEDIA_NAME.match(filename) or not SAFE_MEDIA_NAME.match(project_id.replace(" ", "_")):
+        abort(404)
+    directory = MEDIA_DIR / project_id
+    if not directory.is_dir():
+        abort(404)
+    return send_from_directory(directory, filename, max_age=3600)
+
+
+@app.route("/api/asset/<project_id>/<asset_id>", methods=["POST"])
+def api_asset(project_id, asset_id):
+    """Édition du texte alternatif d'une image → re-rend les prompts concernés."""
+    project = require_project(project_id)
+    data = request.get_json(silent=True) or {}
+    alt = (data.get("alt") or "").strip()
+
+    try:
+        touched = set_asset_alt(project, asset_id, alt)
+    except KeyError:
+        return jsonify(error=f"asset {asset_id} introuvable"), 404
+
+    save_project(project_id, project)
+    prompts = {
+        p["id"]: prompt_view(project, project_id, p)
+        for p in project["prompts"] if p["id"] in touched
+    }
+    return jsonify(
+        ok=True,
+        asset_id=asset_id,
+        alt=alt,
+        updated=sorted(touched),
+        prompts=list(prompts.values()),
+        missing_alt=missing_alt_count(project),
+    )
+
+
+# ──────────────────────────────────────────────────────────────
+# API travail
+# ──────────────────────────────────────────────────────────────
 @app.route("/api/save/<project_id>", methods=["POST"])
 def api_save(project_id):
-    prompts = load_prompts(project_id)
-    if not prompts:
+    project = load_project(project_id)
+    if not project:
         return jsonify(error="Projet introuvable."), 404
 
     data = request.get_json(silent=True) or {}
@@ -181,64 +228,85 @@ def api_save(project_id):
     response = (data.get("response") or "").strip()
     mark_done = bool(data.get("mark_done", True))
 
-    for p in prompts:
+    for p in project["prompts"]:
         if p["id"] == chunk_id:
             p["response"] = response
             if response and mark_done:
                 p["status"] = "done"
             elif not response:
                 p["status"] = "pending"
-            save_prompts(project_id, prompts)
+            save_project(project_id, project)
             cards = parse_tsv_response(response) if response else []
             return jsonify(
                 ok=True,
                 id=chunk_id,
                 status=p["status"],
                 cards_detected=len(cards),
-                progress=progress(prompts),
+                progress=progress(project),
             )
 
     return jsonify(error=f"chunk {chunk_id} introuvable"), 404
 
 
+@app.route("/api/preview/<project_id>", methods=["POST"])
+def api_preview(project_id):
+    """
+    Aperçu des cartes : parse la réponse TSV et résout {{IMG:n}} / {{TABLE:n}}
+    avec des URL servies par l'app (et non les noms plats d'Anki).
+    """
+    project = require_project(project_id)
+    data = request.get_json(silent=True) or {}
+    try:
+        chunk_id = int(data.get("id"))
+    except (TypeError, ValueError):
+        return jsonify(error="id manquant ou invalide"), 400
+
+    prompt = next((p for p in project["prompts"] if p["id"] == chunk_id), None)
+    if prompt is None:
+        return jsonify(error=f"chunk {chunk_id} introuvable"), 404
+
+    response = data.get("response")
+    if response is None:
+        response = prompt.get("response", "")
+
+    assets = project.get("assets", {})
+    prefix = media_url_prefix(project_id)
+    cards, unknown = [], []
+    for question, answer in parse_tsv_response(response):
+        q, _, unk_q = resolve_placeholders(question, prompt, assets, prefix)
+        a, _, unk_a = resolve_placeholders(answer, prompt, assets, prefix)
+        unknown.extend(unk_q + unk_a)
+        cards.append({"question": q, "answer": a})
+
+    return jsonify(ok=True, cards=cards, count=len(cards), unknown_placeholders=unknown)
+
+
 @app.route("/api/state/<project_id>")
 def api_state(project_id):
-    prompts = load_prompts(project_id)
-    if not prompts:
+    project = load_project(project_id)
+    if not project:
         return jsonify(prompts=[], progress={"total": 0, "done": 0, "pending": 0})
-    return jsonify(prompts=prompts, progress=progress(prompts))
+    return jsonify(
+        prompts=project_view(project, project_id),
+        progress=progress(project),
+        missing_alt=missing_alt_count(project),
+    )
 
 
+# ──────────────────────────────────────────────────────────────
+# Export
+# ──────────────────────────────────────────────────────────────
 @app.route("/export.tsv/<project_id>")
 def export_tsv(project_id):
-    prompts = load_prompts(project_id)
-    if not prompts:
-        abort(404)
-
+    project = require_project(project_id)
     only_done = request.args.get("only_done") == "1"
 
-    buf = io.StringIO()
-    writer = csv.writer(buf, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
-    writer.writerow(["#deck column:1"])
-    writer.writerow(["#html:true"])
-    total = 0
-    for p in prompts:
-        response = (p.get("response") or "").strip()
-        if not response:
-            continue
-        if only_done and p.get("status") != "done":
-            continue
-        for question, reponse in parse_tsv_response(response):
-            writer.writerow([p.get("deck", "ESH"), question, reponse])
-            total += 1
+    rows, report = export_rows(project, only_done=only_done)
+    data = tsv_bytes(rows)
 
-    buf.seek(0)
-    data = buf.getvalue().encode("utf-8")
-    
-    # Save a copy locally as well, prefixed with project_id
-    csv_path = _DATA_DIR / f"{project_id}_export.tsv"
-    csv_path.write_bytes(data)
-    
+    # Copie locale, à côté des autres données de l'app
+    (EXPORT_DIR / f"{project_id}_export.tsv").write_bytes(data)
+
     return send_file(
         io.BytesIO(data),
         mimetype="text/tab-separated-values; charset=utf-8",
@@ -247,16 +315,92 @@ def export_tsv(project_id):
     )
 
 
-@app.route("/delete/<project_id>", methods=["POST"])
-def delete_project(project_id):
-    path = get_project_path(project_id)
-    if path.exists():
-        path.unlink()
+@app.route("/export.zip/<project_id>")
+def export_zip(project_id):
+    """TSV + images utilisées, dans une archive prête à décompresser."""
+    project = require_project(project_id)
+    only_done = request.args.get("only_done") == "1"
+
+    rows, report = export_rows(project, only_done=only_done)
+    media_dir = MEDIA_DIR / project_id
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{project_id}_export.tsv", tsv_bytes(rows))
+        for name in report["media"]:
+            src = media_dir / name
+            if src.exists():
+                zf.write(src, f"media/{name}")
+        zf.writestr(
+            "LISEZ-MOI.txt",
+            "\r\n".join([
+                f"Export Anki-Gen — {project_id}",
+                "",
+                f"{report['cards']} carte(s), {len(report['media'])} image(s).",
+                "",
+                "1. Copiez TOUT le contenu du dossier media/ dans le dossier",
+                "   collection.media de votre profil Anki (Anki doit être fermé) :",
+                "   Windows : %APPDATA%\\Anki2\\<profil>\\collection.media",
+                "2. Dans Anki : Fichier > Importer, choisissez le fichier .tsv.",
+                "   Le séparateur (tabulation), le HTML et la colonne de deck sont",
+                "   déjà déclarés dans l'en-tête du fichier.",
+                "",
+                "Astuce : le bouton « Copier les médias dans Anki » de l'application",
+                "fait l'étape 1 automatiquement.",
+            ]),
+        )
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"{project_id}_export.zip",
+    )
+
+
+@app.route("/api/export/report/<project_id>")
+def api_export_report(project_id):
+    """Rapport d'export (cartes, images utilisées, placeholders orphelins)."""
+    project = require_project(project_id)
+    only_done = request.args.get("only_done") == "1"
+    _, report = export_rows(project, only_done=only_done)
+    report["anki_profiles"] = paths.anki_media_dirs()
+    return jsonify(report)
+
+
+@app.route("/api/export/anki-media/<project_id>", methods=["POST"])
+def api_export_anki_media(project_id):
+    """
+    Copie les images utilisées dans le dossier collection.media d'un profil Anki.
+    Le profil doit être choisi explicitement côté interface.
+    """
+    project = require_project(project_id)
+    data = request.get_json(silent=True) or {}
+    destination = (data.get("path") or "").strip()
+    only_done = bool(data.get("only_done"))
+
+    allowed = {p["path"] for p in paths.anki_media_dirs()}
+    if destination not in allowed:
+        return jsonify(error="Dossier collection.media inconnu ou introuvable."), 400
+
+    _, report = export_rows(project, only_done=only_done)
+    if not report["media"]:
+        return jsonify(ok=True, result={"copied": [], "identical": [], "conflicts": [],
+                                        "missing": [], "destination": destination},
+                       message="Aucune image utilisée par les cartes.")
+
+    result = copy_media(project_id, report["media"], Path(destination))
+    return jsonify(ok=True, result=result)
+
+
+@app.route("/delete/<project_id>", methods=["POST"], endpoint="delete_project")
+def delete_project_route(project_id):
+    delete_project(project_id)
     return redirect(url_for("index"))
 
-
-# ── Auto-update endpoints ─────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────
+# Auto-update (repris de main)
+# ──────────────────────────────────────────────────────────────
 @app.route("/api/update/check")
 def api_update_check():
     """Vérifie si une mise à jour est disponible (sans l'appliquer)."""
@@ -292,5 +436,8 @@ def api_version():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="127.0.0.1", port=5000)
+    import os
 
+    # ANKI_GEN_PORT permet de lancer le serveur de dev sans entrer en conflit
+    # avec l'app packagée, qui occupe déjà le port 5000.
+    app.run(debug=True, host="127.0.0.1", port=int(os.environ.get("ANKI_GEN_PORT", 5000)))

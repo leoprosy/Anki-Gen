@@ -1,51 +1,129 @@
 <!doctype html>
 <html lang="fr">
 
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Anki ESH Generator{% endblock %}</title>
-    <meta name="description" content="Générateur de flashcards Anki à partir de cours .docx">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  </head>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}Anki ESH Generator{% endblock %}</title>
+  <meta name="description" content="Générateur de flashcards Anki à partir de cours .docx">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
 
-  <body>
-    <header>
-      <h1>
-        <a href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 8px;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round" style="color: var(--accent);">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="3" y1="9" x2="21" y2="9"></line>
-            <line x1="9" y1="21" x2="9" y2="9"></line>
-          </svg>
-          Anki ESH
-        </a>
-      </h1>
-      {% block header_extra %}{% endblock %}
+<body class="{% block body_class %}{% endblock %}">
+
+  <!-- ── Bibliothèque d'icônes (référencées via <use href="#i-..."> ) ── -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <g id="s" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></g>
+    </defs>
+    <symbol id="i-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path>
+    </symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>
+    </symbol>
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </symbol>
+    <symbol id="i-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+      <rect x="8" y="2" width="8" height="4" rx="1"></rect><path d="M9 14h6M9 18h4"></path>
+    </symbol>
+    <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+      <polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>
+    </symbol>
+    <symbol id="i-save-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9l4 4v4"></path>
+      <polyline points="14 19 17 22 22 17"></polyline>
+    </symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>
+    </symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z"></path>
+    </symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </symbol>
+    <symbol id="i-next" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </symbol>
+    <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>
+      <line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
+    </symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+    </symbol>
+    <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 12 15 15"></polyline>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+    </symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"></circle>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+    </symbol>
+  </svg>
+
+  <div class="shell {% block shell_class %}{% endblock %}">
+
+    <header class="topbar">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="Accueil Anki ESH">
+        <svg width="22" height="22" aria-hidden="true"><use href="#i-logo"></use></svg>
+        <span class="brand__name">Anki ESH</span>
+      </a>
+      {% block topbar %}<div class="topbar__spacer"></div>{% endblock %}
     </header>
 
     <!-- Bandeau de mise à jour (masqué par défaut) -->
     <div id="update-banner" class="update-banner">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-        stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="23 4 23 10 17 10"></polyline>
-        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-      </svg>
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-refresh"></use></svg>
       <span id="update-message"></span>
-      <button id="update-btn" class="update-apply" onclick="applyUpdate()">Mettre à jour</button>
-      <button class="update-dismiss" onclick="document.getElementById('update-banner').style.display='none'">✕</button>
+      <button id="update-btn" type="button" class="update-apply">Mettre à jour</button>
+      <button type="button" class="update-dismiss" id="update-dismiss" aria-label="Masquer">✕</button>
     </div>
 
-    <main>
-      {% block content %}{% endblock %}
-    </main>
+    {% block shell_body %}{% endblock %}
+  </div>
 
-    <script>
-    // ── Vérification silencieuse des mises à jour au démarrage ──
+  <div class="toast-zone" id="toast-zone" aria-live="polite"></div>
+
+  <script>
+    // ── Toast global ────────────────────────────────────────────
+    window.toast = function (message, kind, ms) {
+      const zone = document.getElementById('toast-zone');
+      if (!zone) return;
+      const el = document.createElement('div');
+      el.className = 'toast' + (kind ? ' ' + kind : '');
+      el.textContent = message;
+      zone.appendChild(el);
+      setTimeout(() => {
+        el.classList.add('out');
+        setTimeout(() => el.remove(), 220);
+      }, ms || 2200);
+    };
+
+    // ── Vérification silencieuse des mises à jour ───────────────
+    const updBanner = document.getElementById('update-banner');
+    const updBtn = document.getElementById('update-btn');
+    document.getElementById('update-dismiss').addEventListener('click', () => {
+      updBanner.style.display = 'none';
+    });
+
     async function checkUpdate() {
       try {
         const res = await fetch('/api/update/check');
@@ -53,37 +131,35 @@
         if (data.update_available) {
           document.getElementById('update-message').textContent =
             `Version ${data.remote_version} disponible`;
-          document.getElementById('update-banner').style.display = 'flex';
+          updBanner.style.display = 'flex';
         }
-      } catch (_) {} // Silencieux si hors-ligne
+      } catch (_) { /* silencieux hors-ligne */ }
     }
 
-    async function applyUpdate() {
-      const btn = document.getElementById('update-btn');
-      btn.textContent = 'Mise à jour…';
-      btn.disabled = true;
+    updBtn.addEventListener('click', async () => {
+      updBtn.textContent = 'Mise à jour…';
+      updBtn.disabled = true;
       try {
         const res = await fetch('/api/update/apply', { method: 'POST' });
         const data = await res.json();
+        document.getElementById('update-message').textContent = data.message;
         if (data.status === 'updated') {
-          document.getElementById('update-message').textContent = data.message;
-          btn.textContent = 'Redémarrer';
-          btn.disabled = false;
-          btn.onclick = () => location.reload();
+          updBtn.textContent = 'Redémarrer';
+          updBtn.onclick = () => location.reload();
         } else {
-          document.getElementById('update-message').textContent = data.message;
-          btn.textContent = 'Réessayer';
-          btn.disabled = false;
+          updBtn.textContent = 'Réessayer';
         }
       } catch (e) {
         document.getElementById('update-message').textContent = 'Erreur réseau.';
-        btn.textContent = 'Réessayer';
-        btn.disabled = false;
+        updBtn.textContent = 'Réessayer';
       }
-    }
+      updBtn.disabled = false;
+    });
 
     window.addEventListener('load', () => setTimeout(checkUpdate, 1500));
-    </script>
-  </body>
+  </script>
+
+  {% block scripts %}{% endblock %}
+</body>
 
 </html>

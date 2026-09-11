@@ -1,126 +1,122 @@
 {% extends "base.html" %}
-{% block content %}
+{% block title %}Anki ESH — Accueil{% endblock %}
 
-<div
-  style="display: flex; gap: var(--space-xl); align-items: flex-start; max-width: 1400px; margin: 0 auto; flex-wrap: wrap;">
-  {% if projects %}
-  <section class="card" style="flex: 1; min-width: 350px;">
-    <h2 style="margin-bottom: var(--space-md);">Reprendre un cours</h2>
-    <div style="display: flex; flex-direction: column; gap: 12px;">
-      {% for proj in projects %}
-      <div
-        style="background: var(--surface-alt); padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <h4 style="margin: 0 0 4px; font-size: 15px;">{{ proj.id }}</h4>
-          <div class="muted" style="font-size: 12px;">
-            Deck : {{ proj.deck }} &nbsp;&middot;&nbsp;
-            Progression : {{ proj.progress.done }}/{{ proj.progress.total }} ({{ ((proj.progress.done /
-            proj.progress.total) * 100)|int if proj.progress.total else 0 }}%)
-            {% if proj.images or proj.tables %}
-            &nbsp;&middot;&nbsp;
-            {% if proj.images %}🖼️ {{ proj.images }} image(s){% endif %}
-            {% if proj.images and proj.tables %} · {% endif %}
-            {% if proj.tables %}▦ {{ proj.tables }} tableau(x){% endif %}
-            {% endif %}
+{% block shell_body %}
+<main class="page">
+  <div class="page__head">
+    <h2>Générateur de cartes Anki</h2>
+    <p>Découpe un cours <code>.docx</code> en paragraphes, envoie-les à Claude, colle les réponses, exporte.</p>
+  </div>
+
+  <div class="home-grid">
+    <section class="card">
+      <h3>Nouveau cours</h3>
+      <p class="muted">
+        Le document est découpé selon les titres et la numérotation (I. / A) / 1)).
+        Chaque chunk donne un prompt à coller dans Claude.
+      </p>
+
+      {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+      <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
+        <div class="field">
+          <span>Fichier .docx</span>
+          <div class="drop-zone" id="drop-zone" tabindex="0" role="button"
+            aria-label="Choisir un fichier .docx">
+            <span class="drop-zone__icon" id="drop-icon">
+              <svg width="30" height="30" aria-hidden="true"><use href="#i-file"></use></svg>
+            </span>
+            <span class="drop-zone__prompt">Glissez-déposez votre fichier ici, ou cliquez pour parcourir</span>
+            <input type="file" name="docx" accept=".docx" id="file-input" required class="drop-zone__input">
           </div>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <a href="{{ url_for('work', project_id=proj.id) }}" class="btn primary"
-            style="padding: 8px 12px; font-size: 13px;">Continuer</a>
-          <form action="{{ url_for('delete_project', project_id=proj.id) }}" method="post"
-            onsubmit="return confirm('Supprimer ce projet définitivement ?');" style="margin: 0;">
-            <button type="submit" class="btn ghost"
-              style="color: var(--error); padding: 8px 12px; font-size: 13px;">Supprimer</button>
-          </form>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
 
-  <section class="card" style="flex: 1; min-width: 350px;">
-    <h2>Nouveau cours</h2>
-    <p class="muted" style="margin-bottom: var(--space-lg);">
-      Choisis un fichier <code>.docx</code>. Le document sera découpé en paragraphes
-      selon les titres et la numérotation (I. / A) / 1)). Chaque chunk donnera
-      lieu à un prompt à coller dans Claude.
-    </p>
-
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
-
-    <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
-      <div class="field">
-        <span>Fichier .docx</span>
-        <div class="drop-zone" id="drop-zone">
-          <span class="drop-zone__icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="18" x2="12" y2="12"></line>
-              <polyline points="9 15 12 12 15 15"></polyline>
-            </svg>
-          </span>
-          <span class="drop-zone__prompt">Glissez-déposez votre fichier ici, ou cliquez pour parcourir</span>
-          <input type="file" name="docx" accept=".docx" id="file-input" required class="drop-zone__input">
-        </div>
-      </div>
-
-      <label class="field">
-        <span>Préfixe de deck Anki</span>
-        <div style="position: relative;">
+        <label class="field">
+          <span>Préfixe de deck Anki</span>
           <input type="text" name="deck_prefix" value="*ESH*" required>
+        </label>
+
+        <button type="submit" class="primary w-full">Parser et continuer</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h3>Reprendre un cours</h3>
+      <p class="muted">{{ projects|length }} projet(s) en cours sur cette machine.</p>
+
+      {% if projects %}
+      <div class="project-list">
+        {% for proj in projects %}
+        {% set pct = ((proj.progress.done / proj.progress.total) * 100)|int if proj.progress.total else 0 %}
+        <div class="project-row">
+          <div class="project-row__main">
+            <h4>{{ proj.id }}</h4>
+            <div class="muted">
+              {{ proj.deck }} &middot; {{ proj.progress.done }}/{{ proj.progress.total }} ({{ pct }}%)
+              {% if proj.images %} &middot; 🖼️ {{ proj.images }}{% endif %}
+              {% if proj.tables %} &middot; ▦ {{ proj.tables }}{% endif %}
+            </div>
+            <div class="mini-bar"><span style="width: {{ pct }}%"></span></div>
+          </div>
+          <div class="project-row__actions">
+            <a href="{{ url_for('work', project_id=proj.id) }}" class="btn primary sm">Continuer</a>
+            <form action="{{ url_for('delete_project', project_id=proj.id) }}" method="post"
+              onsubmit="return confirm('Supprimer ce projet définitivement ?');">
+              <button type="submit" class="btn danger sm">Supprimer</button>
+            </form>
+          </div>
         </div>
-      </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">Aucun projet pour l'instant — commence par importer un .docx.</div>
+      {% endif %}
+    </section>
+  </div>
+</main>
+{% endblock %}
 
-      <button type="submit" class="primary w-full">Parser et continuer</button>
-    </form>
-  </section>
-</div>
-
+{% block scripts %}
 <script>
-  const dropZone = document.getElementById('drop-zone');
-  const fileInput = document.getElementById('file-input');
-  const promptText = dropZone.querySelector('.drop-zone__prompt');
-  const icon = dropZone.querySelector('.drop-zone__icon');
+  (() => {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const promptText = dropZone.querySelector('.drop-zone__prompt');
+    const icon = document.getElementById('drop-icon');
 
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  dropZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    dropZone.classList.add('drop-zone--over');
-  });
-
-  ['dragleave', 'dragend'].forEach(type => {
-    dropZone.addEventListener(type, () => {
-      dropZone.classList.remove('drop-zone--over');
+    const open = () => fileInput.click();
+    dropZone.addEventListener('click', open);
+    dropZone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
     });
-  });
 
-  dropZone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    if (e.dataTransfer.files.length) {
-      fileInput.files = e.dataTransfer.files;
-      updateFileNameDisplay();
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drop-zone--over');
+    });
+    ['dragleave', 'dragend'].forEach(type =>
+      dropZone.addEventListener(type, () => dropZone.classList.remove('drop-zone--over')));
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drop-zone--over');
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        updateFileName();
+      }
+    });
+
+    fileInput.addEventListener('change', updateFileName);
+
+    function updateFileName() {
+      const has = fileInput.files.length > 0;
+      promptText.textContent = has
+        ? fileInput.files[0].name
+        : 'Glissez-déposez votre fichier ici, ou cliquez pour parcourir';
+      promptText.classList.toggle('selected', has);
+      icon.innerHTML = `<svg width="30" height="30" aria-hidden="true"><use href="#i-${has ? 'check' : 'file'}"></use></svg>`;
+      icon.style.color = has ? 'var(--success)' : '';
     }
-    dropZone.classList.remove('drop-zone--over');
-  });
-
-  fileInput.addEventListener('change', updateFileNameDisplay);
-
-  function updateFileNameDisplay() {
-    if (fileInput.files.length > 0) {
-      promptText.textContent = fileInput.files[0].name;
-      promptText.classList.add('selected');
-      icon.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
-      icon.style.color = "var(--success)";
-    } else {
-      promptText.textContent = "Glissez-déposez votre fichier ici, ou cliquez pour parcourir";
-      promptText.classList.remove('selected');
-      icon.innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><polyline points="9 15 12 12 15 15"></polyline></svg>';
-      icon.style.color = "var(--text-tertiary)";
-    }
-  }
+  })();
 </script>
 {% endblock %}

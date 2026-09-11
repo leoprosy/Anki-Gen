@@ -1,17 +1,32 @@
 {% extends "base.html" %}
-{% block title %}Travail — Anki ESH{% endblock %}
+{% block title %}{{ project_id }} — Anki ESH{% endblock %}
+{% block shell_class %}shell--fixed{% endblock %}
 
-{% block header_extra %}
-<div class="progress-wrap">
-  <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
-  <div class="progress-bar"><div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div></div>
+{% block topbar %}
+<button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="Liste des chunks" aria-expanded="false"
+  title="Liste des chunks">
+  <svg width="18" height="18" aria-hidden="true"><use href="#i-list"></use></svg>
+</button>
 
-  <details class="export-menu" id="export-menu">
-    <summary class="btn">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-      Exporter
+<div class="topbar__context">
+  <span class="project-name" title="{{ project_id }}">{{ project_id }}</span>
+  <div class="topbar__spacer"></div>
+  <div class="progress" title="Chunks enregistrés">
+    <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
+    <div class="progress-bar" role="progressbar" aria-label="Progression">
+      <div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
+    </div>
+  </div>
+</div>
+
+<div class="topbar__actions">
+  <details class="menu" id="export-menu">
+    <summary title="Exporter">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
+      <span class="lbl">Exporter</span>
     </summary>
-    <div class="export-panel">
+    <div class="menu__panel">
+      <div class="menu__title">Exporter</div>
       <div class="export-report" id="export-report">Calcul du rapport…</div>
       <a class="export-item" href="{{ url_for('export_tsv', project_id=project_id) }}">
         <strong>TSV seul</strong>
@@ -25,152 +40,171 @@
         <strong>Copier les médias dans Anki</strong>
         <span class="muted">Directement dans collection.media (Anki fermé)</span>
       </button>
+      <button type="button" class="export-item" id="copy-system-btn">
+        <strong>Copier le prompt système</strong>
+        <span class="muted">À coller une fois dans le projet Claude</span>
+      </button>
       <div class="export-profiles" id="export-profiles" hidden></div>
       <div class="export-status muted" id="export-status"></div>
     </div>
   </details>
 
-  <a class="btn ghost" href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 6px;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-    Accueil
+  <a class="btn ghost" href="{{ url_for('index') }}" title="Accueil">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-home"></use></svg>
+    <span class="lbl">Accueil</span>
   </a>
 </div>
 {% endblock %}
 
-{% block content %}
-<div class="layout">
-  <aside class="sidebar">
-    <h3>Chunks</h3>
+{% block shell_body %}
+<main class="work">
+  <!-- ── Rail des chunks (tiroir sous 1180px) ─────────────────── -->
+  <aside class="rail" id="rail" aria-label="Liste des paragraphes">
+    <div class="rail__head">
+      <span class="rail__title">Chunks</span>
+      <button type="button" class="icon-btn rail__close" id="rail-close" aria-label="Fermer la liste">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
     <ol class="chunk-list" id="chunk-list">
       {% for p in prompts %}
-        <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
-          <button type="button" class="chunk-btn">
-            <span class="dot-wrapper">
-              <svg class="icon-pending" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
-              <svg class="icon-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            </span>
-            <span class="chunk-id">#{{ p.id }}</span>
-            <span class="chunk-deck">{{ p.deck }}</span>
-            <span class="chunk-badges">
-              {% if p.images %}<span class="badge badge-img" title="{{ p.images|length }} image(s)">🖼️{{ p.images|length }}</span>{% endif %}
-              {% if p.tables %}<span class="badge badge-table" title="{{ p.tables|length }} tableau(x)">▦{{ p.tables|length }}</span>{% endif %}
-            </span>
-          </button>
-        </li>
+      <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
+        <button type="button" class="chunk-btn">
+          <span class="dot-wrapper">
+            <svg class="icon-pending" width="12" height="12" aria-hidden="true"><use href="#i-circle"></use></svg>
+            <svg class="icon-done" width="14" height="14" aria-hidden="true"><use href="#i-check"></use></svg>
+          </span>
+          <span class="chunk-id">#{{ p.id }}</span>
+          <span class="chunk-deck">{{ p.deck }}</span>
+          <span class="chunk-badges">
+            {% if p.images %}<span class="badge" title="{{ p.images|length }} image(s)">🖼️{{ p.images|length }}</span>{% endif %}
+            {% if p.tables %}<span class="badge" title="{{ p.tables|length }} tableau(x)">▦{{ p.tables|length }}</span>{% endif %}
+          </span>
+        </button>
+      </li>
       {% endfor %}
     </ol>
   </aside>
+  <div class="rail-scrim" id="rail-scrim"></div>
 
-  <section class="workspace">
+  <!-- ── Panneaux ─────────────────────────────────────────────── -->
+  <section class="panes">
     {% if warnings %}
     <div class="warn-banner">
       {% for w in warnings %}<div>⚠️ {{ w }}</div>{% endfor %}
     </div>
     {% endif %}
 
-    <div class="chunk-view" id="chunk-view">
-      <header class="chunk-header">
-        <div>
-          <div class="muted">Chunk <span id="cur-id"></span> / Deck</div>
-          <div class="deck-name" id="cur-deck"></div>
-        </div>
-        <div class="nav-btns">
-          <button type="button" id="prev-btn" style="display: flex; align-items: center; gap: 4px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            Précédent
-          </button>
-          <button type="button" id="next-btn" style="display: flex; align-items: center; gap: 4px;">
-            Suivant
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </button>
-        </div>
-      </header>
+    <div class="tabbar" id="tabbar" role="tablist">
+      <button type="button" role="tab" data-tab="source" class="active" aria-selected="true">Cours</button>
+      <button type="button" role="tab" data-tab="answer" aria-selected="false">
+        Réponse<span class="tab-flag" id="tab-flag" hidden></span>
+      </button>
+    </div>
 
-      <section class="block">
-        <div class="block-head">
-          <h4>Paragraphe à envoyer à Claude</h4>
-          <div class="head-actions">
+    <div class="panes__grid" id="panes-grid" data-active="source">
+
+      <!-- Paragraphe source -->
+      <article class="pane" data-pane="source" role="tabpanel" aria-label="Paragraphe du cours">
+        <header class="pane__head">
+          <div class="pane__title">
+            <span class="chunk-index" id="cur-id">#0</span>
+            <span class="deck-name" id="cur-deck"></span>
+          </div>
+          <div class="pane__tools">
             <div class="seg" id="view-toggle">
               <button type="button" data-view="preview" class="active">Aperçu</button>
               <button type="button" data-view="text">Texte</button>
             </div>
-            <button type="button" class="copy-btn" data-copy-target="#cur-prompt">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              <span>Copier</span>
-            </button>
           </div>
+        </header>
+        <div class="pane__body">
+          <div id="cur-preview" class="chunk-preview"></div>
+          <pre id="cur-prompt" class="prompt-text" hidden></pre>
+          <div id="alt-panel" class="alt-panel"></div>
         </div>
-        <div id="cur-preview" class="chunk-preview"></div>
-        <pre id="cur-prompt" class="prompt-text" hidden></pre>
-        <div id="alt-panel" class="alt-panel"></div>
-      </section>
+      </article>
 
-      <section class="block">
-        <div class="block-head">
-          <h4>Réponse de Claude (TSV : QUESTION&#9;RÉPONSE)</h4>
-          <div class="head-actions">
-            <div class="seg" id="answer-toggle">
-              <button type="button" data-answer="edit" class="active">Réponse</button>
-              <button type="button" data-answer="cards">Aperçu cartes</button>
-            </div>
+      <!-- Réponse de Claude -->
+      <article class="pane" data-pane="answer" role="tabpanel" aria-label="Réponse de Claude">
+        <header class="pane__head">
+          <div class="pane__title">
+            <span class="pane__label">Réponse de Claude</span>
+            <span class="muted mono">QUESTION⇥RÉPONSE</span>
+          </div>
+          <div class="pane__tools">
             <span class="muted" id="cards-info"></span>
+            <div class="seg" id="answer-toggle">
+              <button type="button" data-answer="edit" class="active">Texte</button>
+              <button type="button" data-answer="cards">Cartes</button>
+            </div>
           </div>
-        </div>
-
-        <div id="insert-bar" class="insert-bar"></div>
-
-        <div class="response-container" id="response-container">
-          <textarea id="response" placeholder="Colle ici la réponse de Claude pour ce paragraphe... ou dépose un fichier texte"></textarea>
-          <div class="response-overlay">
-            <span class="drop-zone__icon" style="color: var(--accent); margin-bottom: 8px;">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="12" y1="18" x2="12" y2="12"></line>
-                <polyline points="9 15 12 12 15 15"></polyline>
-              </svg>
-            </span>
-            <span>Déposez le fichier TSV/TXT ici</span>
+        </header>
+        <div class="pane__body pane__body--flush">
+          <div id="insert-bar" class="insert-bar"></div>
+          <div class="response-container" id="response-container">
+            <textarea id="response" spellcheck="false"
+              placeholder="Colle ici la réponse de Claude pour ce paragraphe… ou dépose un fichier TSV/TXT"></textarea>
+            <div class="response-overlay">
+              <svg width="30" height="30" aria-hidden="true"><use href="#i-file"></use></svg>
+              <span>Déposez le fichier TSV/TXT ici</span>
+            </div>
           </div>
+          <div id="cards-preview" class="cards-preview" hidden></div>
         </div>
+      </article>
 
-        <div id="cards-preview" class="cards-preview" hidden></div>
-
-        <div class="actions">
-          <button type="button" id="paste-btn" class="btn ghost" title="Coller depuis le presse-papier">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            Coller
-          </button>
-          <button type="button" id="save-btn" class="primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            Enregistrer
-          </button>
-          <button type="button" id="save-next-btn" class="primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            Enregistrer & Suivant
-          </button>
-          <span id="save-status" class="muted"></span>
-        </div>
-      </section>
     </div>
   </section>
-</div>
+</main>
 
+<!-- ── Dock d'actions : visible à toutes les tailles ──────────── -->
+<footer class="dock" aria-label="Actions">
+  <div class="dock__group">
+    <button type="button" class="icon-btn" id="prev-btn" title="Chunk précédent (Alt+←)" aria-label="Chunk précédent">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-prev"></use></svg>
+    </button>
+    <span class="counter" id="dock-counter"></span>
+    <button type="button" class="icon-btn" id="next-btn" title="Chunk suivant (Alt+→)" aria-label="Chunk suivant">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
+    </button>
+  </div>
+
+  <div class="dock__sep"></div>
+
+  <div class="dock__group">
+    <button type="button" class="btn" id="copy-btn" title="Copier le paragraphe (Ctrl+Maj+C)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+      <span class="lbl">Copier</span>
+    </button>
+    <button type="button" class="btn" id="paste-btn" title="Coller la réponse (Ctrl+Maj+V)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
+      <span class="lbl">Coller</span>
+    </button>
+    <button type="button" class="btn" id="preview-btn" title="Aperçu des cartes (Ctrl+Maj+P)" aria-pressed="false">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-eye"></use></svg>
+      <span class="lbl">Aperçu</span>
+    </button>
+  </div>
+
+  <div class="dock__group dock__group--main">
+    <button type="button" class="btn" id="save-btn" title="Enregistrer (Ctrl+S)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
+      <span class="lbl">Enregistrer</span>
+    </button>
+    <button type="button" class="btn primary btn-save-next" id="save-next-btn" title="Enregistrer et passer au suivant (Ctrl+Entrée)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-save-next"></use></svg>
+      <span class="lbl">Enregistrer &amp; suivant</span>
+    </button>
+  </div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
 <script>
   const PROMPTS = {{ prompts | tojson }};
-  window.__INIT_PROGRESS__ = {{ progress | tojson }};
   window.__PROJECT_ID__ = {{ project_id | tojson }};
+  window.__SYSTEM_PROMPT__ = {{ system_prompt | tojson }};
   window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
   window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";

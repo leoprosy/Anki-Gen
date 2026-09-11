@@ -1,147 +1,186 @@
+/* ============================================================
+   Anki-Gen — logique de la vue « travail »
+   Principe : toutes les actions principales (copier / coller /
+   aperçu / enregistrer / naviguer) vivent dans le dock, qui reste
+   visible quelle que soit la taille de la fenêtre.
+   ============================================================ */
 (() => {
-  const prompts = window.PROMPTS || PROMPTS;
+  const prompts = window.PROMPTS || (typeof PROMPTS !== "undefined" ? PROMPTS : null);
   if (!prompts || !prompts.length) return;
 
+  const $ = (id) => document.getElementById(id);
+
   const els = {
-    list: document.getElementById("chunk-list"),
-    curId: document.getElementById("cur-id"),
-    curDeck: document.getElementById("cur-deck"),
-    curPrompt: document.getElementById("cur-prompt"),
-    curPreview: document.getElementById("cur-preview"),
-    altPanel: document.getElementById("alt-panel"),
-    insertBar: document.getElementById("insert-bar"),
-    response: document.getElementById("response"),
-    responseContainer: document.getElementById("response-container"),
-    cardsPreview: document.getElementById("cards-preview"),
-    saveBtn: document.getElementById("save-btn"),
-    saveNextBtn: document.getElementById("save-next-btn"),
-    saveStatus: document.getElementById("save-status"),
-    prevBtn: document.getElementById("prev-btn"),
-    nextBtn: document.getElementById("next-btn"),
-    progressLabel: document.getElementById("progress-label"),
-    progressFill: document.getElementById("progress-fill"),
-    cardsInfo: document.getElementById("cards-info"),
-    chunkView: document.getElementById("chunk-view"),
-    viewToggle: document.getElementById("view-toggle"),
-    answerToggle: document.getElementById("answer-toggle"),
+    list: $("chunk-list"),
+    rail: $("rail"),
+    railToggle: $("rail-toggle"),
+    railClose: $("rail-close"),
+    railScrim: $("rail-scrim"),
+    tabbar: $("tabbar"),
+    tabFlag: $("tab-flag"),
+    panesGrid: $("panes-grid"),
+    curId: $("cur-id"),
+    curDeck: $("cur-deck"),
+    curPrompt: $("cur-prompt"),
+    curPreview: $("cur-preview"),
+    altPanel: $("alt-panel"),
+    insertBar: $("insert-bar"),
+    response: $("response"),
+    responseContainer: $("response-container"),
+    cardsPreview: $("cards-preview"),
+    cardsInfo: $("cards-info"),
+    viewToggle: $("view-toggle"),
+    answerToggle: $("answer-toggle"),
+    progressLabel: $("progress-label"),
+    progressFill: $("progress-fill"),
+    counter: $("dock-counter"),
+    prevBtn: $("prev-btn"),
+    nextBtn: $("next-btn"),
+    copyBtn: $("copy-btn"),
+    pasteBtn: $("paste-btn"),
+    previewBtn: $("preview-btn"),
+    saveBtn: $("save-btn"),
+    saveNextBtn: $("save-next-btn"),
   };
 
-  const firstPending = prompts.findIndex(p => p.status !== "done");
+  const mqDrawer = window.matchMedia("(max-width: 1180px)");
+  const mqTabs = window.matchMedia("(max-width: 900px)");
+
+  const firstPending = prompts.findIndex((p) => p.status !== "done");
   let currentIdx = firstPending >= 0 ? firstPending : 0;
-  let answerMode = "edit";
+  let answerMode = "edit";       // edit | cards
+  let dirty = false;             // réponse modifiée non enregistrée
 
-  const escapeHtml = (s) => (s || "").replace(/[&<>"]/g, c => (
-    { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]
-  ));
+  const escapeHtml = (s) =>
+    (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-  // ── Chunk transition (cross-fade) ──────────────────────────
-  function transitionChunkView(callback) {
-    if (!els.chunkView) { callback(); return; }
-    els.chunkView.classList.add("switching");
-    setTimeout(() => {
-      callback();
-      els.chunkView.classList.remove("switching");
-    }, 150);
+  const toast = (msg, kind, ms) => window.toast && window.toast(msg, kind, ms);
+
+  // ── Tiroir (rail) ──────────────────────────────────────────
+  function setRail(open) {
+    document.body.classList.toggle("rail-open", open);
+    if (els.railToggle) els.railToggle.setAttribute("aria-expanded", String(open));
+  }
+  els.railToggle && els.railToggle.addEventListener("click", () =>
+    setRail(!document.body.classList.contains("rail-open")));
+  els.railClose && els.railClose.addEventListener("click", () => setRail(false));
+  els.railScrim && els.railScrim.addEventListener("click", () => setRail(false));
+
+  // ── Onglets (petites fenêtres) ─────────────────────────────
+  function setTab(tab) {
+    els.panesGrid.dataset.active = tab;
+    els.tabbar.querySelectorAll("button").forEach((b) => {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", String(on));
+    });
+  }
+  els.tabbar.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-tab]");
+    if (btn) setTab(btn.dataset.tab);
+  });
+  /** Amène le panneau demandé sous les yeux, même en mode onglets. */
+  function focusPane(pane) {
+    if (mqTabs.matches) setTab(pane);
   }
 
-  // ── Panneau texte alternatif ───────────────────────────────
+  // ── Panneau des textes alternatifs ─────────────────────────
   function renderAltPanel(p) {
-    if (!els.altPanel) return;
     const images = p.images || [];
     if (!images.length) { els.altPanel.innerHTML = ""; return; }
 
     els.altPanel.innerHTML = `
       <h5>Descriptions des images <span class="muted">(envoyées à Claude avec le paragraphe)</span></h5>
-      ${images.map(img => `
+      ${images.map((img) => `
         <div class="alt-row ${img.alt ? "" : "alt-row--missing"}" data-asset="${escapeHtml(img.id)}">
           <div class="alt-thumb">
             ${img.url ? `<img src="${escapeHtml(img.url)}" alt="">`
                       : `<span class="alt-thumb--missing">✕</span>`}
           </div>
           <div class="alt-fields">
-            <label class="alt-tag">${img.n ? `{{IMG:${img.n}}}`
-                                          : `image du {{TABLE:${img.in_table}}}`}</label>
+            <label class="alt-tag">${img.n ? `{{IMG:${img.n}}}` : `image du {{TABLE:${img.in_table}}}`}</label>
             <textarea rows="2" class="alt-input"
               placeholder="Décris cette image pour Claude (ce que montre le graphique, ses axes, sa source…)">${escapeHtml(img.alt || "")}</textarea>
           </div>
           <div class="alt-actions">
-            <button type="button" class="btn ghost alt-save">Enregistrer</button>
             <span class="alt-status muted"></span>
+            <button type="button" class="btn sm alt-save">Enregistrer</button>
           </div>
         </div>`).join("")}
     `;
   }
 
   function renderInsertBar(p) {
-    if (!els.insertBar) return;
     const chips = [];
-    (p.images || []).forEach(img => chips.push(`{{IMG:${img.n}}}`));
-    (p.tables || []).forEach(t => chips.push(`{{TABLE:${t.n}}}`));
+    (p.images || []).forEach((img) => { if (img.n) chips.push(`{{IMG:${img.n}}}`); });
+    (p.tables || []).forEach((t) => chips.push(`{{TABLE:${t.n}}}`));
     if (!chips.length) { els.insertBar.innerHTML = ""; els.insertBar.hidden = true; return; }
     els.insertBar.hidden = false;
     els.insertBar.innerHTML =
       `<span class="muted">Insérer :</span>` +
-      chips.map(c => `<button type="button" class="chip" data-insert="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
+      chips.map((c) => `<button type="button" class="chip" data-insert="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
   }
 
+  function setDirty(on) {
+    dirty = on;
+    if (els.tabFlag) els.tabFlag.hidden = !on;
+  }
+
+  // ── Rendu du chunk courant ─────────────────────────────────
   function render() {
     const p = prompts[currentIdx];
     els.curId.textContent = `#${p.id}`;
     els.curDeck.textContent = p.deck;
+    els.curDeck.title = p.deck;
     els.curPrompt.textContent = p.prompt;
     els.curPreview.innerHTML = p.preview_html || `<p class="pv-text">${escapeHtml(p.prompt)}</p>`;
     els.response.value = p.response || "";
     renderAltPanel(p);
     renderInsertBar(p);
     updateCardsInfo();
-    els.saveStatus.textContent = "";
-    els.saveStatus.className = "muted";
-    if (answerMode === "cards") refreshCardsPreview();
+    setDirty(false);
 
     for (const li of els.list.querySelectorAll(".chunk-item")) {
-      const id = parseInt(li.dataset.id, 10);
-      li.classList.toggle("active", id === p.id);
+      li.classList.toggle("active", parseInt(li.dataset.id, 10) === p.id);
     }
 
     els.prevBtn.disabled = currentIdx === 0;
     els.nextBtn.disabled = currentIdx === prompts.length - 1;
+    els.counter.textContent = `${currentIdx + 1}/${prompts.length}`;
 
     const activeLi = els.list.querySelector(".chunk-item.active");
-    if (activeLi) activeLi.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    if (activeLi) activeLi.scrollIntoView({ block: "nearest" });
+
+    els.panesGrid.querySelectorAll(".pane__body").forEach((b) => { b.scrollTop = 0; });
+    if (answerMode === "cards") refreshCardsPreview();
   }
 
   function navigateTo(idx) {
     if (idx < 0 || idx >= prompts.length || idx === currentIdx) return;
-    transitionChunkView(() => {
-      currentIdx = idx;
-      render();
-    });
+    currentIdx = idx;
+    render();
   }
 
   function updateProgress() {
     const total = prompts.length;
-    const done = prompts.filter(p => p.status === "done").length;
+    const done = prompts.filter((p) => p.status === "done").length;
     els.progressLabel.textContent = `${done}/${total}`;
     els.progressFill.style.width = total ? `${(100 * done / total).toFixed(1)}%` : "0%";
   }
 
   function updateCardsInfo() {
     const text = els.response.value.trim();
-    if (!text) {
-      els.cardsInfo.textContent = "";
-      return;
-    }
-    const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.startsWith("```") && !l.startsWith("#"));
-    const cards = lines.filter(l => l.includes("\t") || l.includes(","));
+    if (!text) { els.cardsInfo.textContent = ""; return; }
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("```") && !l.startsWith("#"));
+    const cards = lines.filter((l) => l.includes("\t") || l.includes(","));
     const media = (text.match(/\{\{\s*(IMG|IMAGE|TABLE|TABLEAU)\s*[:\-# ]?\s*\d+\s*\}\}/gi) || []).length;
-    els.cardsInfo.textContent =
-      `${cards.length} carte(s) détectée(s)` + (media ? ` · ${media} média(s) référencé(s)` : "");
+    els.cardsInfo.textContent = `${cards.length} carte(s)` + (media ? ` · ${media} média(s)` : "");
   }
 
   // ── Aperçu des cartes ──────────────────────────────────────
   async function refreshCardsPreview() {
     const p = prompts[currentIdx];
-    els.cardsPreview.innerHTML = `<div class="muted">Rendu…</div>`;
+    els.cardsPreview.innerHTML = `<div class="pane-note empty">Rendu…</div>`;
     try {
       const r = await fetch(window.__API_PREVIEW_URL__, {
         method: "POST",
@@ -152,11 +191,13 @@
       if (!r.ok) throw new Error(data.error || "Erreur");
 
       if (!data.cards.length) {
-        els.cardsPreview.innerHTML = `<div class="muted">Aucune carte à prévisualiser.</div>`;
+        els.cardsPreview.innerHTML =
+          `<div class="pane-note empty">Aucune carte à prévisualiser — colle d'abord la réponse de Claude.</div>`;
         return;
       }
       const warn = data.unknown_placeholders.length
-        ? `<div class="preview-warn">⚠️ Placeholder(s) sans correspondance, supprimé(s) à l'export : ${data.unknown_placeholders.map(escapeHtml).join(", ")}</div>`
+        ? `<div class="pane-note warn">⚠️ Placeholder(s) sans correspondance, supprimé(s) à l'export : ${
+            data.unknown_placeholders.map(escapeHtml).join(", ")}</div>`
         : "";
       els.cardsPreview.innerHTML = warn + data.cards.map((c, i) => `
         <div class="card-preview">
@@ -164,7 +205,7 @@
           <div class="card-side"><span class="card-label">Verso</span><div class="card-body">${c.answer}</div></div>
         </div>`).join("");
     } catch (e) {
-      els.cardsPreview.innerHTML = `<div class="err">✗ ${escapeHtml(e.message)}</div>`;
+      els.cardsPreview.innerHTML = `<div class="pane-note err">✗ ${escapeHtml(e.message)}</div>`;
     }
   }
 
@@ -173,8 +214,12 @@
     const showCards = mode === "cards";
     els.responseContainer.hidden = showCards;
     els.cardsPreview.hidden = !showCards;
-    els.answerToggle.querySelectorAll("button").forEach(b =>
+    els.answerToggle.querySelectorAll("button").forEach((b) =>
       b.classList.toggle("active", b.dataset.answer === mode));
+    els.previewBtn.setAttribute("aria-pressed", String(showCards));
+    els.previewBtn.classList.toggle("copied", showCards);
+    const lbl = els.previewBtn.querySelector(".lbl");
+    if (lbl) lbl.textContent = showCards ? "Éditer" : "Aperçu";
     if (showCards) refreshCardsPreview();
   }
 
@@ -182,8 +227,7 @@
   async function save({ advance = false } = {}) {
     const p = prompts[currentIdx];
     const response = els.response.value;
-    els.saveStatus.textContent = "…";
-    els.saveStatus.className = "muted";
+    els.saveBtn.disabled = els.saveNextBtn.disabled = true;
 
     try {
       const r = await fetch(window.__API_SAVE_URL__ || "/api/save", {
@@ -196,26 +240,25 @@
 
       p.response = response;
       p.status = data.status;
+      setDirty(false);
 
       const li = els.list.querySelector(`.chunk-item[data-id="${p.id}"]`);
       if (li) li.dataset.status = p.status;
-
       updateProgress();
+      toast(`✓ Chunk #${p.id} enregistré — ${data.cards_detected} carte(s)`, "ok");
 
-      // Save feedback with pulse animation
-      els.saveStatus.textContent = `✓ enregistré (${data.cards_detected} cartes)`;
-      els.saveStatus.className = "ok";
-      els.saveStatus.style.animation = "none";
-      // Force reflow to restart animation
-      void els.saveStatus.offsetWidth;
-      els.saveStatus.style.animation = "";
-
-      if (advance && currentIdx < prompts.length - 1) {
-        navigateTo(currentIdx + 1);
+      if (advance) {
+        if (currentIdx < prompts.length - 1) {
+          navigateTo(currentIdx + 1);
+          focusPane("answer");
+        } else {
+          toast("Dernier chunk : tout est enregistré.", "ok");
+        }
       }
     } catch (e) {
-      els.saveStatus.textContent = `✗ ${e.message}`;
-      els.saveStatus.className = "err";
+      toast(`✗ ${e.message}`, "err", 4000);
+    } finally {
+      els.saveBtn.disabled = els.saveNextBtn.disabled = false;
     }
   }
 
@@ -238,8 +281,8 @@
       if (!r.ok) throw new Error(data.error || "Erreur");
 
       // Les prompts touchés ont été re-rendus côté serveur : on les remplace
-      (data.prompts || []).forEach(updated => {
-        const idx = prompts.findIndex(p => p.id === updated.id);
+      (data.prompts || []).forEach((updated) => {
+        const idx = prompts.findIndex((p) => p.id === updated.id);
         if (idx >= 0) {
           updated.response = prompts[idx].response;
           updated.status = prompts[idx].status;
@@ -247,7 +290,7 @@
         }
       });
       row.classList.toggle("alt-row--missing", !data.alt);
-      status.textContent = `✓ ${data.updated.length} chunk(s) mis à jour`;
+      status.textContent = `✓ ${data.updated.length} chunk(s)`;
       status.className = "alt-status ok";
 
       const p = prompts[currentIdx];
@@ -260,11 +303,64 @@
     }
   }
 
+  // ── Presse-papier ──────────────────────────────────────────
+  /**
+   * Copie `text`, avec deux replis si l'API presse-papier est refusée :
+   * execCommand, puis sélection du texte à l'écran pour un Ctrl+C manuel.
+   */
+  async function copyText(text, okMsg, selectEl) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(okMsg, "ok", 1600);
+      return true;
+    } catch { /* on tente les replis */ }
+
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    ta.remove();
+    if (ok) { toast(okMsg, "ok", 1600); return true; }
+
+    if (selectEl) {
+      selectEl.hidden = false;
+      const range = document.createRange();
+      range.selectNodeContents(selectEl);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      selectEl.scrollIntoView({ block: "nearest" });
+      toast("Texte sélectionné — appuie sur Ctrl+C", "err", 4000);
+    } else {
+      toast("✗ Copie impossible", "err", 2400);
+    }
+    return false;
+  }
+
+  async function pasteIntoResponse() {
+    focusPane("answer");
+    if (answerMode === "cards") setAnswerMode("edit");
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) { toast("Presse-papier vide", "err", 1800); return; }
+      els.response.value = text;
+      updateCardsInfo();
+      setDirty(true);
+      toast("✓ Réponse collée", "ok", 1400);
+    } catch {
+      els.response.focus();
+      toast("Autorise le presse-papier, ou colle avec Ctrl+V", "err", 3200);
+    }
+  }
+
   // ── Export ─────────────────────────────────────────────────
-  const exportMenu = document.getElementById("export-menu");
-  const exportReport = document.getElementById("export-report");
-  const exportProfiles = document.getElementById("export-profiles");
-  const exportStatus = document.getElementById("export-status");
+  const exportMenu = $("export-menu");
+  const exportReport = $("export-report");
+  const exportProfiles = $("export-profiles");
+  const exportStatus = $("export-status");
   let lastReport = null;
 
   async function loadReport() {
@@ -273,30 +369,26 @@
       const r = await fetch(window.__API_REPORT_URL__);
       const data = await r.json();
       lastReport = data;
-      const bits = [
-        `${data.cards} carte(s)`,
-        `${data.media.length} image(s) utilisée(s)`,
-      ];
+      const bits = [`${data.cards} carte(s)`, `${data.media.length} image(s) utilisée(s)`];
       if (data.unused_assets.length) bits.push(`${data.unused_assets.length} image(s) non exploitée(s)`);
       if (data.unknown_placeholders.length) bits.push(`${data.unknown_placeholders.length} placeholder(s) orphelin(s)`);
-      exportReport.innerHTML = bits.map(escapeHtml).join(" · ");
-    } catch (e) {
+      exportReport.textContent = bits.join(" · ");
+    } catch {
       exportReport.textContent = "Rapport indisponible.";
     }
   }
 
   function renderProfiles() {
     const profiles = (lastReport && lastReport.anki_profiles) || [];
+    exportProfiles.hidden = false;
     if (!profiles.length) {
-      exportProfiles.hidden = false;
       exportProfiles.innerHTML =
         `<div class="muted">Aucun profil Anki détecté sur cette machine. Utilise l'export ZIP.</div>`;
       return;
     }
-    exportProfiles.hidden = false;
     exportProfiles.innerHTML =
       `<div class="muted">Anki doit être fermé. Choisis le profil :</div>` +
-      profiles.map(p => `
+      profiles.map((p) => `
         <button type="button" class="profile-btn" data-path="${escapeHtml(p.path)}">
           ${escapeHtml(p.profile)} <span class="muted">(${p.files} fichiers)</span>
         </button>`).join("");
@@ -332,7 +424,9 @@
       if (exportMenu.open) loadReport();
       else { exportProfiles.hidden = true; exportStatus.textContent = ""; }
     });
-    document.getElementById("copy-media-btn").addEventListener("click", renderProfiles);
+    $("copy-media-btn").addEventListener("click", renderProfiles);
+    $("copy-system-btn").addEventListener("click", () =>
+      copyText(window.__SYSTEM_PROMPT__ || "", "✓ Prompt système copié"));
     exportProfiles.addEventListener("click", (ev) => {
       const btn = ev.target.closest(".profile-btn");
       if (btn) copyMedia(btn.dataset.path);
@@ -342,31 +436,47 @@
     });
   }
 
-  // ── Event listeners ────────────────────────────────────────
+  // ── Écouteurs ──────────────────────────────────────────────
   els.list.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".chunk-btn");
     if (!btn) return;
-    const li = btn.closest(".chunk-item");
-    const id = parseInt(li.dataset.id, 10);
-    const idx = prompts.findIndex(p => p.id === id);
-    if (idx >= 0) navigateTo(idx);
+    const id = parseInt(btn.closest(".chunk-item").dataset.id, 10);
+    const idx = prompts.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      navigateTo(idx);
+      if (mqDrawer.matches) setRail(false);
+    }
   });
 
   els.prevBtn.addEventListener("click", () => navigateTo(currentIdx - 1));
   els.nextBtn.addEventListener("click", () => navigateTo(currentIdx + 1));
-
   els.saveBtn.addEventListener("click", () => save({ advance: false }));
   els.saveNextBtn.addEventListener("click", () => save({ advance: true }));
-  els.response.addEventListener("input", updateCardsInfo);
+  els.pasteBtn.addEventListener("click", pasteIntoResponse);
+  els.previewBtn.addEventListener("click", () => {
+    focusPane("answer");
+    setAnswerMode(answerMode === "cards" ? "edit" : "cards");
+  });
+  els.copyBtn.addEventListener("click", async () => {
+    focusPane("source");
+    const ok = await copyText(prompts[currentIdx].prompt, "✓ Paragraphe copié", els.curPrompt);
+    if (ok) {
+      els.copyBtn.classList.add("copied");
+      setTimeout(() => els.copyBtn.classList.remove("copied"), 1200);
+    } else {
+      // La sélection manuelle exige la vue « Texte »
+      els.viewToggle.querySelector('[data-view="text"]').click();
+    }
+  });
+
+  els.response.addEventListener("input", () => { updateCardsInfo(); setDirty(true); });
 
   els.viewToggle.addEventListener("click", (ev) => {
     const btn = ev.target.closest("button[data-view]");
     if (!btn) return;
-    const view = btn.dataset.view;
-    els.viewToggle.querySelectorAll("button").forEach(b =>
-      b.classList.toggle("active", b === btn));
-    els.curPreview.hidden = view !== "preview";
-    els.curPrompt.hidden = view !== "text";
+    els.viewToggle.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+    els.curPreview.hidden = btn.dataset.view !== "preview";
+    els.curPrompt.hidden = btn.dataset.view !== "text";
   });
 
   els.answerToggle.addEventListener("click", (ev) => {
@@ -377,17 +487,25 @@
   els.insertBar.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".chip");
     if (!btn) return;
+    if (answerMode === "cards") setAnswerMode("edit");
     const ta = els.response;
     const start = ta.selectionStart, end = ta.selectionEnd;
     ta.value = ta.value.slice(0, start) + btn.dataset.insert + ta.value.slice(end);
     ta.selectionStart = ta.selectionEnd = start + btn.dataset.insert.length;
     ta.focus();
     updateCardsInfo();
+    setDirty(true);
   });
 
   els.altPanel.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".alt-save");
     if (btn) saveAlt(btn.closest(".alt-row"));
+  });
+  els.altPanel.addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter" && ev.target.classList.contains("alt-input")) {
+      ev.preventDefault();
+      saveAlt(ev.target.closest(".alt-row"));
+    }
   });
 
   // Agrandissement d'une image de l'aperçu
@@ -397,93 +515,65 @@
     const box = document.createElement("div");
     box.className = "lightbox";
     box.innerHTML = `<img src="${img.getAttribute("src")}" alt="">`;
-    box.addEventListener("click", () => box.remove());
-    document.addEventListener("keydown", function esc(e) {
-      if (e.key === "Escape") { box.remove(); document.removeEventListener("keydown", esc); }
-    });
+    const close = () => { box.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    box.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
     document.body.appendChild(box);
   });
 
-  els.altPanel.addEventListener("keydown", (ev) => {
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter" && ev.target.classList.contains("alt-input")) {
-      ev.preventDefault();
-      saveAlt(ev.target.closest(".alt-row"));
+  // Dépôt d'un fichier TSV/TXT sur la zone de réponse
+  const rc = els.responseContainer;
+  rc.addEventListener("dragover", (e) => { e.preventDefault(); rc.classList.add("drag-over"); });
+  ["dragleave", "dragend"].forEach((t) =>
+    rc.addEventListener(t, () => rc.classList.remove("drag-over")));
+  rc.addEventListener("drop", (e) => {
+    e.preventDefault();
+    rc.classList.remove("drag-over");
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      els.response.value = ev.target.result;
+      updateCardsInfo();
+      setDirty(true);
+      toast(`✓ ${file.name} chargé`, "ok", 1600);
+    };
+    reader.readAsText(file);
+  });
+
+  // ── Raccourcis clavier ─────────────────────────────────────
+  document.addEventListener("keydown", (ev) => {
+    const mod = ev.ctrlKey || ev.metaKey;
+
+    if (ev.key === "Escape" && document.body.classList.contains("rail-open")) {
+      setRail(false);
+      return;
     }
-  });
-
-  // Ctrl+Enter = Save & next
-  els.response.addEventListener("keydown", (ev) => {
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
-      ev.preventDefault();
-      save({ advance: true });
+    if (mod && ev.key === "Enter") { ev.preventDefault(); save({ advance: true }); return; }
+    if (mod && !ev.shiftKey && ev.key.toLowerCase() === "s") { ev.preventDefault(); save(); return; }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "c") {
+      ev.preventDefault(); els.copyBtn.click(); return;
     }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "v") { ev.preventDefault(); pasteIntoResponse(); return; }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "p") { ev.preventDefault(); els.previewBtn.click(); return; }
+    if (ev.altKey && ev.key === "ArrowLeft") { ev.preventDefault(); navigateTo(currentIdx - 1); return; }
+    if (ev.altKey && ev.key === "ArrowRight") { ev.preventDefault(); navigateTo(currentIdx + 1); return; }
   });
 
-  // Paste button
-  const pasteBtn = document.getElementById('paste-btn');
-  if (pasteBtn) {
-    pasteBtn.addEventListener('click', async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          els.response.value = text;
-          updateCardsInfo();
-        }
-      } catch (err) {
-        console.error('Failed to read clipboard: ', err);
-      }
-    });
-  }
-
-  // Response container drag and drop
-  const responseContainer = els.responseContainer;
-  if (responseContainer) {
-    responseContainer.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      responseContainer.classList.add('drag-over');
-    });
-
-    ['dragleave', 'dragend'].forEach(type => {
-      responseContainer.addEventListener(type, () => {
-        responseContainer.classList.remove('drag-over');
-      });
-    });
-
-    responseContainer.addEventListener('drop', (e) => {
-      e.preventDefault();
-      responseContainer.classList.remove('drag-over');
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const file = e.dataTransfer.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          els.response.value = event.target.result;
-          updateCardsInfo();
-        };
-        reader.readAsText(file);
-      }
-    });
-  }
-
-  // Copy buttons
-  document.querySelectorAll(".copy-btn").forEach(btn => {
-    btn.addEventListener("click", async (ev) => {
-      ev.stopPropagation();
-      const sel = btn.dataset.copyTarget;
-      const target = sel ? document.querySelector(sel) : null;
-      if (!target) return;
-      const text = target.textContent || target.value || "";
-      try {
-        await navigator.clipboard.writeText(text);
-        const orig = btn.textContent;
-        btn.textContent = "✓ Copié";
-        btn.classList.add("copied");
-        setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1200);
-      } catch {
-        btn.textContent = "✗ Échec";
-      }
-    });
+  window.addEventListener("beforeunload", (e) => {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = "";
   });
+
+  // Repasse en vue double quand la fenêtre s'élargit
+  mqTabs.addEventListener("change", (e) => { if (!e.matches) setTab("source"); });
+  mqDrawer.addEventListener("change", (e) => { if (!e.matches) setRail(false); });
 
   render();
   updateProgress();
+  if (window.__MISSING_ALT__) {
+    toast(`${window.__MISSING_ALT__} image(s) sans description`, null, 3600);
+  }
 })();

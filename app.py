@@ -416,7 +416,10 @@ def api_update_check():
             "release_notes": release.get("body", ""),
         })
     except Exception as e:
-        return jsonify({"update_available": False, "error": str(e)}), 500
+        # Pas de release publiée, hors-ligne, quota GitHub… : ce sont des
+        # conditions normales, pas des erreurs serveur. On répond 200 avec
+        # update_available=False pour ne pas polluer la console du client.
+        return jsonify({"update_available": False, "error": str(e)})
 
 
 @app.route("/api/update/apply", methods=["POST"])

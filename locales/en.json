@@ -1,0 +1,10 @@
+{
+  "app.name": "Ankigen",
+  "app.tagline": "Turn a .docx course into an Anki deck, one paragraph at a time.",
+  "app.description": "Anki flashcard generator for .docx courses",
+  "nav.home": "Home",
+  "nav.settings": "Settings",
+  "nav.help": "How to use",
+  "js.saved": "Saved",
+  "js.network_error": "Network error."
+}

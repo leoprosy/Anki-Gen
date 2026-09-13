@@ -1,0 +1,10 @@
+{
+  "app.name": "Ankigen",
+  "app.tagline": "Transforme un cours .docx en paquet Anki, paragraphe par paragraphe.",
+  "app.description": "Générateur de flashcards Anki à partir de cours .docx",
+  "nav.home": "Accueil",
+  "nav.settings": "Paramètres",
+  "nav.help": "Mode d'emploi",
+  "js.saved": "Enregistré",
+  "js.network_error": "Erreur réseau."
+}

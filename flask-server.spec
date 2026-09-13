@@ -22,6 +22,7 @@ a = Analysis(
         ('templates', 'app_bundle/templates'),
         ('static', 'app_bundle/static'),
         ('locales', 'app_bundle/locales'),
+        ('skill_templates', 'app_bundle/skill_templates'),
     ],
     hiddenimports=[
         'waitress', 'flask', 'jinja2.ext', 'docx', 'lxml', 'lxml._elementpath', 'lxml.etree',

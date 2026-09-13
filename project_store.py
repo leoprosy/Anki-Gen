@@ -26,6 +26,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from build_anki_csv import parse_tsv_response
+from i18n import DEFAULT_LANG
 from paths import MEDIA_DIR, PROJECTS_DIR, project_media_dir
 from render import render_preview_html, render_prompt_text, resolve_placeholders
 
@@ -220,7 +221,8 @@ def project_view(project: dict, project_id: str) -> list:
 # ──────────────────────────────────────────────────────────────
 # Édition du texte alternatif
 # ──────────────────────────────────────────────────────────────
-def set_asset_alt(project: dict, asset_id: str, alt: str) -> list:
+def set_asset_alt(project: dict, asset_id: str, alt: str,
+                  lang: str = DEFAULT_LANG) -> list:
     """
     Met à jour le texte alternatif d'une image et re-rend les prompts concernés
     (le texte envoyé à Claude contient la description : elle doit suivre).
@@ -242,7 +244,7 @@ def set_asset_alt(project: dict, asset_id: str, alt: str) -> list:
             for b in prompt.get("blocks", [])
         )
         if uses:
-            prompt["prompt"] = render_prompt_text(prompt["blocks"], assets)
+            prompt["prompt"] = render_prompt_text(prompt["blocks"], assets, lang)
             touched.append(prompt["id"])
     return touched
 

@@ -19,6 +19,7 @@ from docx import Document
 
 from docx_blocks import STYLE_LEVELS, iter_blocks
 from media_store import MediaStore
+from i18n import DEFAULT_LANG
 from render import render_prompt_text
 
 # Patterns de numérotation : I. / II. → niveau 1, A) / B) → 2, 1) / 2) → 3, a) → 4
@@ -77,7 +78,8 @@ def number_blocks(blocks: list) -> list:
 # Parsing
 # ──────────────────────────────────────────────
 def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
-               media_dir: Path = None, title_stem: str = None):
+               media_dir: Path = None, title_stem: str = None,
+               lang: str = DEFAULT_LANG):
     """
     Parse le .docx et retourne (chunks, assets, warnings).
 
@@ -115,7 +117,7 @@ def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
         # ignore. L'ancienne condition `deck != deck_prefix` disait la même chose
         # de façon détournée, et devenait fausse avec un préfixe vide.
         if has_content and stack:
-            prompt = render_prompt_text(blocks, store.assets)
+            prompt = render_prompt_text(blocks, store.assets, lang)
             chunks.append({
                 "deck": deck,
                 "blocks": blocks,
@@ -145,7 +147,7 @@ def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
     return chunks, store.assets, store.warnings
 
 
-def build_prompts(chunks, assets=None):
+def build_prompts(chunks, assets=None, lang=DEFAULT_LANG):
     """Génère la liste de prompts à partir des chunks."""
     assets = assets or {}
     prompts = []
@@ -153,7 +155,8 @@ def build_prompts(chunks, assets=None):
         prompts.append({
             "id": i,
             "deck": chunk["deck"],
-            "prompt": chunk.get("prompt") or render_prompt_text(chunk.get("blocks", []), assets),
+            "prompt": chunk.get("prompt")
+                      or render_prompt_text(chunk.get("blocks", []), assets, lang),
             "blocks": chunk.get("blocks", []),
             "assets": chunk.get("assets", []),
             "status": "pending",   # pending | done

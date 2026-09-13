@@ -5,7 +5,9 @@ render.py — Rendu des blocs extraits du .docx.
 Trois sorties distinctes, depuis le même modèle de blocs :
 
   * `render_prompt_text`  → le texte envoyé à Claude (marqueurs [IMAGE n] /
-    [TABLEAU n] + tableau en markdown : compact en tokens, lisible par le modèle).
+    [TABLE n] + tableau en markdown : compact en tokens, lisible par le modèle).
+    Ces marqueurs sont traduits : l'utilisateur les copie dans Claude,
+    ils font donc partie de l'interface au même titre qu'un libellé.
   * `render_table_html`   → HTML auto-suffisant (CSS inline) injecté dans la carte
     Anki à l'export, via le placeholder {{TABLE:n}}.
   * `render_preview_html` → aperçu dans l'interface (images servies par /media/...).
@@ -15,6 +17,7 @@ réponse de Claude : le modèle ne manipule jamais de nom de fichier, donc il ne
 peut pas en inventer.
 """
 
+from i18n import DEFAULT_LANG, translate
 import html
 import re
 
@@ -192,7 +195,7 @@ def render_table_text(table: dict, assets: dict = None) -> str:
 # ──────────────────────────────────────────────────────────────
 # Prompt envoyé à Claude
 # ──────────────────────────────────────────────────────────────
-def render_prompt_text(blocks: list, assets: dict) -> str:
+def render_prompt_text(blocks: list, assets: dict, lang: str = DEFAULT_LANG) -> str:
     """
     Rend les blocs d'un chunk en texte destiné à Claude.
     Les images deviennent des marqueurs décrits par leur texte alternatif ;
@@ -212,22 +215,21 @@ def render_prompt_text(blocks: list, assets: dict) -> str:
             if asset.get("missing"):
                 continue  # image illisible : inutile d'en parler au modèle
             if alt:
-                parts.append(
-                    "[IMAGE %d — description : %s]\n"
-                    "(écris {{IMG:%d}} dans une carte pour y afficher cette image)" % (n, alt, n)
-                )
+                header = translate("prompt.image_with_alt", lang, n=n, alt=alt)
             else:
-                parts.append(
-                    "[IMAGE %d — aucune description disponible]\n"
-                    "(écris {{IMG:%d}} dans une carte pour y afficher cette image)" % (n, n)
-                )
+                header = translate("prompt.image_no_alt", lang, n=n)
+            parts.append(
+                header + "\n"
+                + translate("prompt.image_hint", lang, placeholder="{{IMG:%d}}" % n)
+            )
 
         elif btype == "table":
             n = block.get("n", 1)
             parts.append(
-                "[TABLEAU %d]\n%s\n"
-                "(écris {{TABLE:%d}} pour réutiliser ce tableau dans une carte)"
-                % (n, render_table_text(block, assets), n)
+                translate("prompt.table_header", lang, n=n) + "\n"
+                + render_table_text(block, assets)
+                + "\n"
+                + translate("prompt.table_hint", lang, placeholder="{{TABLE:%d}}" % n)
             )
 
     return "\n\n".join(p for p in parts if p and p.strip()).strip()

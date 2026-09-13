@@ -28,7 +28,7 @@ from flask import (
 import paths
 import settings as user_settings
 from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
-from i18n import available_languages, catalog_for_js, translate
+from i18n import DEFAULT_LANG, available_languages, catalog_for_js, translate
 from parse_cours import build_prompts, parse_docx
 from project_store import (
     PROJECT_VERSION,
@@ -57,6 +57,12 @@ paths.ensure_dirs()
 paths.migrate_legacy_data()
 
 SAFE_MEDIA_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+# Templates de Skill Claude proposés sur /help. Ce sont des documents de
+# plusieurs dizaines de lignes : les garder en fichiers les rend relisibles et
+# modifiables sans toucher au HTML, et le rendu Jinja les échappe, donc le
+# HTML des cartes d'exemple s'affiche en clair au lieu d'être interprété.
+SKILL_TEMPLATE_DIR = paths.APP_DIR / "skill_templates"
 
 app = Flask(
     __name__,
@@ -191,7 +197,7 @@ def upload():
     try:
         chunks, assets, warnings = parse_docx(
             saved, deck_prefix, project_id=project_id,
-            title_stem=Path(file.filename).stem,
+            title_stem=Path(file.filename).stem, lang=current_lang(),
         )
     except Exception as e:
         return render_template(
@@ -214,7 +220,7 @@ def upload():
         "source": file.filename,
         "assets": assets,
         "warnings": warnings,
-        "prompts": build_prompts(chunks, assets),
+        "prompts": build_prompts(chunks, assets, current_lang()),
     }
     save_project(project_id, project)
     return redirect(url_for("work", project_id=project_id))
@@ -240,9 +246,20 @@ def settings_page():
     return render_template("settings.html")
 
 
+def load_skill_template(lang):
+    """Template de Skill dans la langue demandée, avec repli sur l'anglais."""
+    for candidate in (lang, DEFAULT_LANG):
+        try:
+            return (SKILL_TEMPLATE_DIR / f"{candidate}.md").read_text(encoding="utf-8")
+        except OSError:
+            continue
+    return ""
+
+
 @app.route("/help")
 def help_page():
-    return render_template("help.html")
+    return render_template("help.html",
+                           skill_template=load_skill_template(current_lang()))
 
 
 @app.route("/api/settings", methods=["GET", "POST"])
@@ -283,7 +300,7 @@ def api_asset(project_id, asset_id):
     alt = (data.get("alt") or "").strip()
 
     try:
-        touched = set_asset_alt(project, asset_id, alt)
+        touched = set_asset_alt(project, asset_id, alt, current_lang())
     except KeyError:
         return jsonify(error=tr("api.asset_not_found", id=asset_id)), 404
 

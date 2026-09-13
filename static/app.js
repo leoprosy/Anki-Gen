@@ -421,12 +421,52 @@
     }
   }
 
+  // ── Export : télécharge ET écrit dans le dossier configuré ───
+  async function runExport(url) {
+    exportStatus.textContent = window.T("js.exporting");
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("export failed");
+
+      const blob = await res.blob();
+      const name = (res.headers.get("Content-Disposition") || "")
+        .split("filename=").pop().replace(/["';]/g, "") || "export";
+
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+
+      const error = res.headers.get("X-Export-Error");
+      const path = res.headers.get("X-Export-Path");
+      if (error) {
+        toast(decodeURIComponent(error), "err", 5000);
+        exportStatus.textContent = "";
+      } else if (path) {
+        const decoded = decodeURIComponent(path);
+        toast(window.T("js.exported_to", { path: decoded }), "ok", 4000);
+        exportStatus.textContent = decoded;
+      }
+    } catch (e) {
+      toast(window.T("js.export_failed"), "err");
+      exportStatus.textContent = "";
+    }
+  }
+
   if (exportMenu) {
     exportMenu.addEventListener("toggle", () => {
       if (exportMenu.open) loadReport();
       else { exportProfiles.hidden = true; exportStatus.textContent = ""; }
     });
     $("copy-media-btn").addEventListener("click", renderProfiles);
+    ["export-tsv-btn", "export-zip-btn"].forEach((id) => {
+      const btn = $(id);
+      if (btn) btn.addEventListener("click", () => runExport(btn.dataset.exportUrl));
+    });
     $("copy-system-btn").addEventListener("click", () =>
       copyText(window.__SYSTEM_PROMPT__ || "", "✓ Prompt système copié"));
     exportProfiles.addEventListener("click", (ev) => {

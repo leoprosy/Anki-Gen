@@ -11,6 +11,7 @@ import io
 import re
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 from flask import (
     Flask,
@@ -51,7 +52,6 @@ ROOT = paths.DATA_DIR
 UPLOAD_DIR = paths.UPLOAD_DIR
 PROJECTS_DIR = paths.PROJECTS_DIR
 MEDIA_DIR = paths.MEDIA_DIR
-EXPORT_DIR = paths.EXPORT_DIR
 
 paths.ensure_dirs()
 paths.migrate_legacy_data()
@@ -121,6 +121,40 @@ def tsv_bytes(rows) -> bytes:
     for row in rows:
         writer.writerow(row)
     return buf.getvalue().encode("utf-8")
+
+
+def _write_export_copy(filename, data):
+    """
+    Écrit une copie de l'export dans le dossier choisi par l'utilisateur.
+
+    Retourne (chemin, None) ou (None, clé de message). Un réglage devenu invalide
+    doit dégrader l'export en simple téléchargement, jamais le faire échouer :
+    l'utilisateur veut son fichier, pas un message d'erreur sur un réglage.
+    """
+    directory = user_settings.resolve_download_dir()
+    if directory is None:
+        return None, "export.dir_unavailable"
+    try:
+        target = directory / filename
+        target.write_bytes(data)
+        return str(target), None
+    except OSError:
+        return None, "export.write_failed"
+
+
+def _with_export_headers(response, filename, data):
+    """
+    Ajoute X-Export-Path / X-Export-Error à une réponse d'export.
+
+    Le chemin est percent-encodé : WSGI encode les en-têtes en latin-1, et un
+    dossier utilisateur peut contenir n'importe quel caractère. Le JS le repasse
+    par decodeURIComponent.
+    """
+    path, error = _write_export_copy(filename, data)
+    response.headers["X-Export-Path"] = quote(path or "")
+    if error:
+        response.headers["X-Export-Error"] = quote(tr(error))
+    return response
 
 
 # ──────────────────────────────────────────────────────────────
@@ -362,16 +396,15 @@ def export_tsv(project_id):
 
     rows, report = export_rows(project, only_done=only_done)
     data = tsv_bytes(rows)
+    filename = f"{project_id}_export.tsv"
 
-    # Copie locale, à côté des autres données de l'app
-    (EXPORT_DIR / f"{project_id}_export.tsv").write_bytes(data)
-
-    return send_file(
+    response = send_file(
         io.BytesIO(data),
         mimetype="text/tab-separated-values; charset=utf-8",
         as_attachment=True,
-        download_name=f"{project_id}_export.tsv",
+        download_name=filename,
     )
+    return _with_export_headers(response, filename, data)
 
 
 @app.route("/export.zip/<project_id>")
@@ -408,12 +441,15 @@ def export_zip(project_id):
             ]),
         )
     buf.seek(0)
-    return send_file(
-        buf,
+    data = buf.getvalue()
+    filename = f"{project_id}_export.zip"
+    response = send_file(
+        io.BytesIO(data),
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f"{project_id}_export.zip",
+        download_name=filename,
     )
+    return _with_export_headers(response, filename, data)
 
 
 @app.route("/api/export/report/<project_id>")

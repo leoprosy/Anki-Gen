@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="256" height="256"
+  fill="none" stroke="#1D1D1F" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+  role="img" aria-label="Ankigen">
+  <!-- Copie autonome du symbole #i-logo de templates/base.html.
+       Les couleurs y sont littérales : hors page, var(--accent) ne résout pas. -->
+  <rect x="2.5" y="6" width="12" height="15.5" rx="2.5" transform="rotate(-9 8.5 13.75)"/>
+  <rect x="8.5" y="2.5" width="13" height="16" rx="2.5" fill="#FFFFFF"/>
+  <path d="M12 7.5h6M12 11h3.5"/>
+  <path d="M17.8 13.4l.85 1.95 1.95.85-1.95.85-.85 1.95-.85-1.95-1.95-.85 1.95-.85z"
+    fill="#0071E3" stroke="#0071E3" stroke-width="1.1"/>
+</svg>

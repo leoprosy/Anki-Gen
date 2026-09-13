@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-launcher.py — Production WSGI entry point for Anki ESH.
+launcher.py — Production WSGI entry point for Ankigen.
 
 Used in two ways:
   1. Standalone: `python launcher.py` (opens browser)
@@ -97,7 +97,7 @@ def main():
 
     is_sidecar = os.environ.get("ANKI_ESH_SIDECAR") == "1"
 
-    print(f"Anki ESH running on http://127.0.0.1:{port}", flush=True)
+    print(f"Ankigen running on http://127.0.0.1:{port}", flush=True)
 
     if not is_sidecar:
         print("   Close this window to stop the server.\n")

@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}{{ project_id }} — Anki ESH{% endblock %}
+{% block title %}{{ project_id }} — {{ t('app.name') }}{% endblock %}
 {% block shell_class %}shell--fixed{% endblock %}
 
 {% block topbar %}
-<button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="Liste des chunks" aria-expanded="false"
-  title="Liste des chunks">
+<button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="{{ t('work.chunk_list') }}" aria-expanded="false"
+  title="{{ t('work.chunk_list') }}">
   <svg width="18" height="18" aria-hidden="true"><use href="#i-list"></use></svg>
 </button>
 
 <div class="topbar__context">
   <span class="project-name" title="{{ project_id }}">{{ project_id }}</span>
   <div class="topbar__spacer"></div>
-  <div class="progress" title="Chunks enregistrés">
+  <div class="progress" title="{{ t('work.progress_title') }}">
     <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
-    <div class="progress-bar" role="progressbar" aria-label="Progression">
+    <div class="progress-bar" role="progressbar" aria-label="{{ t('work.progress_title') }}">
       <div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
     </div>
   </div>
@@ -21,37 +21,35 @@
 
 <div class="topbar__actions">
   <details class="menu" id="export-menu">
-    <summary title="Exporter">
+    <summary title="{{ t('work.export') }}">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
-      <span class="lbl">Exporter</span>
+      <span class="lbl">{{ t('work.export') }}</span>
     </summary>
     <div class="menu__panel">
-      <div class="menu__title">Exporter</div>
-      <div class="export-report" id="export-report">Calcul du rapport…</div>
-      <a class="export-item" href="{{ url_for('export_tsv', project_id=project_id) }}">
-        <strong>TSV seul</strong>
-        <span class="muted">Cartes uniquement (en-têtes Anki inclus)</span>
-      </a>
-      <a class="export-item" href="{{ url_for('export_zip', project_id=project_id) }}">
-        <strong>ZIP (TSV + images)</strong>
-        <span class="muted">À décompresser dans collection.media</span>
-      </a>
-      <button type="button" class="export-item" id="copy-media-btn">
-        <strong>Copier les médias dans Anki</strong>
-        <span class="muted">Directement dans collection.media (Anki fermé)</span>
+      <div class="menu__title">{{ t('work.export') }}</div>
+      <div class="export-report" id="export-report">{{ t('work.export_computing') }}</div>
+      <button type="button" class="export-item" id="export-tsv-btn"
+        data-export-url="{{ url_for('export_tsv', project_id=project_id) }}">
+        <strong>{{ t('work.export_tsv') }}</strong>
+        <span class="muted">{{ t('work.export_tsv_help') }}</span>
       </button>
-      <button type="button" class="export-item" id="copy-system-btn">
-        <strong>Copier le prompt système</strong>
-        <span class="muted">À coller une fois dans le projet Claude</span>
+      <button type="button" class="export-item" id="export-zip-btn"
+        data-export-url="{{ url_for('export_zip', project_id=project_id) }}">
+        <strong>{{ t('work.export_zip') }}</strong>
+        <span class="muted">{{ t('work.export_zip_help') }}</span>
+      </button>
+      <button type="button" class="export-item" id="copy-media-btn">
+        <strong>{{ t('work.copy_media') }}</strong>
+        <span class="muted">{{ t('work.copy_media_help') }}</span>
       </button>
       <div class="export-profiles" id="export-profiles" hidden></div>
       <div class="export-status muted" id="export-status"></div>
     </div>
   </details>
 
-  <a class="btn ghost" href="{{ url_for('index') }}" title="Accueil">
+  <a class="btn ghost" href="{{ url_for('index') }}" title="{{ t('nav.home') }}">
     <svg width="16" height="16" aria-hidden="true"><use href="#i-home"></use></svg>
-    <span class="lbl">Accueil</span>
+    <span class="lbl">{{ t('nav.home') }}</span>
   </a>
 </div>
 {% endblock %}
@@ -59,10 +57,10 @@
 {% block shell_body %}
 <main class="work">
   <!-- ── Rail des chunks (tiroir sous 1180px) ─────────────────── -->
-  <aside class="rail" id="rail" aria-label="Liste des paragraphes">
+  <aside class="rail" id="rail" aria-label="{{ t('work.chunk_list') }}">
     <div class="rail__head">
-      <span class="rail__title">Chunks</span>
-      <button type="button" class="icon-btn rail__close" id="rail-close" aria-label="Fermer la liste">
+      <span class="rail__title">{{ t('work.chunk_list') }}</span>
+      <button type="button" class="icon-btn rail__close" id="rail-close" aria-label="{{ t('work.close_list') }}">
         <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
       </button>
     </div>
@@ -77,8 +75,8 @@
           <span class="chunk-id">#{{ p.id }}</span>
           <span class="chunk-deck">{{ p.deck }}</span>
           <span class="chunk-badges">
-            {% if p.images %}<span class="badge" title="{{ p.images|length }} image(s)">🖼️{{ p.images|length }}</span>{% endif %}
-            {% if p.tables %}<span class="badge" title="{{ p.tables|length }} tableau(x)">▦{{ p.tables|length }}</span>{% endif %}
+            {% if p.images %}<span class="badge" title="{{ t('work.images_n', n=p.images|length) }}">🖼️{{ p.images|length }}</span>{% endif %}
+            {% if p.tables %}<span class="badge" title="{{ t('work.tables_n', n=p.tables|length) }}">▦{{ p.tables|length }}</span>{% endif %}
           </span>
         </button>
       </li>
@@ -96,16 +94,16 @@
     {% endif %}
 
     <div class="tabbar" id="tabbar" role="tablist">
-      <button type="button" role="tab" data-tab="source" class="active" aria-selected="true">Cours</button>
+      <button type="button" role="tab" data-tab="source" class="active" aria-selected="true">{{ t('work.tab_source') }}</button>
       <button type="button" role="tab" data-tab="answer" aria-selected="false">
-        Réponse<span class="tab-flag" id="tab-flag" hidden></span>
+        {{ t('work.tab_answer') }}<span class="tab-flag" id="tab-flag" hidden></span>
       </button>
     </div>
 
     <div class="panes__grid" id="panes-grid" data-active="source">
 
       <!-- Paragraphe source -->
-      <article class="pane" data-pane="source" role="tabpanel" aria-label="Paragraphe du cours">
+      <article class="pane" data-pane="source" role="tabpanel" aria-label="{{ t('work.tab_source') }}">
         <header class="pane__head">
           <div class="pane__title">
             <span class="chunk-index" id="cur-id">#0</span>
@@ -113,8 +111,8 @@
           </div>
           <div class="pane__tools">
             <div class="seg" id="view-toggle">
-              <button type="button" data-view="preview" class="active">Aperçu</button>
-              <button type="button" data-view="text">Texte</button>
+              <button type="button" data-view="preview" class="active">{{ t('work.view_preview') }}</button>
+              <button type="button" data-view="text">{{ t('work.view_text') }}</button>
             </div>
           </div>
         </header>
@@ -126,17 +124,17 @@
       </article>
 
       <!-- Réponse de Claude -->
-      <article class="pane" data-pane="answer" role="tabpanel" aria-label="Réponse de Claude">
+      <article class="pane" data-pane="answer" role="tabpanel" aria-label="{{ t('work.answer_label') }}">
         <header class="pane__head">
           <div class="pane__title">
-            <span class="pane__label">Réponse de Claude</span>
-            <span class="muted mono">QUESTION⇥RÉPONSE</span>
+            <span class="pane__label">{{ t('work.answer_label') }}</span>
+            <span class="muted mono">{{ t('work.answer_format') }}</span>
           </div>
           <div class="pane__tools">
             <span class="muted" id="cards-info"></span>
             <div class="seg" id="answer-toggle">
-              <button type="button" data-answer="edit" class="active">Texte</button>
-              <button type="button" data-answer="cards">Cartes</button>
+              <button type="button" data-answer="edit" class="active">{{ t('work.view_text') }}</button>
+              <button type="button" data-answer="cards">{{ t('work.answer_cards') }}</button>
             </div>
           </div>
         </header>
@@ -144,10 +142,10 @@
           <div id="insert-bar" class="insert-bar"></div>
           <div class="response-container" id="response-container">
             <textarea id="response" spellcheck="false"
-              placeholder="Colle ici la réponse de Claude pour ce paragraphe… ou dépose un fichier TSV/TXT"></textarea>
+              placeholder="{{ t('work.response_placeholder') }}"></textarea>
             <div class="response-overlay">
               <svg width="30" height="30" aria-hidden="true"><use href="#i-file"></use></svg>
-              <span>Déposez le fichier TSV/TXT ici</span>
+              <span>{{ t('work.drop_tsv') }}</span>
             </div>
           </div>
           <div id="cards-preview" class="cards-preview" hidden></div>
@@ -159,13 +157,13 @@
 </main>
 
 <!-- ── Dock d'actions : visible à toutes les tailles ──────────── -->
-<footer class="dock" aria-label="Actions">
+<footer class="dock" aria-label="{{ t('work.actions') }}">
   <div class="dock__group">
-    <button type="button" class="icon-btn" id="prev-btn" title="Chunk précédent (Alt+←)" aria-label="Chunk précédent">
+    <button type="button" class="icon-btn" id="prev-btn" title="{{ t('work.prev') }} (Alt+←)" aria-label="{{ t('work.prev') }}">
       <svg width="18" height="18" aria-hidden="true"><use href="#i-prev"></use></svg>
     </button>
     <span class="counter" id="dock-counter"></span>
-    <button type="button" class="icon-btn" id="next-btn" title="Chunk suivant (Alt+→)" aria-label="Chunk suivant">
+    <button type="button" class="icon-btn" id="next-btn" title="{{ t('work.next') }} (Alt+→)" aria-label="{{ t('work.next') }}">
       <svg width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
     </button>
   </div>
@@ -173,28 +171,28 @@
   <div class="dock__sep"></div>
 
   <div class="dock__group">
-    <button type="button" class="btn" id="copy-btn" title="Copier le paragraphe (Ctrl+Maj+C)">
+    <button type="button" class="btn" id="copy-btn" title="{{ t('work.copy_title') }} (Ctrl+Maj+C)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
-      <span class="lbl">Copier</span>
+      <span class="lbl">{{ t('work.copy') }}</span>
     </button>
-    <button type="button" class="btn" id="paste-btn" title="Coller la réponse (Ctrl+Maj+V)">
+    <button type="button" class="btn" id="paste-btn" title="{{ t('work.paste_title') }} (Ctrl+Maj+V)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
-      <span class="lbl">Coller</span>
+      <span class="lbl">{{ t('work.paste') }}</span>
     </button>
-    <button type="button" class="btn" id="preview-btn" title="Aperçu des cartes (Ctrl+Maj+P)" aria-pressed="false">
+    <button type="button" class="btn" id="preview-btn" title="{{ t('work.preview_title') }} (Ctrl+Maj+P)" aria-pressed="false">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-eye"></use></svg>
-      <span class="lbl">Aperçu</span>
+      <span class="lbl">{{ t('work.preview') }}</span>
     </button>
   </div>
 
   <div class="dock__group dock__group--main">
-    <button type="button" class="btn" id="save-btn" title="Enregistrer (Ctrl+S)">
+    <button type="button" class="btn" id="save-btn" title="{{ t('work.save') }} (Ctrl+S)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
-      <span class="lbl">Enregistrer</span>
+      <span class="lbl">{{ t('work.save') }}</span>
     </button>
-    <button type="button" class="btn primary btn-save-next" id="save-next-btn" title="Enregistrer et passer au suivant (Ctrl+Entrée)">
+    <button type="button" class="btn primary btn-save-next" id="save-next-btn" title="{{ t('work.save_next_title') }} (Ctrl+Entrée)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-save-next"></use></svg>
-      <span class="lbl">Enregistrer &amp; suivant</span>
+      <span class="lbl">{{ t('work.save_next') }}</span>
     </button>
   </div>
 </footer>
@@ -204,7 +202,6 @@
 <script>
   const PROMPTS = {{ prompts | tojson }};
   window.__PROJECT_ID__ = {{ project_id | tojson }};
-  window.__SYSTEM_PROMPT__ = {{ system_prompt | tojson }};
   window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
   window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";

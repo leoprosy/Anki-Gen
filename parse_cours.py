@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-parse_cours.py — Étape 1 du pipeline Anki ESH
+parse_cours.py — Étape 1 du pipeline Ankigen
 Lit un .docx, détecte la hiérarchie du plan (styles Titre), découpe en chunks par
 section, extrait les images (+ leur texte alternatif) et les tableaux, et génère
 le projet JSON prêt à être travaillé dans l'app.
@@ -19,6 +19,7 @@ from docx import Document
 
 from docx_blocks import STYLE_LEVELS, iter_blocks
 from media_store import MediaStore
+from i18n import DEFAULT_LANG
 from render import render_prompt_text
 
 # Patterns de numérotation : I. / II. → niveau 1, A) / B) → 2, 1) / 2) → 3, a) → 4
@@ -30,42 +31,20 @@ NUMBERING_PATTERNS = [
     (re.compile(r"^\s*[a-z][\.\)]\s+\S"), 4),
 ]
 
-SYSTEM_PROMPT = """Tu es un expert en ESH (Économie, Sociologie et Histoire) pour les classes préparatoires ECG. Ta mission est de convertir chaque paragraphe de cours fourni par l'utilisateur en cartes Anki de manière exhaustive, précise et structurée.
-** Règles de fonctionnement (Paragraphe par paragraphe) : **
-- Génération immédiate : À chaque fois que l'utilisateur t'envoie un paragraphe, tu dois générer les cartes correspondantes directement. N'écris aucune phrase d'introduction, de confirmation ou de conclusion.
-- Zéro déperdition : Absolument chaque information, mécanisme, chiffre et concept du paragraphe doit être transformé en carte.
-- Traitement des œuvres/articles : Si le paragraphe mentionne un ouvrage ou un article, génère systématiquement une carte de cours classique, PLUS une carte dédiée spécifiquement à la mémorisation de son contenu. (Exemple de recto : Quelle est la thèse centrale de [Auteur] dans [Œuvre] ([Date]) ?).
-- Format des cartes: Elles doivent être écrites et formatées en HTML brut entièrement.
-** Règles de formatage (Style HTML obligatoire) : **
-Tu dois impérativement utiliser les balises HTML et le CSS inline suivants pour formater le texte des cartes (en particulier le verso/réponse) :
-Éléments textuels :
-- Dates d'événements : <span style="color: red; font-weight: bold; text-decoration: underline;">Date</span>
-- Citations : <span style="background-color: plum; font-style: italic;">"Citation"</span>
-- Œuvres (titre + date + auteur) : <span style="background-color: yellow; font-style: italic;">Œuvre</span>
-- Articles (titre + date + auteur) : <span style="background-color: yellow;">"Article"</span>
-- Théorie principale : <span style="color: red; font-weight: bold;">Théorie</span>
-- Énumérations: <ul> <li> Texte </li> autres balises li ... </ul>
-Caractères spéciaux et mathématiques : Utiliser la syntaxe MathJax entre des balises latex (ex: [latex]$x = y$[/latex]).
-** Éléments graphiques (images et tableaux) : **
-Le paragraphe peut contenir des marqueurs [IMAGE n] (avec sa description) et [TABLEAU n] (avec son contenu en markdown).
-- Pour afficher une image dans une carte, écris exactement {{IMG:n}} à l'endroit voulu (recto ou verso). N'écris JAMAIS de balise <img> et n'invente JAMAIS de nom de fichier : l'application remplace {{IMG:n}} par l'image correspondante.
-- Pour réutiliser un tableau, écris exactement {{TABLE:n}}. Ne recopie jamais le tableau à la main, l'application injecte le tableau complet en HTML.
-- Un graphique ou un schéma mérite en général une carte dédiée : recto = question sur ce que montre le document, verso = {{IMG:n}} suivi de l'interprétation.
-- Un tableau de données mérite une carte de restitution globale ({{TABLE:n}} au verso) ET des cartes ciblées sur les valeurs ou comparaisons marquantes.
-- Si une image n'a aucune description, ne devine pas son contenu : crée seulement une carte où elle illustre le texte voisin.
-** Règle de sortie: **
-Ne rends que le résultat sous forme de texte csv, colonnes séparées par des tabulations.
-Chaque ligne = une carte. Format : QUESTION[TAB]RÉPONSE
-Aucune ligne d'intro, aucun commentaire, aucun bloc markdown."""
-
 
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
 def build_deck_path(stack, prefix):
-    """Construit le chemin de deck Anki depuis la pile hiérarchique."""
-    parts = [prefix] + [t for _, t in stack]
-    return "::".join(parts)
+    """
+    Chemin de deck Anki depuis la pile hiérarchique.
+
+    Le préfixe est optionnel depuis l'ouverture au public. On filtre les segments
+    vides au lieu de les joindre : `"::".join(["", "Chapitre"])` donnerait
+    « ::Chapitre », que Anki refuse.
+    """
+    segments = [(prefix or "").strip()] + [title for _, title in stack]
+    return "::".join(segment for segment in segments if segment)
 
 
 def split_chapter_title(stem: str):
@@ -99,7 +78,8 @@ def number_blocks(blocks: list) -> list:
 # Parsing
 # ──────────────────────────────────────────────
 def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
-               media_dir: Path = None, title_stem: str = None):
+               media_dir: Path = None, title_stem: str = None,
+               lang: str = DEFAULT_LANG):
     """
     Parse le .docx et retourne (chunks, assets, warnings).
 
@@ -132,10 +112,12 @@ def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
             or b["type"] in ("image", "table")
             for b in blocks
         )
-        # `deck != deck_prefix` : on ignore le contenu antérieur au premier titre
-        # (ligne de titre du chapitre, intro) — comportement aligné sur main.
-        if has_content and deck != deck_prefix:
-            prompt = render_prompt_text(blocks, store.assets)
+        # `stack` vide = on n'est pas encore entré dans une section : c'est le
+        # contenu antérieur au premier titre (ligne de titre, intro), qu'on
+        # ignore. L'ancienne condition `deck != deck_prefix` disait la même chose
+        # de façon détournée, et devenait fausse avec un préfixe vide.
+        if has_content and stack:
+            prompt = render_prompt_text(blocks, store.assets, lang)
             chunks.append({
                 "deck": deck,
                 "blocks": blocks,
@@ -165,7 +147,7 @@ def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
     return chunks, store.assets, store.warnings
 
 
-def build_prompts(chunks, assets=None):
+def build_prompts(chunks, assets=None, lang=DEFAULT_LANG):
     """Génère la liste de prompts à partir des chunks."""
     assets = assets or {}
     prompts = []
@@ -173,10 +155,10 @@ def build_prompts(chunks, assets=None):
         prompts.append({
             "id": i,
             "deck": chunk["deck"],
-            "prompt": chunk.get("prompt") or render_prompt_text(chunk.get("blocks", []), assets),
+            "prompt": chunk.get("prompt")
+                      or render_prompt_text(chunk.get("blocks", []), assets, lang),
             "blocks": chunk.get("blocks", []),
             "assets": chunk.get("assets", []),
-            "system": SYSTEM_PROMPT,
             "status": "pending",   # pending | done
             "response": ""
         })
@@ -233,7 +215,8 @@ def main():
     parser = argparse.ArgumentParser(description="Parse un cours .docx → prompts Anki JSON")
     parser.add_argument("docx", help="Chemin vers le fichier .docx")
     parser.add_argument("--output", default="prompts.json", help="Fichier JSON de sortie")
-    parser.add_argument("--deck-prefix", default="*ESH*", help="Nom du deck racine Anki")
+    parser.add_argument("--deck-prefix", default="",
+                        help="Préfixe de deck Anki (vide par défaut)")
     parser.add_argument("--media-dir", default=None,
                         help="Dossier de sortie des images (défaut: media/<nom du cours>)")
     parser.add_argument(

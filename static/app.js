@@ -98,9 +98,9 @@
                       : `<span class="alt-thumb--missing">✕</span>`}
           </div>
           <div class="alt-fields">
-            <label class="alt-tag">${img.n ? `{{IMG:${img.n}}}` : `image du {{TABLE:${img.in_table}}}`}</label>
+            <label class="alt-tag">${img.n ? `{{IMG:${img.n}}}` : `${window.T("js.image_in_table")} {{TABLE:${img.in_table}}}`}</label>
             <textarea rows="2" class="alt-input"
-              placeholder="Décris cette image pour Claude (ce que montre le graphique, ses axes, sa source…)">${escapeHtml(img.alt || "")}</textarea>
+              placeholder="${escapeHtml(window.T("js.alt_placeholder"))}">${escapeHtml(img.alt || "")}</textarea>
           </div>
           <div class="alt-actions">
             <span class="alt-status muted"></span>
@@ -117,7 +117,7 @@
     if (!chips.length) { els.insertBar.innerHTML = ""; els.insertBar.hidden = true; return; }
     els.insertBar.hidden = false;
     els.insertBar.innerHTML =
-      `<span class="muted">Insérer :</span>` +
+      `<span class="muted">${window.T("js.insert")}</span>` +
       chips.map((c) => `<button type="button" class="chip" data-insert="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
   }
 
@@ -174,7 +174,8 @@
     const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("```") && !l.startsWith("#"));
     const cards = lines.filter((l) => l.includes("\t") || l.includes(","));
     const media = (text.match(/\{\{\s*(IMG|IMAGE|TABLE|TABLEAU)\s*[:\-# ]?\s*\d+\s*\}\}/gi) || []).length;
-    els.cardsInfo.textContent = `${cards.length} carte(s)` + (media ? ` · ${media} média(s)` : "");
+    els.cardsInfo.textContent = window.T("js.cards_count", { n: cards.length })
+      + (media ? " · " + window.T("js.media_count", { n: media }) : "");
   }
 
   // ── Aperçu des cartes ──────────────────────────────────────
@@ -192,7 +193,7 @@
 
       if (!data.cards.length) {
         els.cardsPreview.innerHTML =
-          `<div class="pane-note empty">Aucune carte à prévisualiser — colle d'abord la réponse de Claude.</div>`;
+          `<div class="pane-note empty">${window.T("js.no_cards_to_preview")}</div>`;
         return;
       }
       const warn = data.unknown_placeholders.length
@@ -219,7 +220,7 @@
     els.previewBtn.setAttribute("aria-pressed", String(showCards));
     els.previewBtn.classList.toggle("copied", showCards);
     const lbl = els.previewBtn.querySelector(".lbl");
-    if (lbl) lbl.textContent = showCards ? "Éditer" : "Aperçu";
+    if (lbl) lbl.textContent = showCards ? window.T("js.edit") : window.T("js.preview");
     if (showCards) refreshCardsPreview();
   }
 
@@ -245,14 +246,14 @@
       const li = els.list.querySelector(`.chunk-item[data-id="${p.id}"]`);
       if (li) li.dataset.status = p.status;
       updateProgress();
-      toast(`✓ Chunk #${p.id} enregistré — ${data.cards_detected} carte(s)`, "ok");
+      toast("✓ " + window.T("js.chunk_saved", { id: p.id, n: data.cards_detected }), "ok");
 
       if (advance) {
         if (currentIdx < prompts.length - 1) {
           navigateTo(currentIdx + 1);
           focusPane("answer");
         } else {
-          toast("Dernier chunk : tout est enregistré.", "ok");
+          toast(window.T("js.all_saved"), "ok");
         }
       }
     } catch (e) {
@@ -290,7 +291,7 @@
         }
       });
       row.classList.toggle("alt-row--missing", !data.alt);
-      status.textContent = `✓ ${data.updated.length} chunk(s)`;
+      status.textContent = "✓ " + window.T("js.alt_saved", { n: data.updated.length });
       status.className = "alt-status ok";
 
       const p = prompts[currentIdx];
@@ -333,9 +334,9 @@
       sel.removeAllRanges();
       sel.addRange(range);
       selectEl.scrollIntoView({ block: "nearest" });
-      toast("Texte sélectionné — appuie sur Ctrl+C", "err", 4000);
+      toast(window.T("js.selected_press_ctrl_c"), "err", 4000);
     } else {
-      toast("✗ Copie impossible", "err", 2400);
+      toast("✗ " + window.T("js.copy_failed"), "err", 2400);
     }
     return false;
   }
@@ -345,14 +346,14 @@
     if (answerMode === "cards") setAnswerMode("edit");
     try {
       const text = await navigator.clipboard.readText();
-      if (!text) { toast("Presse-papier vide", "err", 1800); return; }
+      if (!text) { toast(window.T("js.clipboard_empty"), "err", 1800); return; }
       els.response.value = text;
       updateCardsInfo();
       setDirty(true);
-      toast("✓ Réponse collée", "ok", 1400);
+      toast("✓ " + window.T("js.response_pasted"), "ok", 1400);
     } catch {
       els.response.focus();
-      toast("Autorise le presse-papier, ou colle avec Ctrl+V", "err", 3200);
+      toast(window.T("js.clipboard_denied"), "err", 3200);
     }
   }
 
@@ -364,17 +365,18 @@
   let lastReport = null;
 
   async function loadReport() {
-    exportReport.textContent = "Calcul du rapport…";
+    exportReport.textContent = window.T("js.computing_report");
     try {
       const r = await fetch(window.__API_REPORT_URL__);
       const data = await r.json();
       lastReport = data;
-      const bits = [`${data.cards} carte(s)`, `${data.media.length} image(s) utilisée(s)`];
-      if (data.unused_assets.length) bits.push(`${data.unused_assets.length} image(s) non exploitée(s)`);
-      if (data.unknown_placeholders.length) bits.push(`${data.unknown_placeholders.length} placeholder(s) orphelin(s)`);
+      const bits = [window.T("js.cards_count", { n: data.cards }),
+                    window.T("js.images_used", { n: data.media.length })];
+      if (data.unused_assets.length) bits.push(window.T("js.images_unused", { n: data.unused_assets.length }));
+      if (data.unknown_placeholders.length) bits.push(window.T("js.orphan_placeholders", { n: data.unknown_placeholders.length }));
       exportReport.textContent = bits.join(" · ");
     } catch {
-      exportReport.textContent = "Rapport indisponible.";
+      exportReport.textContent = window.T("js.report_unavailable");
     }
   }
 
@@ -383,11 +385,11 @@
     exportProfiles.hidden = false;
     if (!profiles.length) {
       exportProfiles.innerHTML =
-        `<div class="muted">Aucun profil Anki détecté sur cette machine. Utilise l'export ZIP.</div>`;
+        `<div class="muted">${window.T("js.no_anki_profile")}</div>`;
       return;
     }
     exportProfiles.innerHTML =
-      `<div class="muted">Anki doit être fermé. Choisis le profil :</div>` +
+      `<div class="muted">${window.T("js.choose_profile")}</div>` +
       profiles.map((p) => `
         <button type="button" class="profile-btn" data-path="${escapeHtml(p.path)}">
           ${escapeHtml(p.profile)} <span class="muted">(${p.files} fichiers)</span>
@@ -395,7 +397,7 @@
   }
 
   async function copyMedia(path) {
-    exportStatus.textContent = "Copie en cours…";
+    exportStatus.textContent = window.T("js.copying");
     exportStatus.className = "export-status muted";
     try {
       const r = await fetch(window.__API_ANKI_MEDIA_URL__, {
@@ -406,10 +408,10 @@
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Erreur");
       const res = data.result;
-      const bits = [`${res.copied.length} copiée(s)`];
-      if (res.identical.length) bits.push(`${res.identical.length} déjà à jour`);
-      if (res.conflicts.length) bits.push(`⚠️ ${res.conflicts.length} conflit(s) : ${res.conflicts.join(", ")}`);
-      if (res.missing.length) bits.push(`⚠️ ${res.missing.length} introuvable(s)`);
+      const bits = [window.T("js.copied_count", { n: res.copied.length })];
+      if (res.identical.length) bits.push(window.T("js.already_current", { n: res.identical.length }));
+      if (res.conflicts.length) bits.push("⚠️ " + window.T("js.conflicts", { n: res.conflicts.length, names: res.conflicts.join(", ") }));
+      if (res.missing.length) bits.push("⚠️ " + window.T("js.missing_count", { n: res.missing.length }));
       exportStatus.textContent = bits.join(" · ");
       exportStatus.className = res.conflicts.length || res.missing.length
         ? "export-status err" : "export-status ok";
@@ -419,14 +421,52 @@
     }
   }
 
+  // ── Export : télécharge ET écrit dans le dossier configuré ───
+  async function runExport(url) {
+    exportStatus.textContent = window.T("js.exporting");
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("export failed");
+
+      const blob = await res.blob();
+      const name = (res.headers.get("Content-Disposition") || "")
+        .split("filename=").pop().replace(/["';]/g, "") || "export";
+
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+
+      const error = res.headers.get("X-Export-Error");
+      const path = res.headers.get("X-Export-Path");
+      if (error) {
+        toast(decodeURIComponent(error), "err", 5000);
+        exportStatus.textContent = "";
+      } else if (path) {
+        const decoded = decodeURIComponent(path);
+        toast(window.T("js.exported_to", { path: decoded }), "ok", 4000);
+        exportStatus.textContent = decoded;
+      }
+    } catch (e) {
+      toast(window.T("js.export_failed"), "err");
+      exportStatus.textContent = "";
+    }
+  }
+
   if (exportMenu) {
     exportMenu.addEventListener("toggle", () => {
       if (exportMenu.open) loadReport();
       else { exportProfiles.hidden = true; exportStatus.textContent = ""; }
     });
     $("copy-media-btn").addEventListener("click", renderProfiles);
-    $("copy-system-btn").addEventListener("click", () =>
-      copyText(window.__SYSTEM_PROMPT__ || "", "✓ Prompt système copié"));
+    ["export-tsv-btn", "export-zip-btn"].forEach((id) => {
+      const btn = $(id);
+      if (btn) btn.addEventListener("click", () => runExport(btn.dataset.exportUrl));
+    });
     exportProfiles.addEventListener("click", (ev) => {
       const btn = ev.target.closest(".profile-btn");
       if (btn) copyMedia(btn.dataset.path);
@@ -459,7 +499,7 @@
   });
   els.copyBtn.addEventListener("click", async () => {
     focusPane("source");
-    const ok = await copyText(prompts[currentIdx].prompt, "✓ Paragraphe copié", els.curPrompt);
+    const ok = await copyText(prompts[currentIdx].prompt, "✓ " + window.T("js.paragraph_copied"), els.curPrompt);
     if (ok) {
       els.copyBtn.classList.add("copied");
       setTimeout(() => els.copyBtn.classList.remove("copied"), 1200);
@@ -537,7 +577,7 @@
       els.response.value = ev.target.result;
       updateCardsInfo();
       setDirty(true);
-      toast(`✓ ${file.name} chargé`, "ok", 1600);
+      toast("✓ " + window.T("js.file_loaded", { name: file.name }), "ok", 1600);
     };
     reader.readAsText(file);
   });
@@ -574,6 +614,6 @@
   render();
   updateProgress();
   if (window.__MISSING_ALT__) {
-    toast(`${window.__MISSING_ALT__} image(s) sans description`, null, 3600);
+    toast(window.T("js.missing_alt", { n: window.__MISSING_ALT__ }), null, 3600);
   }
 })();

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-app.py — Interface web pour le pipeline Anki ESH.
+app.py — Interface web pour le pipeline Ankigen.
 
 Lance:
     .venv/bin/python app.py
@@ -11,6 +11,7 @@ import io
 import re
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 from flask import (
     Flask,
@@ -25,8 +26,10 @@ from flask import (
 )
 
 import paths
+import settings as user_settings
 from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
-from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
+from i18n import DEFAULT_LANG, available_languages, catalog_for_js, translate
+from parse_cours import build_prompts, parse_docx
 from project_store import (
     PROJECT_VERSION,
     copy_media,
@@ -49,12 +52,17 @@ ROOT = paths.DATA_DIR
 UPLOAD_DIR = paths.UPLOAD_DIR
 PROJECTS_DIR = paths.PROJECTS_DIR
 MEDIA_DIR = paths.MEDIA_DIR
-EXPORT_DIR = paths.EXPORT_DIR
 
 paths.ensure_dirs()
 paths.migrate_legacy_data()
 
 SAFE_MEDIA_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
+
+# Templates de Skill Claude proposés sur /help. Ce sont des documents de
+# plusieurs dizaines de lignes : les garder en fichiers les rend relisibles et
+# modifiables sans toucher au HTML, et le rendu Jinja les échappe, donc le
+# HTML des cartes d'exemple s'affiche en clair au lieu d'être interprété.
+SKILL_TEMPLATE_DIR = paths.APP_DIR / "skill_templates"
 
 app = Flask(
     __name__,
@@ -62,6 +70,37 @@ app = Flask(
     static_folder=str(paths.APP_DIR / "static"),
 )
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
+
+
+# ──────────────────────────────────────────────────────────────
+# Langue et préférences
+# ──────────────────────────────────────────────────────────────
+def current_lang():
+    return user_settings.load_settings()["language"]
+
+
+def tr(key, **params):
+    """Traduction hors template (messages JSON, en-têtes, contenus d'archive)."""
+    return translate(key, current_lang(), **params)
+
+
+@app.context_processor
+def inject_i18n():
+    """
+    Injecte `t`, `lang` et les préférences dans tous les templates.
+
+    Les préférences sont relues à chaque rendu : le fichier est minuscule, et un
+    cache ferait diverger l'affichage juste après un changement de langue.
+    """
+    prefs = user_settings.load_settings()
+    lang = prefs["language"]
+    return {
+        "t": lambda key, **params: translate(key, lang, **params),
+        "lang": lang,
+        "prefs": prefs,
+        "js_i18n": catalog_for_js(lang),
+        "languages": available_languages(),
+    }
 
 
 def sanitize_filename(filename):
@@ -90,6 +129,40 @@ def tsv_bytes(rows) -> bytes:
     return buf.getvalue().encode("utf-8")
 
 
+def _write_export_copy(filename, data):
+    """
+    Écrit une copie de l'export dans le dossier choisi par l'utilisateur.
+
+    Retourne (chemin, None) ou (None, clé de message). Un réglage devenu invalide
+    doit dégrader l'export en simple téléchargement, jamais le faire échouer :
+    l'utilisateur veut son fichier, pas un message d'erreur sur un réglage.
+    """
+    directory = user_settings.resolve_download_dir()
+    if directory is None:
+        return None, "export.dir_unavailable"
+    try:
+        target = directory / filename
+        target.write_bytes(data)
+        return str(target), None
+    except OSError:
+        return None, "export.write_failed"
+
+
+def _with_export_headers(response, filename, data):
+    """
+    Ajoute X-Export-Path / X-Export-Error à une réponse d'export.
+
+    Le chemin est percent-encodé : WSGI encode les en-têtes en latin-1, et un
+    dossier utilisateur peut contenir n'importe quel caractère. Le JS le repasse
+    par decodeURIComponent.
+    """
+    path, error = _write_export_copy(filename, data)
+    response.headers["X-Export-Path"] = quote(path or "")
+    if error:
+        response.headers["X-Export-Error"] = quote(tr(error))
+    return response
+
+
 # ──────────────────────────────────────────────────────────────
 # Pages
 # ──────────────────────────────────────────────────────────────
@@ -103,10 +176,10 @@ def upload():
     file = request.files.get("docx")
     if not file or not file.filename.lower().endswith(".docx"):
         return render_template(
-            "upload.html", error="Merci de fournir un fichier .docx.", projects=list_projects()
+            "upload.html", error=tr("upload.error_not_docx"), projects=list_projects()
         ), 400
 
-    deck_prefix = (request.form.get("deck_prefix") or "*ESH*").strip() or "*ESH*"
+    deck_prefix = (request.form.get("deck_prefix") or "").strip()
     project_id = sanitize_filename(file.filename)
 
     # Ensure unique project_id
@@ -124,18 +197,18 @@ def upload():
     try:
         chunks, assets, warnings = parse_docx(
             saved, deck_prefix, project_id=project_id,
-            title_stem=Path(file.filename).stem,
+            title_stem=Path(file.filename).stem, lang=current_lang(),
         )
     except Exception as e:
         return render_template(
-            "upload.html", error=f"Erreur de parsing : {e}", projects=list_projects()
+            "upload.html", error=tr("upload.error_parsing", error=e), projects=list_projects()
         ), 500
 
     if not chunks:
         return (
             render_template(
                 "upload.html",
-                error="Aucun chunk détecté dans ce document.",
+                error=tr("upload.error_no_chunks"),
                 projects=list_projects(),
             ),
             400,
@@ -147,7 +220,7 @@ def upload():
         "source": file.filename,
         "assets": assets,
         "warnings": warnings,
-        "prompts": build_prompts(chunks, assets),
+        "prompts": build_prompts(chunks, assets, current_lang()),
     }
     save_project(project_id, project)
     return redirect(url_for("work", project_id=project_id))
@@ -162,11 +235,47 @@ def work(project_id):
         "work.html",
         project_id=project_id,
         prompts=project_view(project, project_id),
-        system_prompt=project["prompts"][0].get("system") or SYSTEM_PROMPT,
         progress=progress(project),
         missing_alt=missing_alt_count(project),
         warnings=project.get("warnings", []),
     )
+
+
+@app.route("/settings")
+def settings_page():
+    return render_template("settings.html")
+
+
+def load_skill_template(lang):
+    """Template de Skill dans la langue demandée, avec repli sur l'anglais."""
+    for candidate in (lang, DEFAULT_LANG):
+        try:
+            return (SKILL_TEMPLATE_DIR / f"{candidate}.md").read_text(encoding="utf-8")
+        except OSError:
+            continue
+    return ""
+
+
+@app.route("/help")
+def help_page():
+    return render_template("help.html",
+                           skill_template=load_skill_template(current_lang()))
+
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    if request.method == "GET":
+        return jsonify(user_settings.load_settings())
+    data = request.get_json(silent=True) or {}
+    return jsonify(ok=True, settings=user_settings.save_settings(data))
+
+
+@app.route("/api/settings/check-dir", methods=["POST"])
+def api_settings_check_dir():
+    """Dit à l'interface si un dossier candidat tient debout, sans rien enregistrer."""
+    data = request.get_json(silent=True) or {}
+    ok, message_key = user_settings.check_dir(data.get("path") or "")
+    return jsonify(ok=ok, message=tr(message_key))
 
 
 # ──────────────────────────────────────────────────────────────
@@ -191,9 +300,9 @@ def api_asset(project_id, asset_id):
     alt = (data.get("alt") or "").strip()
 
     try:
-        touched = set_asset_alt(project, asset_id, alt)
+        touched = set_asset_alt(project, asset_id, alt, current_lang())
     except KeyError:
-        return jsonify(error=f"asset {asset_id} introuvable"), 404
+        return jsonify(error=tr("api.asset_not_found", id=asset_id)), 404
 
     save_project(project_id, project)
     prompts = {
@@ -217,13 +326,13 @@ def api_asset(project_id, asset_id):
 def api_save(project_id):
     project = load_project(project_id)
     if not project:
-        return jsonify(error="Projet introuvable."), 404
+        return jsonify(error=tr("api.project_not_found")), 404
 
     data = request.get_json(silent=True) or {}
     try:
         chunk_id = int(data.get("id"))
     except (TypeError, ValueError):
-        return jsonify(error="id manquant ou invalide"), 400
+        return jsonify(error=tr("api.bad_id")), 400
 
     response = (data.get("response") or "").strip()
     mark_done = bool(data.get("mark_done", True))
@@ -245,7 +354,7 @@ def api_save(project_id):
                 progress=progress(project),
             )
 
-    return jsonify(error=f"chunk {chunk_id} introuvable"), 404
+    return jsonify(error=tr("api.chunk_not_found", id=chunk_id)), 404
 
 
 @app.route("/api/preview/<project_id>", methods=["POST"])
@@ -259,11 +368,11 @@ def api_preview(project_id):
     try:
         chunk_id = int(data.get("id"))
     except (TypeError, ValueError):
-        return jsonify(error="id manquant ou invalide"), 400
+        return jsonify(error=tr("api.bad_id")), 400
 
     prompt = next((p for p in project["prompts"] if p["id"] == chunk_id), None)
     if prompt is None:
-        return jsonify(error=f"chunk {chunk_id} introuvable"), 404
+        return jsonify(error=tr("api.chunk_not_found", id=chunk_id)), 404
 
     response = data.get("response")
     if response is None:
@@ -303,16 +412,15 @@ def export_tsv(project_id):
 
     rows, report = export_rows(project, only_done=only_done)
     data = tsv_bytes(rows)
+    filename = f"{project_id}_export.tsv"
 
-    # Copie locale, à côté des autres données de l'app
-    (EXPORT_DIR / f"{project_id}_export.tsv").write_bytes(data)
-
-    return send_file(
+    response = send_file(
         io.BytesIO(data),
         mimetype="text/tab-separated-values; charset=utf-8",
         as_attachment=True,
-        download_name=f"{project_id}_export.tsv",
+        download_name=filename,
     )
+    return _with_export_headers(response, filename, data)
 
 
 @app.route("/export.zip/<project_id>")
@@ -331,31 +439,33 @@ def export_zip(project_id):
             src = media_dir / name
             if src.exists():
                 zf.write(src, f"media/{name}")
+        # Le nom du fichier suit la langue : un francophone ne cherche pas README.txt.
         zf.writestr(
-            "LISEZ-MOI.txt",
+            tr("export.readme_filename"),
             "\r\n".join([
-                f"Export Anki-Gen — {project_id}",
+                tr("export.readme_title", project=project_id),
                 "",
-                f"{report['cards']} carte(s), {len(report['media'])} image(s).",
+                tr("export.readme_counts",
+                   cards=report["cards"], images=len(report["media"])),
                 "",
-                "1. Copiez TOUT le contenu du dossier media/ dans le dossier",
-                "   collection.media de votre profil Anki (Anki doit être fermé) :",
-                "   Windows : %APPDATA%\\Anki2\\<profil>\\collection.media",
-                "2. Dans Anki : Fichier > Importer, choisissez le fichier .tsv.",
-                "   Le séparateur (tabulation), le HTML et la colonne de deck sont",
-                "   déjà déclarés dans l'en-tête du fichier.",
+                tr("export.readme_step_media"),
+                tr("export.readme_step_media_path"),
+                tr("export.readme_step_import"),
+                tr("export.readme_step_header"),
                 "",
-                "Astuce : le bouton « Copier les médias dans Anki » de l'application",
-                "fait l'étape 1 automatiquement.",
+                tr("export.readme_tip"),
             ]),
         )
     buf.seek(0)
-    return send_file(
-        buf,
+    data = buf.getvalue()
+    filename = f"{project_id}_export.zip"
+    response = send_file(
+        io.BytesIO(data),
         mimetype="application/zip",
         as_attachment=True,
-        download_name=f"{project_id}_export.zip",
+        download_name=filename,
     )
+    return _with_export_headers(response, filename, data)
 
 
 @app.route("/api/export/report/<project_id>")
@@ -381,13 +491,13 @@ def api_export_anki_media(project_id):
 
     allowed = {p["path"] for p in paths.anki_media_dirs()}
     if destination not in allowed:
-        return jsonify(error="Dossier collection.media inconnu ou introuvable."), 400
+        return jsonify(error=tr("api.unknown_media_dir")), 400
 
     _, report = export_rows(project, only_done=only_done)
     if not report["media"]:
         return jsonify(ok=True, result={"copied": [], "identical": [], "conflicts": [],
                                         "missing": [], "destination": destination},
-                       message="Aucune image utilisée par les cartes.")
+                       message=tr("api.no_media_used"))
 
     result = copy_media(project_id, report["media"], Path(destination))
     return jsonify(ok=True, result=result)
@@ -427,6 +537,7 @@ def api_update_apply():
     """Applique la mise à jour depuis GitHub Releases."""
     from updater import check_and_update
     result = check_and_update()
+    result["message"] = tr(result.pop("message_key"), **result.pop("message_params"))
     status_code = 200 if result["status"] != "error" else 500
     return jsonify(result), status_code
 

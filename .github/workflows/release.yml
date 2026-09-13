@@ -13,13 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Créer app.zip (fichiers Python + templates + static)
+      - name: Créer app.zip (modules Python + templates + static + locales)
         run: |
           mkdir -p release/app
 
           # Copier les fichiers applicatifs
-          cp app.py parse_cours.py build_anki_csv.py launcher.py updater.py release/app/
-          cp -r templates static release/app/
+          cp app.py launcher.py parse_cours.py build_anki_csv.py \
+             docx_blocks.py media_store.py render.py paths.py \
+             project_store.py updater.py settings.py i18n.py release/app/
+          cp -r templates static locales release/app/
 
           # Générer version.json depuis le tag
           VERSION="${GITHUB_REF_NAME#v}"

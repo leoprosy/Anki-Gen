@@ -1,8 +1,14 @@
-# Anki-Gen (Anki ESH)
+<img src="static/logo.svg" alt="" width="72" align="left" hspace="12">
 
-Anki-Gen est une application locale hybride (backend Flask en Python + frontend web encapsulé dans une app desktop Tauri) qui permet d'automatiser et de faciliter la création de flashcards Anki à partir de vos cours au format `.docx`.
+# Ankigen
 
-L'application découpe votre document Word en différents blocs (chunks) selon la structure hiérarchique du plan (I., A., 1)). Elle vous permet ensuite d'utiliser l'IA (comme Claude) pour générer des cartes (Question/Réponse) pour chaque paragraphe, puis d'exporter le tout en un fichier `.csv` formaté pour l'import Anki.
+**Turn a `.docx` course into an Anki deck, one paragraph at a time.**
+
+Ankigen est une application locale hybride (backend Flask en Python + frontend web encapsulé dans une app desktop Tauri) qui automatise la création de flashcards Anki à partir de cours au format `.docx`.
+
+L'application découpe le document selon la hiérarchie de ses styles de titre, vous laisse envoyer chaque bloc à Claude pour en tirer des cartes Question/Réponse, puis exporte le tout au format attendu par Anki — images et tableaux compris.
+
+L'interface est disponible en **anglais et en français** (anglais par défaut) ; la langue, le dossier d'export et le préfixe de deck se règlent dans **Paramètres**. La page **Mode d'emploi** décrit le flux complet et comment écrire son propre Skill Claude.
 
 ---
 
@@ -21,8 +27,7 @@ Si vous voulez modifier le code ou lancer l'application rapidement sans la compi
 1. **Lancer le backend web classique :**
 
    ```bash
-   # Depuis la racine du projet, avec votre environnement virtuel activé
-   python app.py
+   .venv/Scripts/python.exe app.py
    ```
 
    Rendez-vous ensuite sur `http://127.0.0.1:5000` dans votre navigateur.
@@ -31,7 +36,7 @@ Si vous voulez modifier le code ou lancer l'application rapidement sans la compi
    ```bash
    npm run tauri dev
    ```
-   _Note : Lancez d'abord le serveur Flask (`python app.py`) en arrière-plan, car Tauri en mode développement s'attendra à ce que le port 5000 soit actif._
+   _Note : Lancez d'abord le serveur Flask (`.venv/Scripts/python.exe app.py`) en arrière-plan, car Tauri en mode développement s'attendra à ce que le port 5000 soit actif._
 
 ---
 
@@ -155,7 +160,8 @@ le HTML et la colonne de deck sont déjà déclarés dans l'en-tête du fichier.
 
 - **En développement** (`python app.py`) : dans le dossier du projet
   (`projects/`, `uploads/`, `media/`, `exports/`).
-- **Dans l'app packagée** : dans `%APPDATA%\Anki-Gen\`. C'est indispensable —
+- **Dans l'app packagée** : dans `%APPDATA%\AnkiGen\` (`settings.json`, `projects/`,
+  `uploads/`, `media/`, `exports/`). C'est indispensable —
   un exécutable PyInstaller *onefile* est déballé dans un dossier temporaire, tout
   ce qui y serait écrit disparaîtrait à la fermeture.
 
@@ -163,7 +169,7 @@ Le port du serveur de dev peut être changé avec `ANKI_GEN_PORT` (utile quand l
 installée occupe déjà le port 5000) :
 
 ```bash
-ANKI_GEN_PORT=5001 python app.py
+ANKI_GEN_PORT=5051 .venv/Scripts/python.exe app.py
 ```
 
 ---
@@ -171,7 +177,7 @@ ANKI_GEN_PORT=5001 python app.py
 ## 🧪 Tests
 
 ```bash
-python tests/test_docx_media.py
+.venv/Scripts/python.exe -m unittest discover -s tests
 ```
 
 Les fixtures `.docx` (images avec/sans alt, image seule dans un paragraphe, image

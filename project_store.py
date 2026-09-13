@@ -5,7 +5,7 @@ project_store.py — Lecture / écriture / export des projets Anki-Gen.
 Format v2 (objet) :
 {
   "version": 2,
-  "deck_prefix": "*ESH*",
+  "deck_prefix": "Economics",
   "source": "CH8_ La croissance économique.docx",
   "assets": {"img_1": {...}},
   "prompts": [{"id", "deck", "blocks", "assets", "prompt",

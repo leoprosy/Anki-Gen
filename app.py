@@ -136,7 +136,7 @@ def upload():
     file = request.files.get("docx")
     if not file or not file.filename.lower().endswith(".docx"):
         return render_template(
-            "upload.html", error="Merci de fournir un fichier .docx.", projects=list_projects()
+            "upload.html", error=tr("upload.error_not_docx"), projects=list_projects()
         ), 400
 
     deck_prefix = (request.form.get("deck_prefix") or "").strip()
@@ -161,14 +161,14 @@ def upload():
         )
     except Exception as e:
         return render_template(
-            "upload.html", error=f"Erreur de parsing : {e}", projects=list_projects()
+            "upload.html", error=tr("upload.error_parsing", error=e), projects=list_projects()
         ), 500
 
     if not chunks:
         return (
             render_template(
                 "upload.html",
-                error="Aucun chunk détecté dans ce document.",
+                error=tr("upload.error_no_chunks"),
                 projects=list_projects(),
             ),
             400,
@@ -252,7 +252,7 @@ def api_asset(project_id, asset_id):
     try:
         touched = set_asset_alt(project, asset_id, alt)
     except KeyError:
-        return jsonify(error=f"asset {asset_id} introuvable"), 404
+        return jsonify(error=tr("api.asset_not_found", id=asset_id)), 404
 
     save_project(project_id, project)
     prompts = {
@@ -276,13 +276,13 @@ def api_asset(project_id, asset_id):
 def api_save(project_id):
     project = load_project(project_id)
     if not project:
-        return jsonify(error="Projet introuvable."), 404
+        return jsonify(error=tr("api.project_not_found")), 404
 
     data = request.get_json(silent=True) or {}
     try:
         chunk_id = int(data.get("id"))
     except (TypeError, ValueError):
-        return jsonify(error="id manquant ou invalide"), 400
+        return jsonify(error=tr("api.bad_id")), 400
 
     response = (data.get("response") or "").strip()
     mark_done = bool(data.get("mark_done", True))
@@ -304,7 +304,7 @@ def api_save(project_id):
                 progress=progress(project),
             )
 
-    return jsonify(error=f"chunk {chunk_id} introuvable"), 404
+    return jsonify(error=tr("api.chunk_not_found", id=chunk_id)), 404
 
 
 @app.route("/api/preview/<project_id>", methods=["POST"])
@@ -318,11 +318,11 @@ def api_preview(project_id):
     try:
         chunk_id = int(data.get("id"))
     except (TypeError, ValueError):
-        return jsonify(error="id manquant ou invalide"), 400
+        return jsonify(error=tr("api.bad_id")), 400
 
     prompt = next((p for p in project["prompts"] if p["id"] == chunk_id), None)
     if prompt is None:
-        return jsonify(error=f"chunk {chunk_id} introuvable"), 404
+        return jsonify(error=tr("api.chunk_not_found", id=chunk_id)), 404
 
     response = data.get("response")
     if response is None:
@@ -390,22 +390,21 @@ def export_zip(project_id):
             src = media_dir / name
             if src.exists():
                 zf.write(src, f"media/{name}")
+        # Le nom du fichier suit la langue : un francophone ne cherche pas README.txt.
         zf.writestr(
-            "LISEZ-MOI.txt",
+            tr("export.readme_filename"),
             "\r\n".join([
-                f"Export Anki-Gen — {project_id}",
+                tr("export.readme_title", project=project_id),
                 "",
-                f"{report['cards']} carte(s), {len(report['media'])} image(s).",
+                tr("export.readme_counts",
+                   cards=report["cards"], images=len(report["media"])),
                 "",
-                "1. Copiez TOUT le contenu du dossier media/ dans le dossier",
-                "   collection.media de votre profil Anki (Anki doit être fermé) :",
-                "   Windows : %APPDATA%\\Anki2\\<profil>\\collection.media",
-                "2. Dans Anki : Fichier > Importer, choisissez le fichier .tsv.",
-                "   Le séparateur (tabulation), le HTML et la colonne de deck sont",
-                "   déjà déclarés dans l'en-tête du fichier.",
+                tr("export.readme_step_media"),
+                tr("export.readme_step_media_path"),
+                tr("export.readme_step_import"),
+                tr("export.readme_step_header"),
                 "",
-                "Astuce : le bouton « Copier les médias dans Anki » de l'application",
-                "fait l'étape 1 automatiquement.",
+                tr("export.readme_tip"),
             ]),
         )
     buf.seek(0)
@@ -440,13 +439,13 @@ def api_export_anki_media(project_id):
 
     allowed = {p["path"] for p in paths.anki_media_dirs()}
     if destination not in allowed:
-        return jsonify(error="Dossier collection.media inconnu ou introuvable."), 400
+        return jsonify(error=tr("api.unknown_media_dir")), 400
 
     _, report = export_rows(project, only_done=only_done)
     if not report["media"]:
         return jsonify(ok=True, result={"copied": [], "identical": [], "conflicts": [],
                                         "missing": [], "destination": destination},
-                       message="Aucune image utilisée par les cartes.")
+                       message=tr("api.no_media_used"))
 
     result = copy_media(project_id, report["media"], Path(destination))
     return jsonify(ok=True, result=result)
@@ -486,6 +485,7 @@ def api_update_apply():
     """Applique la mise à jour depuis GitHub Releases."""
     from updater import check_and_update
     result = check_and_update()
+    result["message"] = tr(result.pop("message_key"), **result.pop("message_params"))
     status_code = 200 if result["status"] != "error" else 500
     return jsonify(result), status_code
 

@@ -52,12 +52,15 @@ class BaseFixtureTest(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def parse(self, name, deck_prefix="*TEST*"):
+    def parse(self, name, deck_prefix="*TEST*", lang="en"):
+        # `lang` explicite : les marqueurs [IMAGE n] / [TABLE n] partent dans le
+        # prompt copie vers Claude, ils suivent donc la langue de l'interface.
         return parse_docx(
             self.fixtures[name],
             deck_prefix,
             project_id=Path(name).stem,
             media_dir=self.media / Path(name).stem,
+            lang=lang,
         )
 
 
@@ -106,6 +109,11 @@ class TestImages(BaseFixtureTest):
     def test_prompt_signale_absence_de_description(self):
         chunks, assets, _ = self.parse("fixture_images.docx")
         prompts = "\n".join(c["prompt"] for c in chunks)
+        self.assertIn("no description available", prompts)
+
+    def test_prompt_signale_absence_de_description_en_francais(self):
+        chunks, assets, _ = self.parse("fixture_images.docx", lang="fr")
+        prompts = chr(10).join(c["prompt"] for c in chunks)
         self.assertIn("aucune description disponible", prompts)
 
 
@@ -192,6 +200,13 @@ class TestTables(BaseFixtureTest):
 
     def test_prompt_contient_le_tableau_et_son_placeholder(self):
         prompt = next(c["prompt"] for c in self.chunks
+                      if any(b["type"] == "table" for b in c["blocks"]))
+        self.assertIn("[TABLE 1]", prompt)
+        self.assertIn("{{TABLE:1}}", prompt)
+
+    def test_prompt_tableau_en_francais(self):
+        chunks, _, _ = self.parse("fixture_tables.docx", lang="fr")
+        prompt = next(c["prompt"] for c in chunks
                       if any(b["type"] == "table" for b in c["blocks"]))
         self.assertIn("[TABLEAU 1]", prompt)
         self.assertIn("{{TABLE:1}}", prompt)
@@ -370,7 +385,7 @@ class TestProjectStore(unittest.TestCase):
                 ),
             }],
         })
-        self.assertIn("aucune description", project["prompts"][0]["prompt"])
+        self.assertIn("no description available", project["prompts"][0]["prompt"])
         touched = set_asset_alt(project, "img_1", "Graphique du chômage")
         self.assertEqual(touched, [0])
         self.assertIn("Graphique du chômage", project["prompts"][0]["prompt"])

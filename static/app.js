@@ -467,8 +467,6 @@
       const btn = $(id);
       if (btn) btn.addEventListener("click", () => runExport(btn.dataset.exportUrl));
     });
-    $("copy-system-btn").addEventListener("click", () =>
-      copyText(window.__SYSTEM_PROMPT__ || "", "✓ Prompt système copié"));
     exportProfiles.addEventListener("click", (ev) => {
       const btn = ev.target.closest(".profile-btn");
       if (btn) copyMedia(btn.dataset.path);

@@ -8,9 +8,13 @@ Format v2 (objet) :
   "deck_prefix": "*ESH*",
   "source": "CH8_ La croissance économique.docx",
   "assets": {"img_1": {...}},
-  "prompts": [{"id", "deck", "blocks", "assets", "prompt", "system",
+  "prompts": [{"id", "deck", "blocks", "assets", "prompt",
                "status", "response"}]
 }
+
+Les projets créés avant l'ouverture au public portent un champ `system` (l'ancien
+prompt ESH embarqué). Il est conservé tel quel sur disque et simplement ignoré :
+le flux repose désormais sur un Skill Claude côté utilisateur, décrit dans /help.
 
 Les projets v1 (simple liste de prompts, sans médias) sont migrés à la volée :
 chaque prompt devient un bloc texte unique. Ils restent donc ouvrables.

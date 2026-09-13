@@ -9,6 +9,7 @@ Used in two ways:
 Set environment variable ANKI_ESH_SIDECAR=1 to suppress browser opening.
 """
 
+import json
 import os
 import shutil
 import socket
@@ -47,6 +48,15 @@ def get_data_dir():
         return os.path.dirname(os.path.abspath(__file__))
 
 
+def read_version(path):
+    """Version déclarée par un version.json, ou None s'il est absent/illisible."""
+    try:
+        with open(path, encoding='utf-8') as handle:
+            return json.load(handle).get('version')
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 APP_DIR = get_app_dir()
 DATA_DIR = get_data_dir()
 
@@ -60,12 +70,23 @@ if getattr(sys, 'frozen', False):
     if APP_DIR not in sys.path:
         sys.path.insert(0, APP_DIR)
 
-    # Première exécution : copier les fichiers embarqués dans APPDATA
+    # Déploie les fichiers embarqués dans APPDATA dès que la version livrée
+    # diffère de celle déjà déployée.
+    #
+    # L'ancienne condition était `si version.json n'existe pas` : une fois la
+    # première installation faite, réinstaller l'application ne remplaçait plus
+    # jamais le code d'APP_DIR. L'utilisateur installait la dernière version et
+    # relançait l'ancienne, sans aucun signe de ce qui se passait.
     _bundled = os.path.join(sys._MEIPASS, 'app_bundle')
-    _version_local = os.path.join(APP_DIR, 'version.json')
-    if os.path.isdir(_bundled) and not os.path.exists(_version_local):
-        shutil.copytree(_bundled, APP_DIR, dirs_exist_ok=True)
-        print(f"[bootstrap] Fichiers applicatifs copiés dans {APP_DIR}")
+    if os.path.isdir(_bundled):
+        _installed = read_version(os.path.join(APP_DIR, 'version.json'))
+        _shipped = read_version(os.path.join(_bundled, 'version.json'))
+        if _shipped and _shipped != _installed:
+            # copytree fusionne : seuls les fichiers présents dans le bundle sont
+            # écrasés, les données utilisateur (projects/, media/…) sont intactes.
+            shutil.copytree(_bundled, APP_DIR, dirs_exist_ok=True)
+            print(f'[bootstrap] Fichiers applicatifs déployés dans {APP_DIR} '
+                  f'({_installed or "aucune"} -> {_shipped})')
 
     # Applique une mise à jour préalablement téléchargée (updater.py), si présente.
     # Se fait avant tout import de app.py / démarrage de Waitress, donc jamais

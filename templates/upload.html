@@ -1,32 +1,31 @@
 {% extends "base.html" %}
-{% block title %}Anki ESH — Accueil{% endblock %}
+{% block title %}{{ t('app.name') }}{% endblock %}
 
 {% block shell_body %}
 <main class="page">
   <div class="page__head">
-    <h2>Générateur de cartes Anki</h2>
-    <p>Découpe un cours <code>.docx</code> en paragraphes, envoie-les à Claude, colle les réponses, exporte.</p>
+    <h2>{{ t('upload.page_title') }}</h2>
+    <p>{{ t('upload.page_subtitle') }}</p>
   </div>
 
   <div class="home-grid">
     <section class="card">
-      <h3>Nouveau cours</h3>
+      <h3>{{ t('upload.new_course') }}</h3>
       <p class="muted">
-        Le document est découpé selon les titres et la numérotation (I. / A) / 1)).
-        Chaque chunk donne un prompt à coller dans Claude.
+        {{ t('upload.new_course_help') }}
       </p>
 
       {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
       <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data" id="upload-form">
         <div class="field">
-          <span>Fichier .docx</span>
+          <span>{{ t('upload.file_label') }}</span>
           <div class="drop-zone" id="drop-zone" tabindex="0" role="button"
-            aria-label="Choisir un fichier .docx">
+            aria-label="{{ t('upload.file_label') }}">
             <span class="drop-zone__icon" id="drop-icon">
               <svg width="30" height="30" aria-hidden="true"><use href="#i-file"></use></svg>
             </span>
-            <span class="drop-zone__prompt">Glissez-déposez votre fichier ici, ou cliquez pour parcourir</span>
+            <span class="drop-zone__prompt">{{ t('upload.drop_hint') }}</span>
             <input type="file" name="docx" accept=".docx" id="file-input" required class="drop-zone__input">
           </div>
         </div>
@@ -38,13 +37,13 @@
           <small class="muted">{{ t('upload.deck_prefix_help') }}</small>
         </label>
 
-        <button type="submit" class="primary w-full">Parser et continuer</button>
+        <button type="submit" class="primary w-full">{{ t('upload.submit') }}</button>
       </form>
     </section>
 
     <section class="card">
-      <h3>Reprendre un cours</h3>
-      <p class="muted">{{ projects|length }} projet(s) en cours sur cette machine.</p>
+      <h3>{{ t('upload.resume') }}</h3>
+      <p class="muted">{{ t('upload.projects_count', n=projects|length) }}</p>
 
       {% if projects %}
       <div class="project-list">
@@ -61,17 +60,17 @@
             <div class="mini-bar"><span style="width: {{ pct }}%"></span></div>
           </div>
           <div class="project-row__actions">
-            <a href="{{ url_for('work', project_id=proj.id) }}" class="btn primary sm">Continuer</a>
+            <a href="{{ url_for('work', project_id=proj.id) }}" class="btn primary sm">{{ t('project.continue') }}</a>
             <form action="{{ url_for('delete_project', project_id=proj.id) }}" method="post"
-              onsubmit="return confirm('Supprimer ce projet définitivement ?');">
-              <button type="submit" class="btn danger sm">Supprimer</button>
+              onsubmit="return confirm(window.T('js.delete_confirm'));">
+              <button type="submit" class="btn danger sm">{{ t('project.delete') }}</button>
             </form>
           </div>
         </div>
         {% endfor %}
       </div>
       {% else %}
-      <div class="empty-state">Aucun projet pour l'instant — commence par importer un .docx.</div>
+      <div class="empty-state">{{ t('upload.empty_state') }}</div>
       {% endif %}
     </section>
   </div>
@@ -114,7 +113,7 @@
       const has = fileInput.files.length > 0;
       promptText.textContent = has
         ? fileInput.files[0].name
-        : 'Glissez-déposez votre fichier ici, ou cliquez pour parcourir';
+        : window.T('js.drop_hint');
       promptText.classList.toggle('selected', has);
       icon.innerHTML = `<svg width="30" height="30" aria-hidden="true"><use href="#i-${has ? 'check' : 'file'}"></use></svg>`;
       icon.style.color = has ? 'var(--success)' : '';

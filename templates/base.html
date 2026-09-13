@@ -110,8 +110,8 @@
     <div id="update-banner" class="update-banner">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-refresh"></use></svg>
       <span id="update-message"></span>
-      <button id="update-btn" type="button" class="update-apply">Mettre à jour</button>
-      <button type="button" class="update-dismiss" id="update-dismiss" aria-label="Masquer">✕</button>
+      <button id="update-btn" type="button" class="update-apply">{{ t('update.button') }}</button>
+      <button type="button" class="update-dismiss" id="update-dismiss" aria-label="{{ t('update.dismiss') }}">✕</button>
     </div>
 
     {% block shell_body %}{% endblock %}
@@ -158,28 +158,28 @@
         const data = await res.json();
         if (data.update_available) {
           document.getElementById('update-message').textContent =
-            `Version ${data.remote_version} disponible`;
+            window.T('js.update_available', { version: data.remote_version });
           updBanner.style.display = 'flex';
         }
       } catch (_) { /* silencieux hors-ligne */ }
     }
 
     updBtn.addEventListener('click', async () => {
-      updBtn.textContent = 'Mise à jour…';
+      updBtn.textContent = window.T('js.updating');
       updBtn.disabled = true;
       try {
         const res = await fetch('/api/update/apply', { method: 'POST' });
         const data = await res.json();
         document.getElementById('update-message').textContent = data.message;
         if (data.status === 'updated') {
-          updBtn.textContent = 'Redémarrer';
+          updBtn.textContent = window.T('js.restart');
           updBtn.onclick = () => location.reload();
         } else {
-          updBtn.textContent = 'Réessayer';
+          updBtn.textContent = window.T('js.retry');
         }
       } catch (e) {
-        document.getElementById('update-message').textContent = 'Erreur réseau.';
-        updBtn.textContent = 'Réessayer';
+        document.getElementById('update-message').textContent = window.T('js.network_error');
+        updBtn.textContent = window.T('js.retry');
       }
       updBtn.disabled = false;
     });

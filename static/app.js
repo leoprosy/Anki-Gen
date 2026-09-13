@@ -1,90 +1,234 @@
+/* ============================================================
+   Anki-Gen — logique de la vue « travail »
+   Principe : toutes les actions principales (copier / coller /
+   aperçu / enregistrer / naviguer) vivent dans le dock, qui reste
+   visible quelle que soit la taille de la fenêtre.
+   ============================================================ */
 (() => {
-  const prompts = window.PROMPTS || PROMPTS;
+  const prompts = window.PROMPTS || (typeof PROMPTS !== "undefined" ? PROMPTS : null);
   if (!prompts || !prompts.length) return;
 
+  const $ = (id) => document.getElementById(id);
+
   const els = {
-    list: document.getElementById("chunk-list"),
-    curId: document.getElementById("cur-id"),
-    curDeck: document.getElementById("cur-deck"),
-    curPrompt: document.getElementById("cur-prompt"),
-    response: document.getElementById("response"),
-    saveBtn: document.getElementById("save-btn"),
-    saveNextBtn: document.getElementById("save-next-btn"),
-    saveStatus: document.getElementById("save-status"),
-    prevBtn: document.getElementById("prev-btn"),
-    nextBtn: document.getElementById("next-btn"),
-    progressLabel: document.getElementById("progress-label"),
-    progressFill: document.getElementById("progress-fill"),
-    cardsInfo: document.getElementById("cards-info"),
-    chunkView: document.getElementById("chunk-view"),
+    list: $("chunk-list"),
+    rail: $("rail"),
+    railToggle: $("rail-toggle"),
+    railClose: $("rail-close"),
+    railScrim: $("rail-scrim"),
+    tabbar: $("tabbar"),
+    tabFlag: $("tab-flag"),
+    panesGrid: $("panes-grid"),
+    curId: $("cur-id"),
+    curDeck: $("cur-deck"),
+    curPrompt: $("cur-prompt"),
+    curPreview: $("cur-preview"),
+    altPanel: $("alt-panel"),
+    insertBar: $("insert-bar"),
+    response: $("response"),
+    responseContainer: $("response-container"),
+    cardsPreview: $("cards-preview"),
+    cardsInfo: $("cards-info"),
+    viewToggle: $("view-toggle"),
+    answerToggle: $("answer-toggle"),
+    progressLabel: $("progress-label"),
+    progressFill: $("progress-fill"),
+    counter: $("dock-counter"),
+    prevBtn: $("prev-btn"),
+    nextBtn: $("next-btn"),
+    copyBtn: $("copy-btn"),
+    pasteBtn: $("paste-btn"),
+    previewBtn: $("preview-btn"),
+    saveBtn: $("save-btn"),
+    saveNextBtn: $("save-next-btn"),
   };
 
-  const firstPending = prompts.findIndex(p => p.status !== "done");
-  let currentIdx = firstPending >= 0 ? firstPending : 0;
+  const mqDrawer = window.matchMedia("(max-width: 1180px)");
+  const mqTabs = window.matchMedia("(max-width: 900px)");
 
-  // ── Chunk transition (cross-fade) ──────────────────────────
-  function transitionChunkView(callback) {
-    if (!els.chunkView) { callback(); return; }
-    els.chunkView.classList.add("switching");
-    setTimeout(() => {
-      callback();
-      els.chunkView.classList.remove("switching");
-    }, 150);
+  const firstPending = prompts.findIndex((p) => p.status !== "done");
+  let currentIdx = firstPending >= 0 ? firstPending : 0;
+  let answerMode = "edit";       // edit | cards
+  let dirty = false;             // réponse modifiée non enregistrée
+
+  const escapeHtml = (s) =>
+    (s || "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  const toast = (msg, kind, ms) => window.toast && window.toast(msg, kind, ms);
+
+  // ── Tiroir (rail) ──────────────────────────────────────────
+  function setRail(open) {
+    document.body.classList.toggle("rail-open", open);
+    if (els.railToggle) els.railToggle.setAttribute("aria-expanded", String(open));
+  }
+  els.railToggle && els.railToggle.addEventListener("click", () =>
+    setRail(!document.body.classList.contains("rail-open")));
+  els.railClose && els.railClose.addEventListener("click", () => setRail(false));
+  els.railScrim && els.railScrim.addEventListener("click", () => setRail(false));
+
+  // ── Onglets (petites fenêtres) ─────────────────────────────
+  function setTab(tab) {
+    els.panesGrid.dataset.active = tab;
+    els.tabbar.querySelectorAll("button").forEach((b) => {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle("active", on);
+      b.setAttribute("aria-selected", String(on));
+    });
+  }
+  els.tabbar.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-tab]");
+    if (btn) setTab(btn.dataset.tab);
+  });
+  /** Amène le panneau demandé sous les yeux, même en mode onglets. */
+  function focusPane(pane) {
+    if (mqTabs.matches) setTab(pane);
   }
 
+  // ── Panneau des textes alternatifs ─────────────────────────
+  function renderAltPanel(p) {
+    const images = p.images || [];
+    if (!images.length) { els.altPanel.innerHTML = ""; return; }
+
+    els.altPanel.innerHTML = `
+      <h5>Descriptions des images <span class="muted">(envoyées à Claude avec le paragraphe)</span></h5>
+      ${images.map((img) => `
+        <div class="alt-row ${img.alt ? "" : "alt-row--missing"}" data-asset="${escapeHtml(img.id)}">
+          <div class="alt-thumb">
+            ${img.url ? `<img src="${escapeHtml(img.url)}" alt="">`
+                      : `<span class="alt-thumb--missing">✕</span>`}
+          </div>
+          <div class="alt-fields">
+            <label class="alt-tag">${img.n ? `{{IMG:${img.n}}}` : `${window.T("js.image_in_table")} {{TABLE:${img.in_table}}}`}</label>
+            <textarea rows="2" class="alt-input"
+              placeholder="${escapeHtml(window.T("js.alt_placeholder"))}">${escapeHtml(img.alt || "")}</textarea>
+          </div>
+          <div class="alt-actions">
+            <span class="alt-status muted"></span>
+            <button type="button" class="btn sm alt-save">Enregistrer</button>
+          </div>
+        </div>`).join("")}
+    `;
+  }
+
+  function renderInsertBar(p) {
+    const chips = [];
+    (p.images || []).forEach((img) => { if (img.n) chips.push(`{{IMG:${img.n}}}`); });
+    (p.tables || []).forEach((t) => chips.push(`{{TABLE:${t.n}}}`));
+    if (!chips.length) { els.insertBar.innerHTML = ""; els.insertBar.hidden = true; return; }
+    els.insertBar.hidden = false;
+    els.insertBar.innerHTML =
+      `<span class="muted">${window.T("js.insert")}</span>` +
+      chips.map((c) => `<button type="button" class="chip" data-insert="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join("");
+  }
+
+  function setDirty(on) {
+    dirty = on;
+    if (els.tabFlag) els.tabFlag.hidden = !on;
+  }
+
+  // ── Rendu du chunk courant ─────────────────────────────────
   function render() {
     const p = prompts[currentIdx];
     els.curId.textContent = `#${p.id}`;
     els.curDeck.textContent = p.deck;
+    els.curDeck.title = p.deck;
     els.curPrompt.textContent = p.prompt;
+    els.curPreview.innerHTML = p.preview_html || `<p class="pv-text">${escapeHtml(p.prompt)}</p>`;
     els.response.value = p.response || "";
+    renderAltPanel(p);
+    renderInsertBar(p);
     updateCardsInfo();
-    els.saveStatus.textContent = "";
-    els.saveStatus.className = "muted";
+    setDirty(false);
 
     for (const li of els.list.querySelectorAll(".chunk-item")) {
-      const id = parseInt(li.dataset.id, 10);
-      li.classList.toggle("active", id === p.id);
+      li.classList.toggle("active", parseInt(li.dataset.id, 10) === p.id);
     }
 
     els.prevBtn.disabled = currentIdx === 0;
     els.nextBtn.disabled = currentIdx === prompts.length - 1;
+    els.counter.textContent = `${currentIdx + 1}/${prompts.length}`;
 
     const activeLi = els.list.querySelector(".chunk-item.active");
-    if (activeLi) activeLi.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+    if (activeLi) activeLi.scrollIntoView({ block: "nearest" });
+
+    els.panesGrid.querySelectorAll(".pane__body").forEach((b) => { b.scrollTop = 0; });
+    if (answerMode === "cards") refreshCardsPreview();
   }
 
   function navigateTo(idx) {
     if (idx < 0 || idx >= prompts.length || idx === currentIdx) return;
-    transitionChunkView(() => {
-      currentIdx = idx;
-      render();
-    });
+    currentIdx = idx;
+    render();
   }
 
   function updateProgress() {
     const total = prompts.length;
-    const done = prompts.filter(p => p.status === "done").length;
+    const done = prompts.filter((p) => p.status === "done").length;
     els.progressLabel.textContent = `${done}/${total}`;
     els.progressFill.style.width = total ? `${(100 * done / total).toFixed(1)}%` : "0%";
   }
 
   function updateCardsInfo() {
     const text = els.response.value.trim();
-    if (!text) {
-      els.cardsInfo.textContent = "";
-      return;
-    }
-    const lines = text.split(/\r?\n/).filter(l => l.trim() && !l.startsWith("```"));
-    const cards = lines.filter(l => l.includes("\t") || l.includes(";"));
-    els.cardsInfo.textContent = `${cards.length} carte(s) détectée(s)`;
+    if (!text) { els.cardsInfo.textContent = ""; return; }
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("```") && !l.startsWith("#"));
+    const cards = lines.filter((l) => l.includes("\t") || l.includes(","));
+    const media = (text.match(/\{\{\s*(IMG|IMAGE|TABLE|TABLEAU)\s*[:\-# ]?\s*\d+\s*\}\}/gi) || []).length;
+    els.cardsInfo.textContent = window.T("js.cards_count", { n: cards.length })
+      + (media ? " · " + window.T("js.media_count", { n: media }) : "");
   }
 
+  // ── Aperçu des cartes ──────────────────────────────────────
+  async function refreshCardsPreview() {
+    const p = prompts[currentIdx];
+    els.cardsPreview.innerHTML = `<div class="pane-note empty">Rendu…</div>`;
+    try {
+      const r = await fetch(window.__API_PREVIEW_URL__, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, response: els.response.value }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Erreur");
+
+      if (!data.cards.length) {
+        els.cardsPreview.innerHTML =
+          `<div class="pane-note empty">${window.T("js.no_cards_to_preview")}</div>`;
+        return;
+      }
+      const warn = data.unknown_placeholders.length
+        ? `<div class="pane-note warn">⚠️ Placeholder(s) sans correspondance, supprimé(s) à l'export : ${
+            data.unknown_placeholders.map(escapeHtml).join(", ")}</div>`
+        : "";
+      els.cardsPreview.innerHTML = warn + data.cards.map((c, i) => `
+        <div class="card-preview">
+          <div class="card-side"><span class="card-label">Recto ${i + 1}</span><div class="card-body">${c.question}</div></div>
+          <div class="card-side"><span class="card-label">Verso</span><div class="card-body">${c.answer}</div></div>
+        </div>`).join("");
+    } catch (e) {
+      els.cardsPreview.innerHTML = `<div class="pane-note err">✗ ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function setAnswerMode(mode) {
+    answerMode = mode;
+    const showCards = mode === "cards";
+    els.responseContainer.hidden = showCards;
+    els.cardsPreview.hidden = !showCards;
+    els.answerToggle.querySelectorAll("button").forEach((b) =>
+      b.classList.toggle("active", b.dataset.answer === mode));
+    els.previewBtn.setAttribute("aria-pressed", String(showCards));
+    els.previewBtn.classList.toggle("copied", showCards);
+    const lbl = els.previewBtn.querySelector(".lbl");
+    if (lbl) lbl.textContent = showCards ? window.T("js.edit") : window.T("js.preview");
+    if (showCards) refreshCardsPreview();
+  }
+
+  // ── Sauvegarde ─────────────────────────────────────────────
   async function save({ advance = false } = {}) {
     const p = prompts[currentIdx];
     const response = els.response.value;
-    els.saveStatus.textContent = "…";
-    els.saveStatus.className = "muted";
+    els.saveBtn.disabled = els.saveNextBtn.disabled = true;
 
     try {
       const r = await fetch(window.__API_SAVE_URL__ || "/api/save", {
@@ -97,119 +241,379 @@
 
       p.response = response;
       p.status = data.status;
+      setDirty(false);
 
       const li = els.list.querySelector(`.chunk-item[data-id="${p.id}"]`);
       if (li) li.dataset.status = p.status;
-
       updateProgress();
+      toast("✓ " + window.T("js.chunk_saved", { id: p.id, n: data.cards_detected }), "ok");
 
-      // Save feedback with pulse animation
-      els.saveStatus.textContent = `✓ enregistré (${data.cards_detected} cartes)`;
-      els.saveStatus.className = "ok";
-      els.saveStatus.style.animation = "none";
-      // Force reflow to restart animation
-      void els.saveStatus.offsetWidth;
-      els.saveStatus.style.animation = "";
-
-      if (advance && currentIdx < prompts.length - 1) {
-        navigateTo(currentIdx + 1);
+      if (advance) {
+        if (currentIdx < prompts.length - 1) {
+          navigateTo(currentIdx + 1);
+          focusPane("answer");
+        } else {
+          toast(window.T("js.all_saved"), "ok");
+        }
       }
     } catch (e) {
-      els.saveStatus.textContent = `✗ ${e.message}`;
-      els.saveStatus.className = "err";
+      toast(`✗ ${e.message}`, "err", 4000);
+    } finally {
+      els.saveBtn.disabled = els.saveNextBtn.disabled = false;
     }
   }
 
-  // ── Event listeners ────────────────────────────────────────
+  // ── Texte alternatif ───────────────────────────────────────
+  async function saveAlt(row) {
+    const assetId = row.dataset.asset;
+    const input = row.querySelector(".alt-input");
+    const status = row.querySelector(".alt-status");
+    status.textContent = "…";
+    status.className = "alt-status muted";
+
+    try {
+      const url = window.__API_ASSET_URL__.replace("__ASSET__", encodeURIComponent(assetId));
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alt: input.value }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Erreur");
+
+      // Les prompts touchés ont été re-rendus côté serveur : on les remplace
+      (data.prompts || []).forEach((updated) => {
+        const idx = prompts.findIndex((p) => p.id === updated.id);
+        if (idx >= 0) {
+          updated.response = prompts[idx].response;
+          updated.status = prompts[idx].status;
+          prompts[idx] = updated;
+        }
+      });
+      row.classList.toggle("alt-row--missing", !data.alt);
+      status.textContent = "✓ " + window.T("js.alt_saved", { n: data.updated.length });
+      status.className = "alt-status ok";
+
+      const p = prompts[currentIdx];
+      els.curPrompt.textContent = p.prompt;
+      els.curPreview.innerHTML = p.preview_html || "";
+      setTimeout(() => { status.textContent = ""; }, 2500);
+    } catch (e) {
+      status.textContent = `✗ ${e.message}`;
+      status.className = "alt-status err";
+    }
+  }
+
+  // ── Presse-papier ──────────────────────────────────────────
+  /**
+   * Copie `text`, avec deux replis si l'API presse-papier est refusée :
+   * execCommand, puis sélection du texte à l'écran pour un Ctrl+C manuel.
+   */
+  async function copyText(text, okMsg, selectEl) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(okMsg, "ok", 1600);
+      return true;
+    } catch { /* on tente les replis */ }
+
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    ta.remove();
+    if (ok) { toast(okMsg, "ok", 1600); return true; }
+
+    if (selectEl) {
+      selectEl.hidden = false;
+      const range = document.createRange();
+      range.selectNodeContents(selectEl);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      selectEl.scrollIntoView({ block: "nearest" });
+      toast(window.T("js.selected_press_ctrl_c"), "err", 4000);
+    } else {
+      toast("✗ " + window.T("js.copy_failed"), "err", 2400);
+    }
+    return false;
+  }
+
+  async function pasteIntoResponse() {
+    focusPane("answer");
+    if (answerMode === "cards") setAnswerMode("edit");
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) { toast(window.T("js.clipboard_empty"), "err", 1800); return; }
+      els.response.value = text;
+      updateCardsInfo();
+      setDirty(true);
+      toast("✓ " + window.T("js.response_pasted"), "ok", 1400);
+    } catch {
+      els.response.focus();
+      toast(window.T("js.clipboard_denied"), "err", 3200);
+    }
+  }
+
+  // ── Export ─────────────────────────────────────────────────
+  const exportMenu = $("export-menu");
+  const exportReport = $("export-report");
+  const exportProfiles = $("export-profiles");
+  const exportStatus = $("export-status");
+  let lastReport = null;
+
+  async function loadReport() {
+    exportReport.textContent = window.T("js.computing_report");
+    try {
+      const r = await fetch(window.__API_REPORT_URL__);
+      const data = await r.json();
+      lastReport = data;
+      const bits = [window.T("js.cards_count", { n: data.cards }),
+                    window.T("js.images_used", { n: data.media.length })];
+      if (data.unused_assets.length) bits.push(window.T("js.images_unused", { n: data.unused_assets.length }));
+      if (data.unknown_placeholders.length) bits.push(window.T("js.orphan_placeholders", { n: data.unknown_placeholders.length }));
+      exportReport.textContent = bits.join(" · ");
+    } catch {
+      exportReport.textContent = window.T("js.report_unavailable");
+    }
+  }
+
+  function renderProfiles() {
+    const profiles = (lastReport && lastReport.anki_profiles) || [];
+    exportProfiles.hidden = false;
+    if (!profiles.length) {
+      exportProfiles.innerHTML =
+        `<div class="muted">${window.T("js.no_anki_profile")}</div>`;
+      return;
+    }
+    exportProfiles.innerHTML =
+      `<div class="muted">${window.T("js.choose_profile")}</div>` +
+      profiles.map((p) => `
+        <button type="button" class="profile-btn" data-path="${escapeHtml(p.path)}">
+          ${escapeHtml(p.profile)} <span class="muted">(${p.files} fichiers)</span>
+        </button>`).join("");
+  }
+
+  async function copyMedia(path) {
+    exportStatus.textContent = window.T("js.copying");
+    exportStatus.className = "export-status muted";
+    try {
+      const r = await fetch(window.__API_ANKI_MEDIA_URL__, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Erreur");
+      const res = data.result;
+      const bits = [window.T("js.copied_count", { n: res.copied.length })];
+      if (res.identical.length) bits.push(window.T("js.already_current", { n: res.identical.length }));
+      if (res.conflicts.length) bits.push("⚠️ " + window.T("js.conflicts", { n: res.conflicts.length, names: res.conflicts.join(", ") }));
+      if (res.missing.length) bits.push("⚠️ " + window.T("js.missing_count", { n: res.missing.length }));
+      exportStatus.textContent = bits.join(" · ");
+      exportStatus.className = res.conflicts.length || res.missing.length
+        ? "export-status err" : "export-status ok";
+    } catch (e) {
+      exportStatus.textContent = `✗ ${e.message}`;
+      exportStatus.className = "export-status err";
+    }
+  }
+
+  // ── Export : télécharge ET écrit dans le dossier configuré ───
+  async function runExport(url) {
+    exportStatus.textContent = window.T("js.exporting");
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("export failed");
+
+      const blob = await res.blob();
+      const name = (res.headers.get("Content-Disposition") || "")
+        .split("filename=").pop().replace(/["';]/g, "") || "export";
+
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+
+      const error = res.headers.get("X-Export-Error");
+      const path = res.headers.get("X-Export-Path");
+      if (error) {
+        toast(decodeURIComponent(error), "err", 5000);
+        exportStatus.textContent = "";
+      } else if (path) {
+        const decoded = decodeURIComponent(path);
+        toast(window.T("js.exported_to", { path: decoded }), "ok", 4000);
+        exportStatus.textContent = decoded;
+      }
+    } catch (e) {
+      toast(window.T("js.export_failed"), "err");
+      exportStatus.textContent = "";
+    }
+  }
+
+  if (exportMenu) {
+    exportMenu.addEventListener("toggle", () => {
+      if (exportMenu.open) loadReport();
+      else { exportProfiles.hidden = true; exportStatus.textContent = ""; }
+    });
+    $("copy-media-btn").addEventListener("click", renderProfiles);
+    ["export-tsv-btn", "export-zip-btn"].forEach((id) => {
+      const btn = $(id);
+      if (btn) btn.addEventListener("click", () => runExport(btn.dataset.exportUrl));
+    });
+    exportProfiles.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".profile-btn");
+      if (btn) copyMedia(btn.dataset.path);
+    });
+    document.addEventListener("click", (ev) => {
+      if (exportMenu.open && !exportMenu.contains(ev.target)) exportMenu.open = false;
+    });
+  }
+
+  // ── Écouteurs ──────────────────────────────────────────────
   els.list.addEventListener("click", (ev) => {
     const btn = ev.target.closest(".chunk-btn");
     if (!btn) return;
-    const li = btn.closest(".chunk-item");
-    const id = parseInt(li.dataset.id, 10);
-    const idx = prompts.findIndex(p => p.id === id);
-    if (idx >= 0) navigateTo(idx);
+    const id = parseInt(btn.closest(".chunk-item").dataset.id, 10);
+    const idx = prompts.findIndex((p) => p.id === id);
+    if (idx >= 0) {
+      navigateTo(idx);
+      if (mqDrawer.matches) setRail(false);
+    }
   });
 
   els.prevBtn.addEventListener("click", () => navigateTo(currentIdx - 1));
   els.nextBtn.addEventListener("click", () => navigateTo(currentIdx + 1));
-
   els.saveBtn.addEventListener("click", () => save({ advance: false }));
   els.saveNextBtn.addEventListener("click", () => save({ advance: true }));
-  els.response.addEventListener("input", updateCardsInfo);
-
-  // Ctrl+Enter = Save & next
-  els.response.addEventListener("keydown", (ev) => {
-    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") {
-      ev.preventDefault();
-      save({ advance: true });
+  els.pasteBtn.addEventListener("click", pasteIntoResponse);
+  els.previewBtn.addEventListener("click", () => {
+    focusPane("answer");
+    setAnswerMode(answerMode === "cards" ? "edit" : "cards");
+  });
+  els.copyBtn.addEventListener("click", async () => {
+    focusPane("source");
+    const ok = await copyText(prompts[currentIdx].prompt, "✓ " + window.T("js.paragraph_copied"), els.curPrompt);
+    if (ok) {
+      els.copyBtn.classList.add("copied");
+      setTimeout(() => els.copyBtn.classList.remove("copied"), 1200);
+    } else {
+      // La sélection manuelle exige la vue « Texte »
+      els.viewToggle.querySelector('[data-view="text"]').click();
     }
   });
 
-  // Paste button
-  const pasteBtn = document.getElementById('paste-btn');
-  if (pasteBtn) {
-    pasteBtn.addEventListener('click', async () => {
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          els.response.value = text;
-          updateCardsInfo();
-        }
-      } catch (err) {
-        console.error('Failed to read clipboard: ', err);
-      }
-    });
-  }
+  els.response.addEventListener("input", () => { updateCardsInfo(); setDirty(true); });
 
-  // Response container drag and drop
-  const responseContainer = document.getElementById('response-container');
-  if (responseContainer) {
-    responseContainer.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      responseContainer.classList.add('drag-over');
-    });
-
-    ['dragleave', 'dragend'].forEach(type => {
-      responseContainer.addEventListener(type, () => {
-        responseContainer.classList.remove('drag-over');
-      });
-    });
-
-    responseContainer.addEventListener('drop', (e) => {
-      e.preventDefault();
-      responseContainer.classList.remove('drag-over');
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        const file = e.dataTransfer.files[0];
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          els.response.value = event.target.result;
-          updateCardsInfo();
-        };
-        reader.readAsText(file);
-      }
-    });
-  }
-
-  // Copy buttons
-  document.querySelectorAll(".copy-btn").forEach(btn => {
-    btn.addEventListener("click", async (ev) => {
-      ev.stopPropagation();
-      const sel = btn.dataset.copyTarget;
-      const target = sel ? document.querySelector(sel) : null;
-      if (!target) return;
-      const text = target.textContent || target.value || "";
-      try {
-        await navigator.clipboard.writeText(text);
-        const orig = btn.textContent;
-        btn.textContent = "✓ Copié";
-        btn.classList.add("copied");
-        setTimeout(() => { btn.textContent = orig; btn.classList.remove("copied"); }, 1200);
-      } catch {
-        btn.textContent = "✗ Échec";
-      }
-    });
+  els.viewToggle.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-view]");
+    if (!btn) return;
+    els.viewToggle.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === btn));
+    els.curPreview.hidden = btn.dataset.view !== "preview";
+    els.curPrompt.hidden = btn.dataset.view !== "text";
   });
+
+  els.answerToggle.addEventListener("click", (ev) => {
+    const btn = ev.target.closest("button[data-answer]");
+    if (btn) setAnswerMode(btn.dataset.answer);
+  });
+
+  els.insertBar.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".chip");
+    if (!btn) return;
+    if (answerMode === "cards") setAnswerMode("edit");
+    const ta = els.response;
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.slice(0, start) + btn.dataset.insert + ta.value.slice(end);
+    ta.selectionStart = ta.selectionEnd = start + btn.dataset.insert.length;
+    ta.focus();
+    updateCardsInfo();
+    setDirty(true);
+  });
+
+  els.altPanel.addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".alt-save");
+    if (btn) saveAlt(btn.closest(".alt-row"));
+  });
+  els.altPanel.addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter" && ev.target.classList.contains("alt-input")) {
+      ev.preventDefault();
+      saveAlt(ev.target.closest(".alt-row"));
+    }
+  });
+
+  // Agrandissement d'une image de l'aperçu
+  els.curPreview.addEventListener("click", (ev) => {
+    const img = ev.target.closest(".pv-image img");
+    if (!img) return;
+    const box = document.createElement("div");
+    box.className = "lightbox";
+    box.innerHTML = `<img src="${img.getAttribute("src")}" alt="">`;
+    const close = () => { box.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    box.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(box);
+  });
+
+  // Dépôt d'un fichier TSV/TXT sur la zone de réponse
+  const rc = els.responseContainer;
+  rc.addEventListener("dragover", (e) => { e.preventDefault(); rc.classList.add("drag-over"); });
+  ["dragleave", "dragend"].forEach((t) =>
+    rc.addEventListener(t, () => rc.classList.remove("drag-over")));
+  rc.addEventListener("drop", (e) => {
+    e.preventDefault();
+    rc.classList.remove("drag-over");
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      els.response.value = ev.target.result;
+      updateCardsInfo();
+      setDirty(true);
+      toast("✓ " + window.T("js.file_loaded", { name: file.name }), "ok", 1600);
+    };
+    reader.readAsText(file);
+  });
+
+  // ── Raccourcis clavier ─────────────────────────────────────
+  document.addEventListener("keydown", (ev) => {
+    const mod = ev.ctrlKey || ev.metaKey;
+
+    if (ev.key === "Escape" && document.body.classList.contains("rail-open")) {
+      setRail(false);
+      return;
+    }
+    if (mod && ev.key === "Enter") { ev.preventDefault(); save({ advance: true }); return; }
+    if (mod && !ev.shiftKey && ev.key.toLowerCase() === "s") { ev.preventDefault(); save(); return; }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "c") {
+      ev.preventDefault(); els.copyBtn.click(); return;
+    }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "v") { ev.preventDefault(); pasteIntoResponse(); return; }
+    if (mod && ev.shiftKey && ev.key.toLowerCase() === "p") { ev.preventDefault(); els.previewBtn.click(); return; }
+    if (ev.altKey && ev.key === "ArrowLeft") { ev.preventDefault(); navigateTo(currentIdx - 1); return; }
+    if (ev.altKey && ev.key === "ArrowRight") { ev.preventDefault(); navigateTo(currentIdx + 1); return; }
+  });
+
+  window.addEventListener("beforeunload", (e) => {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = "";
+  });
+
+  // Repasse en vue double quand la fenêtre s'élargit
+  mqTabs.addEventListener("change", (e) => { if (!e.matches) setTab("source"); });
+  mqDrawer.addEventListener("change", (e) => { if (!e.matches) setRail(false); });
 
   render();
   updateProgress();
+  if (window.__MISSING_ALT__) {
+    toast(window.T("js.missing_alt", { n: window.__MISSING_ALT__ }), null, 3600);
+  }
 })();

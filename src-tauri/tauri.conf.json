@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Anki Gen",
-  "version": "1.0.0",
+  "productName": "Ankigen",
+  "version": "1.2.0",
   "identifier": "ankiesh",
   "build": {
     "frontendDist": "../dist-tauri",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Anki Gen",
+        "title": "Ankigen",
         "label": "main",
         "width": 1200,
         "height": 800,

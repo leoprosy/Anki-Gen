@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ t('nav.help') }} — {{ t('app.name') }}{% endblock %}
+
+{% block shell_body %}
+<main class="page">
+  <div class="page__head">
+    <h2>{{ t('help.title') }}</h2>
+    <p>{{ t('help.intro') }}</p>
+  </div>
+
+  <section class="card">
+    <h3>{{ t('help.workflow_title') }}</h3>
+    <ol class="help-steps">
+      <li>{{ t('help.step_upload') }}</li>
+      <li>{{ t('help.step_chunks') }}</li>
+      <li>{{ t('help.step_claude') }}</li>
+      <li>{{ t('help.step_paste') }}</li>
+      <li>{{ t('help.step_export') }}</li>
+      <li>{{ t('help.step_import') }}</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h3>{{ t('help.skill_title') }}</h3>
+    <p class="muted">{{ t('help.skill_intro') }}</p>
+    <p class="muted">{{ t('help.skill_location') }}</p>
+
+    <div class="block-head">
+      <h4>{{ t('help.skill_template_title') }}</h4>
+      <button type="button" class="btn sm" id="copy-skill-btn">{{ t('help.copy') }}</button>
+    </div>
+    <p class="muted">{{ t('help.skill_template_help') }}</p>
+
+    <pre id="skill-template" class="prompt-text">{{ skill_template }}</pre>
+  </section>
+
+  <section class="card">
+    <h3>{{ t('help.anki_title') }}</h3>
+    <ol class="help-steps">
+      <li>{{ t('help.anki_media') }}</li>
+      <li>{{ t('help.anki_import') }}</li>
+      <li>{{ t('help.anki_header') }}</li>
+    </ol>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('copy-skill-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('copy-skill-btn');
+    try {
+      await navigator.clipboard.writeText(document.getElementById('skill-template').textContent);
+      btn.textContent = window.T('js.copied');
+      setTimeout(() => { btn.textContent = window.T('js.copy'); }, 1400);
+    } catch (e) {
+      btn.textContent = window.T('js.copy_failed');
+    }
+  });
+</script>
+{% endblock %}

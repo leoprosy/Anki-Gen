@@ -5,12 +5,16 @@ project_store.py — Lecture / écriture / export des projets Anki-Gen.
 Format v2 (objet) :
 {
   "version": 2,
-  "deck_prefix": "*ESH*",
+  "deck_prefix": "Economics",
   "source": "CH8_ La croissance économique.docx",
   "assets": {"img_1": {...}},
-  "prompts": [{"id", "deck", "blocks", "assets", "prompt", "system",
+  "prompts": [{"id", "deck", "blocks", "assets", "prompt",
                "status", "response"}]
 }
+
+Les projets créés avant l'ouverture au public portent un champ `system` (l'ancien
+prompt ESH embarqué). Il est conservé tel quel sur disque et simplement ignoré :
+le flux repose désormais sur un Skill Claude côté utilisateur, décrit dans /help.
 
 Les projets v1 (simple liste de prompts, sans médias) sont migrés à la volée :
 chaque prompt devient un bloc texte unique. Ils restent donc ouvrables.
@@ -22,10 +26,17 @@ from pathlib import Path
 from urllib.parse import quote
 
 from build_anki_csv import parse_tsv_response
+from i18n import DEFAULT_LANG
 from paths import MEDIA_DIR, PROJECTS_DIR, project_media_dir
 from render import render_preview_html, render_prompt_text, resolve_placeholders
 
 PROJECT_VERSION = 2
+
+# Nom de deck de dernier recours pour une ligne TSV : Anki refuse un champ deck
+# vide. Ce n'est pas de la copie d'interface mais un identifiant de deck, donc il
+# n'est pas traduit — sinon un même projet exporté dans deux langues créerait
+# deux decks différents dans Anki.
+DEFAULT_DECK_NAME = "Ankigen"
 
 
 # ──────────────────────────────────────────────────────────────
@@ -116,7 +127,7 @@ def list_projects() -> list:
         out.append({
             "id": file.stem,
             "progress": progress(project),
-            "deck": project["prompts"][0].get("deck") or project.get("deck_prefix") or "ESH",
+            "deck": project["prompts"][0].get("deck") or project.get("deck_prefix") or "",
             "source": project.get("source"),
             "images": images,
             "tables": tables,
@@ -210,7 +221,8 @@ def project_view(project: dict, project_id: str) -> list:
 # ──────────────────────────────────────────────────────────────
 # Édition du texte alternatif
 # ──────────────────────────────────────────────────────────────
-def set_asset_alt(project: dict, asset_id: str, alt: str) -> list:
+def set_asset_alt(project: dict, asset_id: str, alt: str,
+                  lang: str = DEFAULT_LANG) -> list:
     """
     Met à jour le texte alternatif d'une image et re-rend les prompts concernés
     (le texte envoyé à Claude contient la description : elle doit suivre).
@@ -232,7 +244,7 @@ def set_asset_alt(project: dict, asset_id: str, alt: str) -> list:
             for b in prompt.get("blocks", [])
         )
         if uses:
-            prompt["prompt"] = render_prompt_text(prompt["blocks"], assets)
+            prompt["prompt"] = render_prompt_text(prompt["blocks"], assets, lang)
             touched.append(prompt["id"])
     return touched
 
@@ -265,7 +277,7 @@ def export_rows(project: dict, only_done: bool = False, media_prefix: str = ""):
             skipped += 1
             continue
 
-        deck = prompt.get("deck") or project.get("deck_prefix") or "ESH"
+        deck = prompt.get("deck") or project.get("deck_prefix") or DEFAULT_DECK_NAME
         for question, answer in parse_tsv_response(response):
             q, used_q, unk_q = resolve_placeholders(question, prompt, assets, media_prefix)
             a, used_a, unk_a = resolve_placeholders(answer, prompt, assets, media_prefix)

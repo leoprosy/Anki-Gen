@@ -1,8 +1,14 @@
-# Anki-Gen (Anki ESH)
+<img src="static/logo.svg" alt="" width="72" align="left" hspace="12">
 
-Anki-Gen est une application locale hybride (backend Flask en Python + frontend web encapsulé dans une app desktop Tauri) qui permet d'automatiser et de faciliter la création de flashcards Anki à partir de vos cours au format `.docx`.
+# Ankigen
 
-L'application découpe votre document Word en différents blocs (chunks) selon la structure hiérarchique du plan (I., A., 1)). Elle vous permet ensuite d'utiliser l'IA (comme Claude) pour générer des cartes (Question/Réponse) pour chaque paragraphe, puis d'exporter le tout en un fichier `.csv` formaté pour l'import Anki.
+**Turn a `.docx` course into an Anki deck, one paragraph at a time.**
+
+Ankigen est une application locale hybride (backend Flask en Python + frontend web encapsulé dans une app desktop Tauri) qui automatise la création de flashcards Anki à partir de cours au format `.docx`.
+
+L'application découpe le document selon la hiérarchie de ses styles de titre, vous laisse envoyer chaque bloc à Claude pour en tirer des cartes Question/Réponse, puis exporte le tout au format attendu par Anki — images et tableaux compris.
+
+L'interface est disponible en **anglais et en français** (anglais par défaut) ; la langue, le dossier d'export et le préfixe de deck se règlent dans **Paramètres**. La page **Mode d'emploi** décrit le flux complet et comment écrire son propre Skill Claude.
 
 ---
 
@@ -21,8 +27,7 @@ Si vous voulez modifier le code ou lancer l'application rapidement sans la compi
 1. **Lancer le backend web classique :**
 
    ```bash
-   # Depuis la racine du projet, avec votre environnement virtuel activé
-   python app.py
+   .venv/Scripts/python.exe app.py
    ```
 
    Rendez-vous ensuite sur `http://127.0.0.1:5000` dans votre navigateur.
@@ -31,7 +36,7 @@ Si vous voulez modifier le code ou lancer l'application rapidement sans la compi
    ```bash
    npm run tauri dev
    ```
-   _Note : Lancez d'abord le serveur Flask (`python app.py`) en arrière-plan, car Tauri en mode développement s'attendra à ce que le port 5000 soit actif._
+   _Note : Lancez d'abord le serveur Flask (`.venv/Scripts/python.exe app.py`) en arrière-plan, car Tauri en mode développement s'attendra à ce que le port 5000 soit actif._
 
 ---
 
@@ -80,15 +85,22 @@ Vous trouverez les installeurs finaux `.exe` (NSIS) et `.msi` (Wix) dans le doss
 
 ## 📖 Mode d'emploi de l'Application
 
-1. **Dashboard & Import :** Sur l'écran d'accueil, sous "Nouveau cours", importez un fichier `.docx` bien structuré (avec des titres numérotés comme `I.`, `A)`, `1)`). Entrez le préfixe de votre Deck Anki (ex: `*ESH*`).
-2. **Parsing :** L'application va lire et parser le cours, et créer un "Projet" sauvegardé localement (dans le dossier `projects/`).
-3. **Génération via l'IA :**
-   - Sur l'interface de travail, cliquez sur le bouton "Copier" pour copier le **System Prompt** (à ne coller qu'une seule fois dans Claude ou ChatGPT).
-   - Copiez le texte du "Chunk" (paragraphe) actuel et envoyez-le à Claude.
-   - Claude va générer des questions/réponses au format TSV.
-4. **Validation :** Copiez la réponse de Claude et collez-la dans la zone de texte de l'application (ou utilisez le bouton "Coller").
-5. **Sauvegarde :** Cliquez sur "Enregistrer & Suivant" pour passer au paragraphe suivant.
-6. **Exportation :** À tout moment, vous pouvez cliquer sur "CSV" pour télécharger votre fichier formaté prêt à être importé dans Anki !
+La page **Mode d'emploi** de l'application reprend tout ceci, traduit, avec un template
+de Skill Claude à copier.
+
+1. **Import :** Sur l'écran d'accueil, sous « Nouveau cours », importez un `.docx` dont les
+   titres utilisent de vrais styles de titre — c'est là-dessus que repose le découpage.
+   Le préfixe de deck est optionnel (vide par défaut, réglable dans Paramètres).
+2. **Parsing :** L'application découpe le cours et crée un projet sauvegardé localement.
+3. **Génération via Claude :** Ankigen n'embarque plus de prompt système. Le flux suppose
+   que vous disposez d'un **Skill Claude** dédié à l'écriture de cartes — la page Mode
+   d'emploi explique comment l'écrire. Copiez ensuite le chunk courant et envoyez-le à
+   Claude, qui répond au format TSV.
+4. **Validation :** Collez la réponse dans la zone de texte (ou bouton « Coller »), et
+   vérifiez le rendu dans l'onglet « Cartes ».
+5. **Sauvegarde :** « Enregistrer & suivant » passe au paragraphe suivant.
+6. **Exportation :** Le menu « Exporter » écrit le fichier dans votre dossier d'export
+   configuré **et** le télécharge.
 
 _(Vos projets sont persistants. Vous pouvez fermer l'application et reprendre vos cours en attente plus tard depuis le Dashboard)._
 
@@ -155,7 +167,8 @@ le HTML et la colonne de deck sont déjà déclarés dans l'en-tête du fichier.
 
 - **En développement** (`python app.py`) : dans le dossier du projet
   (`projects/`, `uploads/`, `media/`, `exports/`).
-- **Dans l'app packagée** : dans `%APPDATA%\Anki-Gen\`. C'est indispensable —
+- **Dans l'app packagée** : dans `%APPDATA%\AnkiGen\` (`settings.json`, `projects/`,
+  `uploads/`, `media/`, `exports/`). C'est indispensable —
   un exécutable PyInstaller *onefile* est déballé dans un dossier temporaire, tout
   ce qui y serait écrit disparaîtrait à la fermeture.
 
@@ -163,7 +176,7 @@ Le port du serveur de dev peut être changé avec `ANKI_GEN_PORT` (utile quand l
 installée occupe déjà le port 5000) :
 
 ```bash
-ANKI_GEN_PORT=5001 python app.py
+ANKI_GEN_PORT=5051 .venv/Scripts/python.exe app.py
 ```
 
 ---
@@ -171,7 +184,7 @@ ANKI_GEN_PORT=5001 python app.py
 ## 🧪 Tests
 
 ```bash
-python tests/test_docx_media.py
+.venv/Scripts/python.exe -m unittest discover -s tests
 ```
 
 Les fixtures `.docx` (images avec/sans alt, image seule dans un paragraphe, image

@@ -59,5 +59,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Anki ESH");
+        .expect("error while running Ankigen");
 }

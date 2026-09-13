@@ -28,14 +28,16 @@
     <div class="menu__panel">
       <div class="menu__title">{{ t('work.export') }}</div>
       <div class="export-report" id="export-report">{{ t('work.export_computing') }}</div>
-      <a class="export-item" href="{{ url_for('export_tsv', project_id=project_id) }}">
+      <button type="button" class="export-item" id="export-tsv-btn"
+        data-export-url="{{ url_for('export_tsv', project_id=project_id) }}">
         <strong>{{ t('work.export_tsv') }}</strong>
         <span class="muted">{{ t('work.export_tsv_help') }}</span>
-      </a>
-      <a class="export-item" href="{{ url_for('export_zip', project_id=project_id) }}">
+      </button>
+      <button type="button" class="export-item" id="export-zip-btn"
+        data-export-url="{{ url_for('export_zip', project_id=project_id) }}">
         <strong>{{ t('work.export_zip') }}</strong>
         <span class="muted">{{ t('work.export_zip_help') }}</span>
-      </a>
+      </button>
       <button type="button" class="export-item" id="copy-media-btn">
         <strong>{{ t('work.copy_media') }}</strong>
         <span class="muted">{{ t('work.copy_media_help') }}</span>

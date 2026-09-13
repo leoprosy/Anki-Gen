@@ -1,6 +1,6 @@
 {
   "name": "anki-gen",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Turn a .docx course into an Anki deck, with Claude in the loop.",
   "main": "index.js",
   "scripts": {

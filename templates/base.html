@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="fr">
+<html lang="{{ lang }}">
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <title>{% block title %}Anki ESH Generator{% endblock %}</title>
-  <meta name="description" content="Générateur de flashcards Anki à partir de cours .docx">
+  <title>{% block title %}{{ t('app.name') }}{% endblock %}</title>
+  <meta name="description" content="{{ t('app.description') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -82,11 +82,19 @@
   <div class="shell {% block shell_class %}{% endblock %}">
 
     <header class="topbar">
-      <a class="brand" href="{{ url_for('index') }}" aria-label="Accueil Anki ESH">
+      <a class="brand" href="{{ url_for('index') }}" aria-label="{{ t('nav.home') }}">
         <svg width="22" height="22" aria-hidden="true"><use href="#i-logo"></use></svg>
-        <span class="brand__name">Anki ESH</span>
+        <span class="brand__name">{{ t('app.name') }}</span>
       </a>
       {% block topbar %}<div class="topbar__spacer"></div>{% endblock %}
+      <nav class="topbar__nav">
+        <a class="btn ghost sm" href="{{ url_for('help_page') }}" title="{{ t('nav.help') }}">
+          <span class="lbl">{{ t('nav.help') }}</span>
+        </a>
+        <a class="btn ghost sm" href="{{ url_for('settings_page') }}" title="{{ t('nav.settings') }}">
+          <span class="lbl">{{ t('nav.settings') }}</span>
+        </a>
+      </nav>
     </header>
 
     <!-- Bandeau de mise à jour (masqué par défaut) -->
@@ -103,6 +111,17 @@
   <div class="toast-zone" id="toast-zone" aria-live="polite"></div>
 
   <script>
+    // ── Chaînes traduites pour le JS (namespace `js.` des catalogues) ──
+    window.__I18N__ = {{ js_i18n | tojson }};
+    window.T = function (key, params) {
+      let text = window.__I18N__[key];
+      if (text === undefined) return key;
+      if (params) {
+        for (const name in params) text = text.split('{' + name + '}').join(params[name]);
+      }
+      return text;
+    };
+
     // ── Toast global ────────────────────────────────────────────
     window.toast = function (message, kind, ms) {
       const zone = document.getElementById('toast-zone');

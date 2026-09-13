@@ -1,2 +1,112 @@
 {% extends "base.html" %}
-{% block shell_body %}<main class="page"><h2>{{ t('nav.help') }}</h2></main>{% endblock %}
+{% block title %}{{ t('nav.help') }} — {{ t('app.name') }}{% endblock %}
+
+{% block shell_body %}
+<main class="page">
+  <div class="page__head">
+    <h2>{{ t('help.title') }}</h2>
+    <p>{{ t('help.intro') }}</p>
+  </div>
+
+  <section class="card">
+    <h3>{{ t('help.workflow_title') }}</h3>
+    <ol class="help-steps">
+      <li>{{ t('help.step_upload') }}</li>
+      <li>{{ t('help.step_chunks') }}</li>
+      <li>{{ t('help.step_claude') }}</li>
+      <li>{{ t('help.step_paste') }}</li>
+      <li>{{ t('help.step_export') }}</li>
+      <li>{{ t('help.step_import') }}</li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h3>{{ t('help.skill_title') }}</h3>
+    <p class="muted">{{ t('help.skill_intro') }}</p>
+    <p class="muted">{{ t('help.skill_location') }}</p>
+
+    <div class="block-head">
+      <h4>{{ t('help.skill_template_title') }}</h4>
+      <button type="button" class="btn sm" id="copy-skill-btn">{{ t('help.copy') }}</button>
+    </div>
+    <pre id="skill-template" class="prompt-text">{% raw %}---
+name: course-to-anki
+description: Use when turning a paragraph of course material into Anki
+  flashcards. Outputs tab-separated QUESTION/ANSWER rows, nothing else.
+---
+
+# Course paragraph to Anki cards
+
+You convert one paragraph of course material into Anki flashcards.
+
+## Output format - this is the contract
+
+Return ONLY tab-separated rows. One row per card:
+
+    QUESTION<TAB>ANSWER
+
+No preamble, no confirmation, no closing remark, no markdown fences.
+Anything else breaks the import.
+
+## Card content
+
+- Exhaustive: every fact, mechanism, figure and concept in the paragraph
+  becomes a card. Nothing is dropped as "minor".
+- One idea per card. A card whose answer needs "and" is two cards.
+- The question must be answerable without seeing the paragraph.
+
+## Formatting
+
+Cards are raw HTML. Use inline styles to make key elements stand out, and
+keep the same convention across a whole deck so cards look consistent:
+
+- Dates: <span style="color: red; font-weight: bold;">1929</span>
+- Quotes: <span style="background-color: plum; font-style: italic;">"..."</span>
+- Works and authors: <span style="background-color: yellow;">Title (Year)</span>
+- Key terms: <span style="color: red; font-weight: bold;">term</span>
+- Lists: <ul><li>...</li></ul>
+- Maths: [latex]$x = y$[/latex]
+
+## Images and tables - required convention
+
+The paragraph may contain [IMAGE n] markers (with a description) and
+[TABLE n] markers (with markdown content).
+
+- To show an image, write exactly {{IMG:n}} where it belongs.
+- To reuse a table, write exactly {{TABLE:n}}.
+- NEVER write an <img> tag and NEVER invent a filename. The application
+  substitutes these placeholders with the real file at export time; a
+  hand-written tag points at nothing.
+- A chart or diagram usually deserves its own card: question on the front,
+  {{IMG:n}} plus the interpretation on the back.
+- A data table deserves one recall card ({{TABLE:n}} on the back) plus
+  targeted cards on the striking values.
+- If an image has no description, do not guess what it shows.
+{% endraw %}</pre>
+  </section>
+
+  <section class="card">
+    <h3>{{ t('help.anki_title') }}</h3>
+    <ol class="help-steps">
+      <li>{{ t('help.anki_media') }}</li>
+      <li>{{ t('help.anki_import') }}</li>
+      <li>{{ t('help.anki_header') }}</li>
+    </ol>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.getElementById('copy-skill-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('copy-skill-btn');
+    try {
+      await navigator.clipboard.writeText(document.getElementById('skill-template').textContent);
+      btn.textContent = window.T('js.copied');
+      setTimeout(() => { btn.textContent = window.T('js.copy'); }, 1400);
+    } catch (e) {
+      btn.textContent = window.T('js.copy_failed');
+    }
+  });
+</script>
+{% endblock %}

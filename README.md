@@ -85,15 +85,22 @@ Vous trouverez les installeurs finaux `.exe` (NSIS) et `.msi` (Wix) dans le doss
 
 ## 📖 Mode d'emploi de l'Application
 
-1. **Dashboard & Import :** Sur l'écran d'accueil, sous "Nouveau cours", importez un fichier `.docx` bien structuré (avec des titres numérotés comme `I.`, `A)`, `1)`). Entrez le préfixe de votre Deck Anki (ex: `*ESH*`).
-2. **Parsing :** L'application va lire et parser le cours, et créer un "Projet" sauvegardé localement (dans le dossier `projects/`).
-3. **Génération via l'IA :**
-   - Sur l'interface de travail, cliquez sur le bouton "Copier" pour copier le **System Prompt** (à ne coller qu'une seule fois dans Claude ou ChatGPT).
-   - Copiez le texte du "Chunk" (paragraphe) actuel et envoyez-le à Claude.
-   - Claude va générer des questions/réponses au format TSV.
-4. **Validation :** Copiez la réponse de Claude et collez-la dans la zone de texte de l'application (ou utilisez le bouton "Coller").
-5. **Sauvegarde :** Cliquez sur "Enregistrer & Suivant" pour passer au paragraphe suivant.
-6. **Exportation :** À tout moment, vous pouvez cliquer sur "CSV" pour télécharger votre fichier formaté prêt à être importé dans Anki !
+La page **Mode d'emploi** de l'application reprend tout ceci, traduit, avec un template
+de Skill Claude à copier.
+
+1. **Import :** Sur l'écran d'accueil, sous « Nouveau cours », importez un `.docx` dont les
+   titres utilisent de vrais styles de titre — c'est là-dessus que repose le découpage.
+   Le préfixe de deck est optionnel (vide par défaut, réglable dans Paramètres).
+2. **Parsing :** L'application découpe le cours et crée un projet sauvegardé localement.
+3. **Génération via Claude :** Ankigen n'embarque plus de prompt système. Le flux suppose
+   que vous disposez d'un **Skill Claude** dédié à l'écriture de cartes — la page Mode
+   d'emploi explique comment l'écrire. Copiez ensuite le chunk courant et envoyez-le à
+   Claude, qui répond au format TSV.
+4. **Validation :** Collez la réponse dans la zone de texte (ou bouton « Coller »), et
+   vérifiez le rendu dans l'onglet « Cartes ».
+5. **Sauvegarde :** « Enregistrer & suivant » passe au paragraphe suivant.
+6. **Exportation :** Le menu « Exporter » écrit le fichier dans votre dossier d'export
+   configuré **et** le télécharge.
 
 _(Vos projets sont persistants. Vous pouvez fermer l'application et reprendre vos cours en attente plus tard depuis le Dashboard)._
 

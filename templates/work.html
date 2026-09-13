@@ -42,10 +42,6 @@
         <strong>{{ t('work.copy_media') }}</strong>
         <span class="muted">{{ t('work.copy_media_help') }}</span>
       </button>
-      <button type="button" class="export-item" id="copy-system-btn">
-        <strong>Copier le prompt système</strong>
-        <span class="muted">À coller une fois dans le projet Claude</span>
-      </button>
       <div class="export-profiles" id="export-profiles" hidden></div>
       <div class="export-status muted" id="export-status"></div>
     </div>
@@ -206,7 +202,6 @@
 <script>
   const PROMPTS = {{ prompts | tojson }};
   window.__PROJECT_ID__ = {{ project_id | tojson }};
-  window.__SYSTEM_PROMPT__ = {{ system_prompt | tojson }};
   window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
   window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";

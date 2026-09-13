@@ -28,7 +28,7 @@ from flask import (
 import paths
 import settings as user_settings
 from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
-from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
+from parse_cours import build_prompts, parse_docx
 from project_store import (
     PROJECT_VERSION,
     copy_media,
@@ -229,7 +229,6 @@ def work(project_id):
         "work.html",
         project_id=project_id,
         prompts=project_view(project, project_id),
-        system_prompt=project["prompts"][0].get("system") or SYSTEM_PROMPT,
         progress=progress(project),
         missing_alt=missing_alt_count(project),
         warnings=project.get("warnings", []),

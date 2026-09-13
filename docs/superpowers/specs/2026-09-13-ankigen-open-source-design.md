@@ -109,8 +109,17 @@ Interface publique :
 
 **Robustesse.** Un `settings.json` absent, illisible ou contenant un JSON invalide produit
 les valeurs par défaut sans lever d'exception : une préférence corrompue ne doit jamais
-empêcher l'application de démarrer. Une valeur individuelle invalide (langue inconnue,
-`download_dir` inexistant) retombe sur son défaut, les autres clés sont conservées.
+empêcher l'application de démarrer. Une valeur individuelle invalide (langue inconnue, type
+inattendu) retombe sur son défaut, les autres clés sont conservées.
+
+**Cas particulier de `download_dir`.** Le module **stocke le chemin tel que l'utilisateur
+l'a saisi** dès lors que c'est une chaîne non vide, y compris s'il ne pointe nulle part.
+Réécrire silencieusement le réglage vers le défaut ferait disparaître une saisie sans
+explication — l'utilisateur retrouverait un champ qu'il n'a pas rempli. La vérification
+d'utilisabilité est séparée : `resolve_download_dir()` retourne un dossier écrivable ou
+`None`, et c'est l'export qui décide quoi faire d'un `None` (section 5). Le réglage garde
+donc la saisie, l'export dégrade proprement, et la page de réglages affiche à la demande
+si le dossier est atteignable.
 
 **Surface HTTP.** `GET /api/settings` et `POST /api/settings` (JSON partiel), plus la page
 `GET /settings` rendue par un nouveau template `settings.html`, accessible depuis la barre.
@@ -258,8 +267,16 @@ fichiers, testables isolément. `app.py` est le seul point qui les relie.
 
 ## Tests
 
-Une suite pytest existe (`tests/test_docx_media.py`, avec `tests/make_fixtures.py`). On
-l'étend sur les points où une régression serait silencieuse :
+Une suite existe (`tests/test_docx_media.py`, avec `tests/make_fixtures.py`), bâtie sur
+`unittest` de la bibliothèque standard — choix délibéré du dépôt, documenté dans l'en-tête
+du fichier : la suite doit tourner sans dépendance supplémentaire. Les nouveaux tests
+suivent ce même cadre ; on n'introduit pas pytest.
+
+Commande de référence, vérifiée : `.venv/Scripts/python.exe -m unittest discover -s tests`
+(38 tests au vert sur `b8e58c1`). L'interpréteur du venv est nécessaire — `python` sur le
+PATH n'a ni `docx` ni `flask`.
+
+On étend la suite sur les points où une régression serait silencieuse :
 
 - `tests/test_settings.py` — défauts sur fichier absent ; JSON corrompu → défauts sans
   exception ; valeur individuelle invalide → défaut pour cette clé seulement ;
@@ -271,11 +288,9 @@ l'étend sur les points où une régression serait silencieuse :
   préfixe renseigné produit `Prefix::Chapitre::…` ; contenu antérieur au premier titre non
   émis dans les deux cas
 
-Vérification manuelle avant PR, `pytest` ne couvrant pas l'interface : parcours complet
+Vérification manuelle avant PR, la suite ne couvrant pas l'interface : parcours complet
 upload → travail → export dans les deux langues, bascule de langue, export avec un
 `download_dir` volontairement invalide.
-
-`pytest` rejoint `requirements.txt` (fichier encodé en UTF-16, encodage à préserver).
 
 ## Risques
 

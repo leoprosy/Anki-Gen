@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-updater.py — Module d'auto-mise à jour pour Anki ESH.
+updater.py — Module d'auto-mise à jour pour Ankigen.
 
 Interroge l'API GitHub Releases pour vérifier si une nouvelle version
 est disponible, et remplace les fichiers applicatifs dans %APPDATA%/AnkiGen/app/

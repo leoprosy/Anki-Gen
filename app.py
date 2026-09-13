@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-app.py — Interface web pour le pipeline Anki ESH.
+app.py — Interface web pour le pipeline Ankigen.
 
 Lance:
     .venv/bin/python app.py

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-parse_cours.py — Étape 1 du pipeline Anki ESH
+parse_cours.py — Étape 1 du pipeline Ankigen
 Lit un .docx, détecte la hiérarchie du plan (styles Titre), découpe en chunks par
 section, extrait les images (+ leur texte alternatif) et les tableaux, et génère
 le projet JSON prêt à être travaillé dans l'app.

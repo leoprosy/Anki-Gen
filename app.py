@@ -139,7 +139,7 @@ def upload():
             "upload.html", error="Merci de fournir un fichier .docx.", projects=list_projects()
         ), 400
 
-    deck_prefix = (request.form.get("deck_prefix") or "*ESH*").strip() or "*ESH*"
+    deck_prefix = (request.form.get("deck_prefix") or "").strip()
     project_id = sanitize_filename(file.filename)
 
     # Ensure unique project_id

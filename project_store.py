@@ -27,6 +27,12 @@ from render import render_preview_html, render_prompt_text, resolve_placeholders
 
 PROJECT_VERSION = 2
 
+# Nom de deck de dernier recours pour une ligne TSV : Anki refuse un champ deck
+# vide. Ce n'est pas de la copie d'interface mais un identifiant de deck, donc il
+# n'est pas traduit — sinon un même projet exporté dans deux langues créerait
+# deux decks différents dans Anki.
+DEFAULT_DECK_NAME = "Ankigen"
+
 
 # ──────────────────────────────────────────────────────────────
 # Chemins
@@ -116,7 +122,7 @@ def list_projects() -> list:
         out.append({
             "id": file.stem,
             "progress": progress(project),
-            "deck": project["prompts"][0].get("deck") or project.get("deck_prefix") or "ESH",
+            "deck": project["prompts"][0].get("deck") or project.get("deck_prefix") or "",
             "source": project.get("source"),
             "images": images,
             "tables": tables,
@@ -265,7 +271,7 @@ def export_rows(project: dict, only_done: bool = False, media_prefix: str = ""):
             skipped += 1
             continue
 
-        deck = prompt.get("deck") or project.get("deck_prefix") or "ESH"
+        deck = prompt.get("deck") or project.get("deck_prefix") or DEFAULT_DECK_NAME
         for question, answer in parse_tsv_response(response):
             q, used_q, unk_q = resolve_placeholders(question, prompt, assets, media_prefix)
             a, used_a, unk_a = resolve_placeholders(answer, prompt, assets, media_prefix)

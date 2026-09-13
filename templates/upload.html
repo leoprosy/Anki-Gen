@@ -32,8 +32,10 @@
         </div>
 
         <label class="field">
-          <span>Préfixe de deck Anki</span>
-          <input type="text" name="deck_prefix" value="*ESH*" required>
+          <span>{{ t('upload.deck_prefix_label') }}</span>
+          <input type="text" name="deck_prefix" value="{{ prefs.deck_prefix }}"
+            placeholder="{{ t('upload.deck_prefix_placeholder') }}">
+          <small class="muted">{{ t('upload.deck_prefix_help') }}</small>
         </label>
 
         <button type="submit" class="primary w-full">Parser et continuer</button>
@@ -52,7 +54,7 @@
           <div class="project-row__main">
             <h4>{{ proj.id }}</h4>
             <div class="muted">
-              {{ proj.deck }} &middot; {{ proj.progress.done }}/{{ proj.progress.total }} ({{ pct }}%)
+              {{ proj.deck or t('project.no_deck') }} &middot; {{ proj.progress.done }}/{{ proj.progress.total }} ({{ pct }}%)
               {% if proj.images %} &middot; 🖼️ {{ proj.images }}{% endif %}
               {% if proj.tables %} &middot; ▦ {{ proj.tables }}{% endif %}
             </div>

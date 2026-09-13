@@ -7,6 +7,7 @@
   "nav.help": "Mode d'emploi",
   "nav.home": "Accueil",
   "nav.settings": "Paramètres",
+  "project.no_deck": "Sans préfixe",
   "settings.check_folder": "Vérifier le dossier",
   "settings.deck_prefix_help": "Pré-rempli à l'import d'un cours. Laisse vide pour aucun préfixe.",
   "settings.deck_prefix_label": "Préfixe de deck Anki par défaut",
@@ -22,5 +23,8 @@
   "settings.language_label": "Langue de l'interface",
   "settings.save": "Enregistrer",
   "settings.subtitle": "Ces préférences sont enregistrées sur cette machine uniquement.",
-  "settings.title": "Paramètres"
+  "settings.title": "Paramètres",
+  "upload.deck_prefix_help": "Placé devant chaque deck construit depuis les titres du document.",
+  "upload.deck_prefix_label": "Préfixe de deck Anki",
+  "upload.deck_prefix_placeholder": "Optionnel — ex. Économie"
 }

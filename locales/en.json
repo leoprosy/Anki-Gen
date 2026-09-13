@@ -7,6 +7,7 @@
   "nav.help": "How to use",
   "nav.home": "Home",
   "nav.settings": "Settings",
+  "project.no_deck": "No prefix",
   "settings.check_folder": "Check folder",
   "settings.deck_prefix_help": "Prefilled when you import a course. Leave empty for no prefix.",
   "settings.deck_prefix_label": "Default Anki deck prefix",
@@ -22,5 +23,8 @@
   "settings.language_label": "Interface language",
   "settings.save": "Save",
   "settings.subtitle": "These preferences are stored on this machine only.",
-  "settings.title": "Settings"
+  "settings.title": "Settings",
+  "upload.deck_prefix_help": "Prepended to every deck built from the document's headings.",
+  "upload.deck_prefix_label": "Anki deck prefix",
+  "upload.deck_prefix_placeholder": "Optional — e.g. Economics"
 }

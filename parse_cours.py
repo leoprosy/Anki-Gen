@@ -63,9 +63,15 @@ Aucune ligne d'intro, aucun commentaire, aucun bloc markdown."""
 # Helpers
 # ──────────────────────────────────────────────
 def build_deck_path(stack, prefix):
-    """Construit le chemin de deck Anki depuis la pile hiérarchique."""
-    parts = [prefix] + [t for _, t in stack]
-    return "::".join(parts)
+    """
+    Chemin de deck Anki depuis la pile hiérarchique.
+
+    Le préfixe est optionnel depuis l'ouverture au public. On filtre les segments
+    vides au lieu de les joindre : `"::".join(["", "Chapitre"])` donnerait
+    « ::Chapitre », que Anki refuse.
+    """
+    segments = [(prefix or "").strip()] + [title for _, title in stack]
+    return "::".join(segment for segment in segments if segment)
 
 
 def split_chapter_title(stem: str):
@@ -132,9 +138,11 @@ def parse_docx(path: Path, deck_prefix: str, project_id: str = None,
             or b["type"] in ("image", "table")
             for b in blocks
         )
-        # `deck != deck_prefix` : on ignore le contenu antérieur au premier titre
-        # (ligne de titre du chapitre, intro) — comportement aligné sur main.
-        if has_content and deck != deck_prefix:
+        # `stack` vide = on n'est pas encore entré dans une section : c'est le
+        # contenu antérieur au premier titre (ligne de titre, intro), qu'on
+        # ignore. L'ancienne condition `deck != deck_prefix` disait la même chose
+        # de façon détournée, et devenait fausse avec un préfixe vide.
+        if has_content and stack:
             prompt = render_prompt_text(blocks, store.assets)
             chunks.append({
                 "deck": deck,
@@ -233,7 +241,8 @@ def main():
     parser = argparse.ArgumentParser(description="Parse un cours .docx → prompts Anki JSON")
     parser.add_argument("docx", help="Chemin vers le fichier .docx")
     parser.add_argument("--output", default="prompts.json", help="Fichier JSON de sortie")
-    parser.add_argument("--deck-prefix", default="*ESH*", help="Nom du deck racine Anki")
+    parser.add_argument("--deck-prefix", default="",
+                        help="Préfixe de deck Anki (vide par défaut)")
     parser.add_argument("--media-dir", default=None,
                         help="Dossier de sortie des images (défaut: media/<nom du cours>)")
     parser.add_argument(

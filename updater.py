@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-updater.py — Module d'auto-mise à jour pour Anki ESH.
+updater.py — Module d'auto-mise à jour pour Ankigen.
 
 Interroge l'API GitHub Releases pour vérifier si une nouvelle version
 est disponible, et télécharge les fichiers applicatifs dans un dossier de
@@ -150,11 +150,17 @@ def apply_staged_update(target_dir):
 def check_and_update():
     """Point d'entrée principal pour vérifier et appliquer une mise à jour.
 
+    Le message est retourné sous forme de *clé* de traduction et de paramètres,
+    et non de texte : ce module ne connaît pas la langue de l'utilisateur, et la
+    traduire ici l'obligerait à dépendre de i18n. C'est `app.py`, qui lit les
+    préférences, qui rend la clé en texte.
+
     Returns:
         dict: Résultat avec les clés :
             - status: 'up_to_date' | 'updated' | 'error'
             - version: str (version courante ou nouvelle)
-            - message: str (message descriptif)
+            - message_key: str (clé de traduction)
+            - message_params: dict (paramètres d'interpolation)
     """
     try:
         release = fetch_latest_release()
@@ -165,7 +171,8 @@ def check_and_update():
             return {
                 "status": "up_to_date",
                 "version": local_version,
-                "message": "Déjà à jour.",
+                "message_key": "update.up_to_date",
+                "message_params": {},
             }
 
         # Cherche l'asset app.zip dans le release
@@ -181,25 +188,29 @@ def check_and_update():
             return {
                 "status": "error",
                 "version": local_version,
-                "message": "Asset app.zip introuvable dans le release GitHub.",
+                "message_key": "update.asset_missing",
+                "message_params": {},
             }
 
         download_and_apply(asset_url, _get_app_dir())
         return {
             "status": "staged",
             "version": remote_version,
-            "message": f"v{remote_version} téléchargée. Redémarrez l'application pour l'appliquer.",
+            "message_key": "update.staged",
+            "message_params": {"version": remote_version},
         }
 
     except URLError:
         return {
             "status": "error",
             "version": get_local_version(),
-            "message": "Pas de connexion réseau.",
+            "message_key": "update.offline",
+            "message_params": {},
         }
     except Exception as e:
         return {
             "status": "error",
             "version": get_local_version(),
-            "message": f"Erreur lors de la mise à jour : {e}",
+            "message_key": "update.failed",
+            "message_params": {"error": str(e)},
         }

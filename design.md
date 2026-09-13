@@ -1,7 +1,9 @@
-# Anki-Gen — Frontend Design System
+# Anki-Gen — Frontend Design System (v2)
 
-> A clean, sober, Apple-inspired light interface.  
+> A clean, sober, Apple-inspired interface.
 > **Principle:** remove everything that isn't necessary — then remove a little more.
+> **Structural rule (v2):** the action dock is *always* visible. No window size may
+> hide copy / paste / preview / save behind a scroll.
 
 ---
 
@@ -49,6 +51,20 @@
   --blur-bg:     saturate(180%) blur(20px);
 }
 ```
+
+### v2 additions
+
+```css
+--surface-alt-2: #E8E8ED;   /* hover state of a recessed surface        */
+--hairline:      rgba(0,0,0,0.08); /* the only allowed 0.5px separator     */
+--tap:           40px;      /* minimum interactive target               */
+--safe-b:        env(safe-area-inset-bottom, 0px);
+--ease:          cubic-bezier(0.25, 1, 0.5, 1);
+--rail-w:        264px;  --gap: 16px;  --pad: 16px;
+```
+
+Every one of these is redefined (where relevant) inside
+`@media (prefers-color-scheme: dark)` — see §10.6.
 
 ### Accent Budget
 
@@ -434,31 +450,77 @@ header {
 
 ---
 
-## 10. Layout & Responsiveness
+## 10. Layout, Shell & Responsiveness
+
+### 10.1 The shell
+
+Every page is a vertical flex column that owns the full viewport height.
+The work view locks that height (`.shell--fixed`) so scrolling happens **inside**
+panels, never on the page — which is what keeps the dock on screen.
 
 ```css
-main {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: var(--space-lg);
-}
+.shell        { display: flex; flex-direction: column; min-height: 100dvh; }
+.shell--fixed { height: 100dvh; overflow: hidden; }
 
-.layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: var(--space-lg);
-}
-
-@media (max-width: 900px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-  .sidebar {
-    position: static;
-    max-height: 300px;
-  }
-}
+.topbar { flex: none; }          /* header  */
+.work   { flex: 1; min-height: 0; }  /* content */
+.dock   { flex: none; }          /* actions */
 ```
+
+> `min-height: 0` on the growing child is mandatory: without it a flex/grid item
+> refuses to shrink below its content and the dock gets pushed off screen.
+
+### 10.2 The action dock
+
+All primary actions live in one bar at the bottom of the work view:
+previous / next · copy · paste · preview · save · save & next.
+
+| Width | Dock rendering |
+|---|---|
+| > 760px | icon + label |
+| ≤ 760px | icons only (40px targets), `title` + `aria-label` carry the meaning |
+| ≤ 420px | counter hidden, every button icon-only (38px) |
+| anything smaller | the dock scrolls horizontally — **never** hides an action |
+
+An action is never *moved* into a menu when space runs short: it is only
+*shortened*. Progressive disclosure applies to labels, not to capabilities.
+
+### 10.3 Breakpoints
+
+| Range | Chunk list | Panels |
+|---|---|---|
+| ≥ 1180px | fixed rail, 264px | source + answer side by side |
+| 900–1180px | off-canvas drawer (☰ in the header, scrim, Esc) | source + answer side by side |
+| < 900px | off-canvas drawer | one panel at a time, `Cours / Réponse` tabs |
+| height < 560px | — | tighter paddings, 36px targets |
+
+Panel-level adjustments use **container queries**, not viewport ones: a panel
+reacts to *its own* width, so the same panel behaves identically whether it is
+squeezed by a sibling or by a narrow window.
+
+```css
+.pane { container-type: inline-size; container-name: pane; }
+@container pane (max-width: 460px) { .pane__title .mono { display: none; } }
+```
+
+### 10.4 Fixed positioning caveat
+
+`.topbar` uses `backdrop-filter`, which makes it the **containing block** of any
+`position: fixed` descendant. Popovers anchored in the header (the export sheet)
+are therefore positioned relative to the header, not the viewport — offsets like
+`bottom: 0` would send them off screen. Anchor them with `top: calc(100% + 6px)`
+instead, and size scrims with `width: 100vw; height: 100vh`.
+
+### 10.5 Touch & safe areas
+
+- Minimum interactive target: `--tap` (40px, 38px under 420px).
+- Every bottom-anchored surface adds `env(safe-area-inset-bottom)`.
+- `<meta name="viewport" content="… viewport-fit=cover">`.
+
+### 10.6 Dark variant
+
+Tokens — and only tokens — are redefined under `prefers-color-scheme: dark`.
+No component rule may hard-code a color; if a shade is needed, add a token.
 
 ---
 
@@ -474,6 +536,10 @@ main {
 | Keep surfaces white or near-white | Use dark/colored panel backgrounds |
 | Use `backdrop-filter: blur` on header | Use opaque header with harsh bottom border |
 | Let content breathe with generous padding | Cram elements together with tight margins |
+| Keep every primary action in the dock | Hide an action behind a scroll or a menu when the window shrinks |
+| Give scrolling to panels (`overflow-y: auto`) | Give `overflow: hidden` to a container whose content can grow |
+| Drive colors through tokens | Hard-code a hex value in a component rule |
+| Style state with `[hidden]`-safe rules | Set `display` on an element toggled via `hidden` without a `[hidden]` guard |
 
 ---
 
@@ -481,9 +547,11 @@ main {
 
 | File | Purpose |
 |---|---|
-| `static/style.css` | All styles (single file, follows tokens above) |
-| `templates/base.html` | Loads Inter font, links stylesheet |
-| `static/app.js` | JS animations (chunk transitions, save pulse) |
+| `static/style.css` | All styles (single file, follows the tokens above) |
+| `templates/base.html` | Shell, icon sprite, topbar, toasts, update banner |
+| `templates/work.html` | Work view: rail, panels, dock |
+| `templates/upload.html` | Home: new course + resume |
+| `static/app.js` | Work-view logic: navigation, tabs, drawer, dock, clipboard, export |
 
 ---
 

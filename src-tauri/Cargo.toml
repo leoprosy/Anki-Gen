@@ -1,6 +1,6 @@
 [package]
 name = "anki-esh"
-version = "1.0.0"
+version = "1.1.0"
 description = "Anki ESH — Générateur de flashcards"
 authors = ["Leo"]
 license = "MIT"

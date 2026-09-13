@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}{{ t('settings.title') }} — {{ t('app.name') }}{% endblock %}
+
+{% block shell_body %}
+<main class="page">
+  <div class="page__head">
+    <h2>{{ t('settings.title') }}</h2>
+    <p>{{ t('settings.subtitle') }}</p>
+  </div>
+
+  <section class="card">
+    <label class="field">
+      <span>{{ t('settings.language_label') }}</span>
+      <select id="set-language">
+        {% for entry in languages %}
+        <option value="{{ entry.code }}" {% if entry.code == prefs.language %}selected{% endif %}>{{ entry.label }}</option>
+        {% endfor %}
+      </select>
+      <small class="muted">{{ t('settings.language_help') }}</small>
+    </label>
+
+    <label class="field">
+      <span>{{ t('settings.deck_prefix_label') }}</span>
+      <input type="text" id="set-deck-prefix" value="{{ prefs.deck_prefix }}"
+        placeholder="{{ t('settings.deck_prefix_placeholder') }}">
+      <small class="muted">{{ t('settings.deck_prefix_help') }}</small>
+    </label>
+
+    <label class="field">
+      <span>{{ t('settings.download_dir_label') }}</span>
+      <input type="text" id="set-download-dir" value="{{ prefs.download_dir }}" spellcheck="false">
+      <small class="muted">{{ t('settings.download_dir_help') }}</small>
+    </label>
+
+    <div class="actions">
+      <button type="button" class="btn" id="check-dir-btn">{{ t('settings.check_folder') }}</button>
+      <button type="button" class="btn primary" id="save-settings-btn">{{ t('settings.save') }}</button>
+      <span class="muted" id="settings-status"></span>
+    </div>
+  </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const status = document.getElementById('settings-status');
+
+    document.getElementById('check-dir-btn').addEventListener('click', async () => {
+      status.textContent = '…';
+      status.className = 'muted';
+      try {
+        const res = await fetch('/api/settings/check-dir', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: document.getElementById('set-download-dir').value }),
+        });
+        const data = await res.json();
+        status.textContent = data.message;
+        status.className = data.ok ? 'ok' : 'err';
+      } catch (e) {
+        status.textContent = window.T('js.network_error');
+        status.className = 'err';
+      }
+    });
+
+    document.getElementById('save-settings-btn').addEventListener('click', async () => {
+      const payload = {
+        language: document.getElementById('set-language').value,
+        deck_prefix: document.getElementById('set-deck-prefix').value,
+        download_dir: document.getElementById('set-download-dir').value,
+      };
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error('save failed');
+        // La langue ne change l'interface qu'au rendu suivant : on recharge.
+        location.reload();
+      } catch (e) {
+        status.textContent = window.T('js.network_error');
+        status.className = 'err';
+      }
+    });
+  })();
+</script>
+{% endblock %}

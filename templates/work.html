@@ -1,125 +1,213 @@
 {% extends "base.html" %}
-{% block title %}Travail — Anki ESH{% endblock %}
+{% block title %}{{ project_id }} — {{ t('app.name') }}{% endblock %}
+{% block shell_class %}shell--fixed{% endblock %}
 
-{% block header_extra %}
-<div class="progress-wrap">
-  <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
-  <div class="progress-bar"><div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div></div>
-  <a class="btn" href="{{ url_for('export_tsv', project_id=project_id) }}" style="display: flex; align-items: center; gap: 6px;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-    TSV
-  </a>
-  <a class="btn ghost" href="{{ url_for('index') }}" style="display: flex; align-items: center; gap: 6px;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-    Accueil
+{% block topbar %}
+<button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="{{ t('work.chunk_list') }}" aria-expanded="false"
+  title="{{ t('work.chunk_list') }}">
+  <svg width="18" height="18" aria-hidden="true"><use href="#i-list"></use></svg>
+</button>
+
+<div class="topbar__context">
+  <span class="project-name" title="{{ project_id }}">{{ project_id }}</span>
+  <div class="topbar__spacer"></div>
+  <div class="progress" title="{{ t('work.progress_title') }}">
+    <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
+    <div class="progress-bar" role="progressbar" aria-label="{{ t('work.progress_title') }}">
+      <div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
+    </div>
+  </div>
+</div>
+
+<div class="topbar__actions">
+  <details class="menu" id="export-menu">
+    <summary title="{{ t('work.export') }}">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
+      <span class="lbl">{{ t('work.export') }}</span>
+    </summary>
+    <div class="menu__panel">
+      <div class="menu__title">{{ t('work.export') }}</div>
+      <div class="export-report" id="export-report">{{ t('work.export_computing') }}</div>
+      <button type="button" class="export-item" id="export-tsv-btn"
+        data-export-url="{{ url_for('export_tsv', project_id=project_id) }}">
+        <strong>{{ t('work.export_tsv') }}</strong>
+        <span class="muted">{{ t('work.export_tsv_help') }}</span>
+      </button>
+      <button type="button" class="export-item" id="export-zip-btn"
+        data-export-url="{{ url_for('export_zip', project_id=project_id) }}">
+        <strong>{{ t('work.export_zip') }}</strong>
+        <span class="muted">{{ t('work.export_zip_help') }}</span>
+      </button>
+      <button type="button" class="export-item" id="copy-media-btn">
+        <strong>{{ t('work.copy_media') }}</strong>
+        <span class="muted">{{ t('work.copy_media_help') }}</span>
+      </button>
+      <div class="export-profiles" id="export-profiles" hidden></div>
+      <div class="export-status muted" id="export-status"></div>
+    </div>
+  </details>
+
+  <a class="btn ghost" href="{{ url_for('index') }}" title="{{ t('nav.home') }}">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-home"></use></svg>
+    <span class="lbl">{{ t('nav.home') }}</span>
   </a>
 </div>
 {% endblock %}
 
-{% block content %}
-<div class="layout">
-  <aside class="sidebar">
-    <h3>Chunks</h3>
+{% block shell_body %}
+<main class="work">
+  <!-- ── Rail des chunks (tiroir sous 1180px) ─────────────────── -->
+  <aside class="rail" id="rail" aria-label="{{ t('work.chunk_list') }}">
+    <div class="rail__head">
+      <span class="rail__title">{{ t('work.chunk_list') }}</span>
+      <button type="button" class="icon-btn rail__close" id="rail-close" aria-label="{{ t('work.close_list') }}">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
     <ol class="chunk-list" id="chunk-list">
       {% for p in prompts %}
-        <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
-          <button type="button" class="chunk-btn">
-            <span class="dot-wrapper">
-              <svg class="icon-pending" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>
-              <svg class="icon-done" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            </span>
-            <span class="chunk-id">#{{ p.id }}</span>
-            <span class="chunk-deck">{{ p.deck }}</span>
-          </button>
-        </li>
+      <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
+        <button type="button" class="chunk-btn">
+          <span class="dot-wrapper">
+            <svg class="icon-pending" width="12" height="12" aria-hidden="true"><use href="#i-circle"></use></svg>
+            <svg class="icon-done" width="14" height="14" aria-hidden="true"><use href="#i-check"></use></svg>
+          </span>
+          <span class="chunk-id">#{{ p.id }}</span>
+          <span class="chunk-deck">{{ p.deck }}</span>
+          <span class="chunk-badges">
+            {% if p.images %}<span class="badge" title="{{ t('work.images_n', n=p.images|length) }}">🖼️{{ p.images|length }}</span>{% endif %}
+            {% if p.tables %}<span class="badge" title="{{ t('work.tables_n', n=p.tables|length) }}">▦{{ p.tables|length }}</span>{% endif %}
+          </span>
+        </button>
+      </li>
       {% endfor %}
     </ol>
   </aside>
+  <div class="rail-scrim" id="rail-scrim"></div>
 
-  <section class="workspace">
-    <div class="chunk-view" id="chunk-view">
-      <header class="chunk-header">
-        <div>
-          <div class="muted">Chunk <span id="cur-id"></span> / Deck</div>
-          <div class="deck-name" id="cur-deck"></div>
-        </div>
-        <div class="nav-btns">
-          <button type="button" id="prev-btn" style="display: flex; align-items: center; gap: 4px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            Précédent
-          </button>
-          <button type="button" id="next-btn" style="display: flex; align-items: center; gap: 4px;">
-            Suivant
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-          </button>
-        </div>
-      </header>
+  <!-- ── Panneaux ─────────────────────────────────────────────── -->
+  <section class="panes">
+    {% if warnings %}
+    <div class="warn-banner">
+      {% for w in warnings %}<div>⚠️ {{ w }}</div>{% endfor %}
+    </div>
+    {% endif %}
 
-      <section class="block">
-        <div class="block-head">
-          <h4>Paragraphe à envoyer à Claude</h4>
-          <button type="button" class="copy-btn" data-copy-target="#cur-prompt">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            <span>Copier</span>
-          </button>
-        </div>
-        <pre id="cur-prompt" class="prompt-text"></pre>
-      </section>
+    <div class="tabbar" id="tabbar" role="tablist">
+      <button type="button" role="tab" data-tab="source" class="active" aria-selected="true">{{ t('work.tab_source') }}</button>
+      <button type="button" role="tab" data-tab="answer" aria-selected="false">
+        {{ t('work.tab_answer') }}<span class="tab-flag" id="tab-flag" hidden></span>
+      </button>
+    </div>
 
-      <section class="block">
-        <div class="block-head">
-          <h4>Réponse de Claude (TSV : QUESTION&#9;RÉPONSE)</h4>
-          <span class="muted" id="cards-info"></span>
-        </div>
-        <div class="response-container" id="response-container">
-          <textarea id="response" placeholder="Colle ici la réponse de Claude pour ce paragraphe... ou dépose un fichier texte"></textarea>
-          <div class="response-overlay">
-            <span class="drop-zone__icon" style="color: var(--accent); margin-bottom: 8px;">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="12" y1="18" x2="12" y2="12"></line>
-                <polyline points="9 15 12 12 15 15"></polyline>
-              </svg>
-            </span>
-            <span>Déposez le fichier TSV/TXT ici</span>
+    <div class="panes__grid" id="panes-grid" data-active="source">
+
+      <!-- Paragraphe source -->
+      <article class="pane" data-pane="source" role="tabpanel" aria-label="{{ t('work.tab_source') }}">
+        <header class="pane__head">
+          <div class="pane__title">
+            <span class="chunk-index" id="cur-id">#0</span>
+            <span class="deck-name" id="cur-deck"></span>
           </div>
+          <div class="pane__tools">
+            <div class="seg" id="view-toggle">
+              <button type="button" data-view="preview" class="active">{{ t('work.view_preview') }}</button>
+              <button type="button" data-view="text">{{ t('work.view_text') }}</button>
+            </div>
+          </div>
+        </header>
+        <div class="pane__body">
+          <div id="cur-preview" class="chunk-preview"></div>
+          <pre id="cur-prompt" class="prompt-text" hidden></pre>
+          <div id="alt-panel" class="alt-panel"></div>
         </div>
-        <div class="actions">
-          <button type="button" id="paste-btn" class="btn ghost" title="Coller depuis le presse-papier">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            Coller
-          </button>
-          <button type="button" id="save-btn" class="primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            Enregistrer
-          </button>
-          <button type="button" id="save-next-btn" class="primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; vertical-align: -3px;">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            Enregistrer & Suivant
-          </button>
-          <span id="save-status" class="muted"></span>
+      </article>
+
+      <!-- Réponse de Claude -->
+      <article class="pane" data-pane="answer" role="tabpanel" aria-label="{{ t('work.answer_label') }}">
+        <header class="pane__head">
+          <div class="pane__title">
+            <span class="pane__label">{{ t('work.answer_label') }}</span>
+            <span class="muted mono">{{ t('work.answer_format') }}</span>
+          </div>
+          <div class="pane__tools">
+            <span class="muted" id="cards-info"></span>
+            <div class="seg" id="answer-toggle">
+              <button type="button" data-answer="edit" class="active">{{ t('work.view_text') }}</button>
+              <button type="button" data-answer="cards">{{ t('work.answer_cards') }}</button>
+            </div>
+          </div>
+        </header>
+        <div class="pane__body pane__body--flush">
+          <div id="insert-bar" class="insert-bar"></div>
+          <div class="response-container" id="response-container">
+            <textarea id="response" spellcheck="false"
+              placeholder="{{ t('work.response_placeholder') }}"></textarea>
+            <div class="response-overlay">
+              <svg width="30" height="30" aria-hidden="true"><use href="#i-file"></use></svg>
+              <span>{{ t('work.drop_tsv') }}</span>
+            </div>
+          </div>
+          <div id="cards-preview" class="cards-preview" hidden></div>
         </div>
-      </section>
+      </article>
+
     </div>
   </section>
-</div>
+</main>
 
+<!-- ── Dock d'actions : visible à toutes les tailles ──────────── -->
+<footer class="dock" aria-label="{{ t('work.actions') }}">
+  <div class="dock__group">
+    <button type="button" class="icon-btn" id="prev-btn" title="{{ t('work.prev') }} (Alt+←)" aria-label="{{ t('work.prev') }}">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-prev"></use></svg>
+    </button>
+    <span class="counter" id="dock-counter"></span>
+    <button type="button" class="icon-btn" id="next-btn" title="{{ t('work.next') }} (Alt+→)" aria-label="{{ t('work.next') }}">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
+    </button>
+  </div>
+
+  <div class="dock__sep"></div>
+
+  <div class="dock__group">
+    <button type="button" class="btn" id="copy-btn" title="{{ t('work.copy_title') }} (Ctrl+Maj+C)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+      <span class="lbl">{{ t('work.copy') }}</span>
+    </button>
+    <button type="button" class="btn" id="paste-btn" title="{{ t('work.paste_title') }} (Ctrl+Maj+V)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
+      <span class="lbl">{{ t('work.paste') }}</span>
+    </button>
+    <button type="button" class="btn" id="preview-btn" title="{{ t('work.preview_title') }} (Ctrl+Maj+P)" aria-pressed="false">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-eye"></use></svg>
+      <span class="lbl">{{ t('work.preview') }}</span>
+    </button>
+  </div>
+
+  <div class="dock__group dock__group--main">
+    <button type="button" class="btn" id="save-btn" title="{{ t('work.save') }} (Ctrl+S)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
+      <span class="lbl">{{ t('work.save') }}</span>
+    </button>
+    <button type="button" class="btn primary btn-save-next" id="save-next-btn" title="{{ t('work.save_next_title') }} (Ctrl+Entrée)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-save-next"></use></svg>
+      <span class="lbl">{{ t('work.save_next') }}</span>
+    </button>
+  </div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
 <script>
   const PROMPTS = {{ prompts | tojson }};
-  window.__INIT_PROGRESS__ = {{ progress | tojson }};
+  window.__PROJECT_ID__ = {{ project_id | tojson }};
+  window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
+  window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";
+  window.__API_PREVIEW_URL__ = "{{ url_for('api_preview', project_id=project_id) }}";
+  window.__API_REPORT_URL__ = "{{ url_for('api_export_report', project_id=project_id) }}";
+  window.__API_ANKI_MEDIA_URL__ = "{{ url_for('api_export_anki_media', project_id=project_id) }}";
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 {% endblock %}

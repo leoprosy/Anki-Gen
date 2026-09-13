@@ -28,6 +28,7 @@ from flask import (
 import paths
 import settings as user_settings
 from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
+from i18n import available_languages, catalog_for_js, translate
 from parse_cours import build_prompts, parse_docx
 from project_store import (
     PROJECT_VERSION,
@@ -45,7 +46,6 @@ from project_store import (
     save_project,
     set_asset_alt,
 )
-from i18n import available_languages, catalog_for_js, translate
 from render import resolve_placeholders
 
 ROOT = paths.DATA_DIR

@@ -1,10 +1,15 @@
 {
+  "app.description": "Générateur de flashcards Anki à partir de cours .docx",
   "app.name": "Ankigen",
   "app.tagline": "Transforme un cours .docx en paquet Anki, paragraphe par paragraphe.",
-  "app.description": "Générateur de flashcards Anki à partir de cours .docx",
+  "js.network_error": "Erreur réseau.",
+  "js.saved": "Enregistré",
+  "nav.help": "Mode d'emploi",
   "nav.home": "Accueil",
   "nav.settings": "Paramètres",
-  "nav.help": "Mode d'emploi",
-  "js.saved": "Enregistré",
-  "js.network_error": "Erreur réseau."
+  "settings.dir_blank": "Indique un chemin de dossier.",
+  "settings.dir_not_a_folder": "Ce chemin pointe vers un fichier, pas un dossier.",
+  "settings.dir_not_writable": "Ce dossier n'est pas accessible en écriture.",
+  "settings.dir_ok": "Dossier atteignable et accessible en écriture.",
+  "settings.dir_unreachable": "Ce dossier ne peut être ni créé ni atteint."
 }

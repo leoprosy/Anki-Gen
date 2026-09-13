@@ -1,10 +1,15 @@
 {
+  "app.description": "Anki flashcard generator for .docx courses",
   "app.name": "Ankigen",
   "app.tagline": "Turn a .docx course into an Anki deck, one paragraph at a time.",
-  "app.description": "Anki flashcard generator for .docx courses",
+  "js.network_error": "Network error.",
+  "js.saved": "Saved",
+  "nav.help": "How to use",
   "nav.home": "Home",
   "nav.settings": "Settings",
-  "nav.help": "How to use",
-  "js.saved": "Saved",
-  "js.network_error": "Network error."
+  "settings.dir_blank": "Please enter a folder path.",
+  "settings.dir_not_a_folder": "That path points to a file, not a folder.",
+  "settings.dir_not_writable": "That folder is not writable.",
+  "settings.dir_ok": "Folder is reachable and writable.",
+  "settings.dir_unreachable": "That folder cannot be created or reached."
 }

@@ -7,9 +7,20 @@
   "nav.help": "How to use",
   "nav.home": "Home",
   "nav.settings": "Settings",
+  "settings.check_folder": "Check folder",
+  "settings.deck_prefix_help": "Prefilled when you import a course. Leave empty for no prefix.",
+  "settings.deck_prefix_label": "Default Anki deck prefix",
+  "settings.deck_prefix_placeholder": "e.g. Economics",
   "settings.dir_blank": "Please enter a folder path.",
   "settings.dir_not_a_folder": "That path points to a file, not a folder.",
   "settings.dir_not_writable": "That folder is not writable.",
   "settings.dir_ok": "Folder is reachable and writable.",
-  "settings.dir_unreachable": "That folder cannot be created or reached."
+  "settings.dir_unreachable": "That folder cannot be created or reached.",
+  "settings.download_dir_help": "Exports are written here in addition to your browser download.",
+  "settings.download_dir_label": "Export folder",
+  "settings.language_help": "Applied as soon as you save.",
+  "settings.language_label": "Interface language",
+  "settings.save": "Save",
+  "settings.subtitle": "These preferences are stored on this machine only.",
+  "settings.title": "Settings"
 }

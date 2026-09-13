@@ -25,6 +25,7 @@ from flask import (
 )
 
 import paths
+import settings as user_settings
 from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
 from parse_cours import SYSTEM_PROMPT, build_prompts, parse_docx
 from project_store import (
@@ -43,6 +44,7 @@ from project_store import (
     save_project,
     set_asset_alt,
 )
+from i18n import available_languages, catalog_for_js, translate
 from render import resolve_placeholders
 
 ROOT = paths.DATA_DIR
@@ -62,6 +64,37 @@ app = Flask(
     static_folder=str(paths.APP_DIR / "static"),
 )
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
+
+
+# ──────────────────────────────────────────────────────────────
+# Langue et préférences
+# ──────────────────────────────────────────────────────────────
+def current_lang():
+    return user_settings.load_settings()["language"]
+
+
+def tr(key, **params):
+    """Traduction hors template (messages JSON, en-têtes, contenus d'archive)."""
+    return translate(key, current_lang(), **params)
+
+
+@app.context_processor
+def inject_i18n():
+    """
+    Injecte `t`, `lang` et les préférences dans tous les templates.
+
+    Les préférences sont relues à chaque rendu : le fichier est minuscule, et un
+    cache ferait diverger l'affichage juste après un changement de langue.
+    """
+    prefs = user_settings.load_settings()
+    lang = prefs["language"]
+    return {
+        "t": lambda key, **params: translate(key, lang, **params),
+        "lang": lang,
+        "prefs": prefs,
+        "js_i18n": catalog_for_js(lang),
+        "languages": available_languages(),
+    }
 
 
 def sanitize_filename(filename):
@@ -167,6 +200,32 @@ def work(project_id):
         missing_alt=missing_alt_count(project),
         warnings=project.get("warnings", []),
     )
+
+
+@app.route("/settings")
+def settings_page():
+    return render_template("settings.html")
+
+
+@app.route("/help")
+def help_page():
+    return render_template("help.html")
+
+
+@app.route("/api/settings", methods=["GET", "POST"])
+def api_settings():
+    if request.method == "GET":
+        return jsonify(user_settings.load_settings())
+    data = request.get_json(silent=True) or {}
+    return jsonify(ok=True, settings=user_settings.save_settings(data))
+
+
+@app.route("/api/settings/check-dir", methods=["POST"])
+def api_settings_check_dir():
+    """Dit à l'interface si un dossier candidat tient debout, sans rien enregistrer."""
+    data = request.get_json(silent=True) or {}
+    ok, message_key = user_settings.check_dir(data.get("path") or "")
+    return jsonify(ok=ok, message=tr(message_key))
 
 
 # ──────────────────────────────────────────────────────────────

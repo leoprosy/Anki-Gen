@@ -19,3 +19,4 @@ version.json
 /exports
 /tests/fixtures
 /tests/__pycache__
+/settings.json

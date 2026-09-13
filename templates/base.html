@@ -171,12 +171,14 @@
         const res = await fetch('/api/update/apply', { method: 'POST' });
         const data = await res.json();
         document.getElementById('update-message').textContent = data.message;
-        if (data.status === 'updated') {
-          updBtn.textContent = window.T('js.restart');
-          updBtn.onclick = () => location.reload();
-        } else {
-          updBtn.textContent = window.T('js.retry');
+        if (data.status === 'staged') {
+          // L'echange a lieu au prochain demarrage : recharger la page ne
+          // suffit pas, il faut vraiment quitter puis relancer.
+          updBtn.textContent = window.T('js.quit_and_relaunch');
+          updBtn.disabled = true;
+          return;
         }
+        updBtn.textContent = window.T('js.retry');
       } catch (e) {
         document.getElementById('update-message').textContent = window.T('js.network_error');
         updBtn.textContent = window.T('js.retry');

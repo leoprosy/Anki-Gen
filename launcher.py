@@ -67,6 +67,16 @@ if getattr(sys, 'frozen', False):
         shutil.copytree(_bundled, APP_DIR, dirs_exist_ok=True)
         print(f"[bootstrap] Fichiers applicatifs copiés dans {APP_DIR}")
 
+    # Applique une mise à jour préalablement téléchargée (updater.py), si présente.
+    # Se fait avant tout import de app.py / démarrage de Waitress, donc jamais
+    # pendant que le serveur sert des requêtes.
+    try:
+        from updater import apply_staged_update
+        if apply_staged_update(APP_DIR):
+            print(f"[bootstrap] Mise à jour appliquée dans {APP_DIR}")
+    except Exception as e:
+        print(f"[bootstrap] Échec de l'application de la mise à jour : {e}")
+
 
 from app import app
 

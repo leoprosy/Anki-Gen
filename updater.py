@@ -46,6 +46,25 @@ def get_local_version():
         return "0.0.0"
 
 
+def is_newer_version(remote_version, local_version):
+    """Indique si une version distante lisible est plus récente que la version locale."""
+
+    def parse(version):
+        try:
+            parts = tuple(int(part) for part in version.split("."))
+        except (AttributeError, ValueError):
+            return None
+        if len(parts) != 3 or any(part < 0 for part in parts):
+            return None
+        return parts
+
+    remote = parse(remote_version)
+    local = parse(local_version)
+    if remote is None or local is None or local == (0, 0, 0):
+        return False
+    return remote > local
+
+
 def fetch_latest_release():
     """Interroge l'API GitHub pour obtenir le dernier release.
 

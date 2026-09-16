@@ -41,6 +41,33 @@ class SwapTestCase(unittest.TestCase):
         return staged
 
 
+class TestVersionComparison(unittest.TestCase):
+    def test_newer_release_is_available(self):
+        self.assertTrue(updater.is_newer_version("1.2.0", "1.1.0"))
+
+    def test_equal_release_is_not_available(self):
+        self.assertFalse(updater.is_newer_version("1.2.0", "1.2.0"))
+
+    def test_older_release_is_not_available(self):
+        self.assertFalse(updater.is_newer_version("1.1.0", "1.2.0"))
+
+    def test_numeric_components_are_compared_numerically(self):
+        self.assertTrue(updater.is_newer_version("1.10.0", "1.9.0"))
+
+    def test_missing_local_version_does_not_offer_an_update(self):
+        self.assertFalse(updater.is_newer_version("1.2.0", "0.0.0"))
+
+    def test_malformed_versions_do_not_offer_an_update(self):
+        for remote, local in (
+            ("", "1.1.0"),
+            ("1.2.0-beta", "1.1.0"),
+            ("v1.2.0-beta", "1.1.0"),
+            ("1.2.0", ""),
+        ):
+            with self.subTest(remote=remote, local=local):
+                self.assertFalse(updater.is_newer_version(remote, local))
+
+
 class TestApplyStagedUpdate(SwapTestCase):
     def test_no_staging_is_a_no_op(self):
         self.assertFalse(updater.apply_staged_update(str(self.live)))

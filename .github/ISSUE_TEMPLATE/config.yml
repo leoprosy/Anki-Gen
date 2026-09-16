@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Share a card-writing Claude Skill
+    url: https://github.com/leoprosy/Anki-Gen/discussions
+    about: Skills, deck conventions, prompts and workflows are discussed here, not in issues.
+  - name: Questions about using Ankigen
+    url: https://github.com/leoprosy/Anki-Gen/discussions/categories/q-a
+    about: Ask in Q&A — installation, Anki import, .docx structure.

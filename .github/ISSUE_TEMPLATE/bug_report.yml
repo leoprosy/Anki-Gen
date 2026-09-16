@@ -1,0 +1,58 @@
+name: Bug report
+description: Something breaks — a course that will not parse, a card that comes out wrong, a crash.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English or French, as you prefer. / Anglais ou français, comme vous préférez.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+      placeholder: |
+        1. Imported a .docx with …
+        2. Clicked …
+        3. Expected … but got …
+    validations:
+      required: true
+
+  - type: textarea
+    id: document
+    attributes:
+      label: The document, if parsing is involved
+      description: >
+        Do not upload a course you do not own the rights to. What matters is the structure:
+        which heading styles, how deep, whether it contains images, tables, nested tables,
+        text boxes. A small .docx that reproduces the problem is the fastest fix.
+
+  - type: input
+    id: version
+    attributes:
+      label: Ankigen version
+      description: Bottom of the Settings page, or the tag of the installer you downloaded.
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running it?
+      options:
+        - Windows installer (.exe / .msi)
+        - From source (python app.py)
+        - From source (npm run tauri dev)
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output
+      description: >
+        From source, the terminal output. From the installer, the sidecar console window.
+        Paste it as text, not as a screenshot.
+      render: shell

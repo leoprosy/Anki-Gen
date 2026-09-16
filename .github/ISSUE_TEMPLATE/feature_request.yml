@@ -1,0 +1,39 @@
+name: Feature request
+description: A format to support, a step to remove, an integration to add.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English or French, as you prefer. / Anglais ou français, comme vous préférez.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is slow or awkward today
+      description: Describe the moment in your own workflow where Ankigen gets in the way.
+      placeholder: >
+        Every chunk means switching to the browser, pasting, copying the answer back…
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like instead
+      description: A sketch is enough. If you have thought about the implementation, say so.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried or considered
+      description: Existing workarounds, other tools, why they do not fit.
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Would you like to build it?
+      options:
+        - label: I would like to work on this myself

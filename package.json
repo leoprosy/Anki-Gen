@@ -1,7 +1,7 @@
 {
   "name": "anki-gen",
   "version": "1.2.0",
-  "description": "Turn a .docx course into an Anki deck, with Claude in the loop.",
+  "description": "Turn a .docx course into an Anki deck, one paragraph at a time.",
   "main": "index.js",
   "scripts": {
     "tauri": "tauri",
@@ -13,9 +13,17 @@
     "type": "git",
     "url": "git+https://github.com/leoprosy/Anki-Gen.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "anki",
+    "flashcards",
+    "spaced-repetition",
+    "claude",
+    "tauri",
+    "docx",
+    "study"
+  ],
+  "author": "leoprosy",
+  "license": "GPL-3.0-or-later",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/leoprosy/Anki-Gen/issues"

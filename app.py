@@ -515,12 +515,12 @@ def delete_project_route(project_id):
 def api_update_check():
     """Vérifie si une mise à jour est disponible (sans l'appliquer)."""
     try:
-        from updater import fetch_latest_release, get_local_version
+        from updater import fetch_latest_release, get_local_version, is_newer_version
         release = fetch_latest_release()
         remote = release["tag_name"].lstrip("v")
         local = get_local_version()
         return jsonify({
-            "update_available": remote != local,
+            "update_available": is_newer_version(remote, local),
             "local_version": local,
             "remote_version": remote,
             "release_notes": release.get("body", ""),

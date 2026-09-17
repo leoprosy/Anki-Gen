@@ -1,0 +1,83 @@
+name: Build latest commit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-latest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Rebuild le package pour la version courante
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Lire la version courante (tauri.conf.json)
+        id: version
+        shell: pwsh
+        run: |
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          "version=$($conf.version)" >> $env:GITHUB_OUTPUT
+          Write-Host "Version : $($conf.version)"
+
+      - name: Installer les dépendances Python
+        run: python -m pip install -r requirements.txt
+
+      - name: Compiler le sidecar Flask (PyInstaller)
+        run: pyinstaller --noconfirm flask-server.spec
+
+      - name: Placer le sidecar sous sa cible de compilation
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force src-tauri/binaries | Out-Null
+          Copy-Item dist/flask-server.exe src-tauri/binaries/flask-server-x86_64-pc-windows-msvc.exe -Force
+
+      - name: Installer les dépendances Node
+        run: npm ci
+
+      - name: Compiler l'application Tauri
+        run: npm run build
+
+      - name: Créer app.zip (modules Python + templates + static + locales)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release/app | Out-Null
+          Copy-Item app.py, launcher.py, parse_cours.py, build_anki_csv.py, `
+            docx_blocks.py, media_store.py, render.py, paths.py, `
+            project_store.py, updater.py, settings.py, i18n.py release/app/
+          Copy-Item -Recurse templates, static, locales, skill_templates release/app/
+          Set-Content release/app/version.json "{`"version`": `"${{ steps.version.outputs.version }}`"}"
+          Compress-Archive -Path release/app/* -DestinationPath app.zip -Force
+
+      - name: "Publier / mettre à jour la release v${{ steps.version.outputs.version }}"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          files: |
+            app.zip
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi

@@ -46,23 +46,75 @@ def get_local_version():
         return "0.0.0"
 
 
+def get_local_commit():
+    """Lit le commit ayant produit le code local, depuis version.json.
+
+    Absent des installations antérieures à l'introduction de ce champ : dans
+    ce cas is_update_available() se rabat sur la seule comparaison de
+    version, ce qui reste correct (juste moins précis pour détecter une
+    reconstruction de main qui n'a pas changé de numéro de version).
+    """
+    version_file = os.path.join(_get_app_dir(), "version.json")
+    if not os.path.exists(version_file):
+        return ""
+    try:
+        with open(version_file, encoding="utf-8") as f:
+            return json.load(f).get("commit", "")
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+
+def _parse_semver(version):
+    try:
+        parts = tuple(int(part) for part in version.split("."))
+    except (AttributeError, ValueError):
+        return None
+    if len(parts) != 3 or any(part < 0 for part in parts):
+        return None
+    return parts
+
+
 def is_newer_version(remote_version, local_version):
     """Indique si une version distante lisible est plus récente que la version locale."""
-
-    def parse(version):
-        try:
-            parts = tuple(int(part) for part in version.split("."))
-        except (AttributeError, ValueError):
-            return None
-        if len(parts) != 3 or any(part < 0 for part in parts):
-            return None
-        return parts
-
-    remote = parse(remote_version)
-    local = parse(local_version)
+    remote = _parse_semver(remote_version)
+    local = _parse_semver(local_version)
     if remote is None or local is None or local == (0, 0, 0):
         return False
     return remote > local
+
+
+def is_update_available(remote_manifest, local_version, local_commit):
+    """Indique si le release distant apporte du code plus récent que le local.
+
+    Deux façons d'être « en retard » :
+      - une vraie sortie de version (le numéro distant est supérieur) ;
+      - une reconstruction de main sur la MÊME version (build-latest.yml
+        republie app.zip sans changer le tag) : dans ce cas le numéro de
+        version ne bouge pas, seul le commit qui a produit l'archive change.
+
+    On ne signale jamais de mise à jour vers un numéro de version antérieur
+    au local, même si son commit diffère (protège contre un manifeste
+    incohérent plutôt que de proposer un downgrade).
+    """
+    if remote_manifest is None:
+        return False
+
+    remote_version = remote_manifest.get("version", "")
+    remote_commit = remote_manifest.get("commit", "")
+
+    remote_parsed = _parse_semver(remote_version)
+    local_parsed = _parse_semver(local_version)
+    if remote_parsed is not None and local_parsed is not None and remote_parsed < local_parsed:
+        return False
+
+    if is_newer_version(remote_version, local_version):
+        return True
+
+    return bool(remote_commit) and remote_commit != local_commit
+
+
+def _find_asset(release, name):
+    return next((a for a in release.get("assets", []) if a["name"] == name), None)
 
 
 def fetch_latest_release():
@@ -77,6 +129,23 @@ def fetch_latest_release():
     """
     req = Request(RELEASES_URL, headers={"User-Agent": "AnkiGen-Updater/1.0"})
     with urlopen(req, timeout=5) as resp:
+        return json.loads(resp.read())
+
+
+def fetch_remote_manifest(release):
+    """Télécharge le petit version.json publié comme asset du release — distinct
+    de celui empaqueté dans app.zip — pour connaître la version ET le commit
+    distants sans avoir à télécharger app.zip juste pour vérifier.
+
+    Returns:
+        dict | None: {'version': str, 'commit': str}, ou None si l'asset est
+        absent (release publié avant l'introduction du manifeste, par ex.).
+    """
+    asset = _find_asset(release, "version.json")
+    if asset is None:
+        return None
+    req = Request(asset["browser_download_url"], headers={"User-Agent": "AnkiGen-Updater/1.0"})
+    with urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())
 
 
@@ -176,17 +245,18 @@ def check_and_update():
 
     Returns:
         dict: Résultat avec les clés :
-            - status: 'up_to_date' | 'updated' | 'error'
+            - status: 'up_to_date' | 'staged' | 'error'
             - version: str (version courante ou nouvelle)
             - message_key: str (clé de traduction)
             - message_params: dict (paramètres d'interpolation)
     """
     try:
         release = fetch_latest_release()
-        remote_version = release["tag_name"].lstrip("v")
         local_version = get_local_version()
+        local_commit = get_local_commit()
+        manifest = fetch_remote_manifest(release)
 
-        if remote_version == local_version:
+        if not is_update_available(manifest, local_version, local_commit):
             return {
                 "status": "up_to_date",
                 "version": local_version,
@@ -194,16 +264,10 @@ def check_and_update():
                 "message_params": {},
             }
 
-        # Cherche l'asset app.zip dans le release
-        asset_url = next(
-            (
-                a["browser_download_url"]
-                for a in release.get("assets", [])
-                if a["name"] == "app.zip"
-            ),
-            None,
-        )
-        if not asset_url:
+        remote_version = (manifest or {}).get("version") or release["tag_name"].lstrip("v")
+
+        asset = _find_asset(release, "app.zip")
+        if asset is None:
             return {
                 "status": "error",
                 "version": local_version,
@@ -211,7 +275,7 @@ def check_and_update():
                 "message_params": {},
             }
 
-        download_and_apply(asset_url, _get_app_dir())
+        download_and_apply(asset["browser_download_url"], _get_app_dir())
         return {
             "status": "staged",
             "version": remote_version,

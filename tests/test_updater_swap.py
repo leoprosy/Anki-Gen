@@ -68,6 +68,39 @@ class TestVersionComparison(unittest.TestCase):
                 self.assertFalse(updater.is_newer_version(remote, local))
 
 
+class TestUpdateAvailable(unittest.TestCase):
+    """is_update_available() couvre le cas que is_newer_version() seul ratait :
+    build-latest.yml republie app.zip sur chaque push vers main SANS changer
+    le tag/la version, donc un utilisateur déjà sur cette version ne verrait
+    jamais la mise à jour si on ne comparait que des numéros de version."""
+
+    def test_no_manifest_means_no_update(self):
+        """Release publié avant l'introduction du manifeste version.json."""
+        self.assertFalse(updater.is_update_available(None, "1.2.0", "abc123"))
+
+    def test_higher_version_is_an_update_even_without_commit(self):
+        manifest = {"version": "1.3.0", "commit": ""}
+        self.assertTrue(updater.is_update_available(manifest, "1.2.0", "abc123"))
+
+    def test_same_version_same_commit_is_up_to_date(self):
+        manifest = {"version": "1.2.0", "commit": "abc123"}
+        self.assertFalse(updater.is_update_available(manifest, "1.2.0", "abc123"))
+
+    def test_same_version_different_commit_is_an_update(self):
+        """Le coeur du fix : un rebuild de main sur la même version doit notifier."""
+        manifest = {"version": "1.2.0", "commit": "def456"}
+        self.assertTrue(updater.is_update_available(manifest, "1.2.0", "abc123"))
+
+    def test_same_version_unknown_local_commit_is_an_update(self):
+        """Installation antérieure au champ 'commit' : un rattrapage ponctuel est correct."""
+        manifest = {"version": "1.2.0", "commit": "def456"}
+        self.assertTrue(updater.is_update_available(manifest, "1.2.0", ""))
+
+    def test_older_version_is_never_an_update_even_with_different_commit(self):
+        manifest = {"version": "1.1.0", "commit": "def456"}
+        self.assertFalse(updater.is_update_available(manifest, "1.2.0", "abc123"))
+
+
 class TestApplyStagedUpdate(SwapTestCase):
     def test_no_staging_is_a_no_op(self):
         self.assertFalse(updater.apply_staged_update(str(self.live)))

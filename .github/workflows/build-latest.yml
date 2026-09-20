@@ -69,7 +69,12 @@ jobs:
             docx_blocks.py, media_store.py, render.py, paths.py, `
             project_store.py, updater.py, settings.py, i18n.py release/app/
           Copy-Item -Recurse templates, static, locales, skill_templates release/app/
-          Set-Content release/app/version.json "{`"version`": `"${{ steps.version.outputs.version }}`"}"
+          # version.json est aussi publié comme asset séparé du release (voir
+          # release.yml) : l'updater le lit pour connaître version+commit sans
+          # télécharger app.zip juste pour vérifier. C'est ce qui permet à un
+          # rebuild de main (même version, nouveau commit) d'être détecté par
+          # les utilisateurs déjà sur cette version.
+          Set-Content release/app/version.json "{`"version`": `"${{ steps.version.outputs.version }}`", `"commit`": `"${{ github.sha }}`"}"
           Compress-Archive -Path release/app/* -DestinationPath app.zip -Force
 
       - name: "Publier / mettre à jour la release v${{ steps.version.outputs.version }}"
@@ -79,5 +84,6 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           files: |
             app.zip
+            release/app/version.json
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi

@@ -25,9 +25,12 @@ jobs:
              project_store.py updater.py settings.py i18n.py release/app/
           cp -r templates static locales skill_templates release/app/
 
-          # Générer version.json depuis le tag
+          # Générer version.json depuis le tag. Publié à la fois DANS app.zip
+          # (utilisé par l'app pour afficher sa propre version) et comme asset
+          # séparé du release (permet à l'updater de lire version+commit sans
+          # télécharger app.zip juste pour vérifier — voir updater.fetch_remote_manifest).
           VERSION="${GITHUB_REF_NAME#v}"
-          echo "{\"version\": \"${VERSION}\"}" > release/app/version.json
+          echo "{\"version\": \"${VERSION}\", \"commit\": \"${GITHUB_SHA}\"}" > release/app/version.json
 
           # Créer l'archive
           cd release && zip -r ../app.zip app/
@@ -35,7 +38,9 @@ jobs:
       - name: Créer le GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: app.zip
+          files: |
+            app.zip
+            release/app/version.json
           generate_release_notes: true
 
   # ── 2. Installeurs Windows : ce que téléchargent les utilisateurs ───────────

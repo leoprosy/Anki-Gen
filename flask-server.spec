@@ -5,15 +5,35 @@
 # resté à 1.0.0 pendant que l'app passait en 1.2.0, si bien que l'application
 # packagée annonçait une version fausse et que l'updater se croyait en retard).
 # Le workflow de release fait l'équivalent pour app.zip à partir du tag.
+#
+# Le commit est inclus pour la même raison que dans app.zip (voir updater.py /
+# is_update_available) : sans lui, un installeur reconstruit sur la même
+# version que la dernière release ne serait jamais détecté comme différent.
 import json as _json
+import os as _os
+import subprocess as _subprocess
 from pathlib import Path as _Path
+
+
+def _resolve_commit():
+    sha = _os.environ.get("GITHUB_SHA")
+    if sha:
+        return sha
+    try:
+        return _subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True, stderr=_subprocess.DEVNULL
+        ).strip()
+    except Exception:
+        return ""
+
 
 _conf = _json.loads(_Path("src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
 _version = _conf["version"]
+_commit = _resolve_commit()
 _Path("version.json").write_text(
-    _json.dumps({"version": _version}, indent=2) + "\n", encoding="utf-8"
+    _json.dumps({"version": _version, "commit": _commit}, indent=2) + "\n", encoding="utf-8"
 )
-print(f"[spec] version.json généré : {_version}")
+print(f"[spec] version.json généré : {_version} ({_commit[:7] if _commit else 'commit inconnu'})")
 
 
 

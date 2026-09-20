@@ -2,42 +2,63 @@
 {% block title %}{{ t('settings.title') }} — {{ t('app.name') }}{% endblock %}
 
 {% block shell_body %}
-<main class="page">
-  <div class="page__head">
+<main class="page settings-page">
+  <div class="page__head settings-hero">
     <h2>{{ t('settings.title') }}</h2>
     <p>{{ t('settings.subtitle') }}</p>
   </div>
 
-  <section class="card">
-    <label class="field">
-      <span>{{ t('settings.language_label') }}</span>
-      <select id="set-language">
+  <form id="settings-form">
+  <section class="card settings-section" aria-labelledby="interface-title">
+    <div class="settings-section-heading">
+      <span class="settings-section-icon" aria-hidden="true"><svg width="20" height="20"><use href="#i-eye"></use></svg></span>
+      <h3 id="interface-title">{{ t('settings.interface_title') }}</h3>
+    </div>
+    <div class="settings-row">
+      <div class="settings-description">
+        <label for="set-language">{{ t('settings.language_label') }}</label>
+        <p id="language-help">{{ t('settings.language_help') }}</p>
+      </div>
+      <select id="set-language" aria-describedby="language-help">
         {% for entry in languages %}
         <option value="{{ entry.code }}" {% if entry.code == prefs.language %}selected{% endif %}>{{ entry.label }}</option>
         {% endfor %}
       </select>
-      <small class="muted">{{ t('settings.language_help') }}</small>
-    </label>
-
-    <label class="field">
-      <span>{{ t('settings.deck_prefix_label') }}</span>
-      <input type="text" id="set-deck-prefix" value="{{ prefs.deck_prefix }}"
-        placeholder="{{ t('settings.deck_prefix_placeholder') }}">
-      <small class="muted">{{ t('settings.deck_prefix_help') }}</small>
-    </label>
-
-    <label class="field">
-      <span>{{ t('settings.download_dir_label') }}</span>
-      <input type="text" id="set-download-dir" value="{{ prefs.download_dir }}" spellcheck="false">
-      <small class="muted">{{ t('settings.download_dir_help') }}</small>
-    </label>
-
-    <div class="actions">
-      <button type="button" class="btn" id="check-dir-btn">{{ t('settings.check_folder') }}</button>
-      <button type="button" class="btn primary" id="save-settings-btn">{{ t('settings.save') }}</button>
-      <span class="muted" id="settings-status"></span>
     </div>
   </section>
+  <section class="card settings-section" aria-labelledby="defaults-title">
+    <div class="settings-section-heading">
+      <span class="settings-section-icon" aria-hidden="true"><svg width="20" height="20"><use href="#i-download"></use></svg></span>
+      <h3 id="defaults-title">{{ t('settings.defaults_title') }}</h3>
+    </div>
+    <div class="settings-row">
+      <div class="settings-description">
+        <label for="set-deck-prefix">{{ t('settings.deck_prefix_label') }}</label>
+        <p id="prefix-help">{{ t('settings.deck_prefix_help') }}</p>
+      </div>
+      <input type="text" id="set-deck-prefix" value="{{ prefs.deck_prefix }}"
+        placeholder="{{ t('settings.deck_prefix_placeholder') }}" aria-describedby="prefix-help">
+    </div>
+    <div class="settings-row">
+      <div class="settings-description">
+        <label for="set-download-dir">{{ t('settings.download_dir_label') }}</label>
+        <p id="folder-help">{{ t('settings.download_dir_help') }}</p>
+      </div>
+      <div class="settings-folder-control">
+        <input type="text" id="set-download-dir" value="{{ prefs.download_dir }}" spellcheck="false" autocapitalize="off" aria-describedby="folder-help folder-status">
+        <button type="button" class="btn sm" id="check-dir-btn">{{ t('settings.check_folder') }}</button>
+        <p class="settings-feedback" id="folder-status" role="status"></p>
+      </div>
+    </div>
+  </section>
+  <div class="settings-footer">
+    <p class="settings-feedback" id="settings-status" role="status"></p>
+    <button type="submit" class="btn primary" id="save-settings-btn">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
+      {{ t('settings.save') }}
+    </button>
+  </div>
+  </form>
 </main>
 {% endblock %}
 
@@ -45,26 +66,44 @@
 <script>
   (() => {
     const status = document.getElementById('settings-status');
+    const folderStatus = document.getElementById('folder-status');
+    const checkBtn = document.getElementById('check-dir-btn');
+    const saveBtn = document.getElementById('save-settings-btn');
 
-    document.getElementById('check-dir-btn').addEventListener('click', async () => {
-      status.textContent = '…';
-      status.className = 'muted';
+    checkBtn.addEventListener('click', async () => {
+      checkBtn.disabled = true;
+      folderStatus.textContent = '…';
+      folderStatus.className = 'settings-feedback';
+      const path = document.getElementById('set-download-dir').value;
       try {
         const res = await fetch('/api/settings/check-dir', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: document.getElementById('set-download-dir').value }),
+          body: JSON.stringify({ path }),
         });
         const data = await res.json();
-        status.textContent = data.message;
-        status.className = data.ok ? 'ok' : 'err';
+        if (document.getElementById('set-download-dir').value !== path) return;
+        folderStatus.textContent = data.message;
+        folderStatus.className = 'settings-feedback ' + (data.ok ? 'is-success' : 'is-error');
       } catch (e) {
-        status.textContent = window.T('js.network_error');
-        status.className = 'err';
+        if (document.getElementById('set-download-dir').value === path) {
+          folderStatus.textContent = window.T('js.network_error');
+          folderStatus.className = 'settings-feedback is-error';
+        }
+      } finally {
+        checkBtn.disabled = false;
       }
     });
 
-    document.getElementById('save-settings-btn').addEventListener('click', async () => {
+    document.getElementById('set-download-dir').addEventListener('input', () => {
+      folderStatus.textContent = '';
+    });
+
+    document.getElementById('settings-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (saveBtn.disabled) return;
+      saveBtn.disabled = true;
+      status.textContent = '';
       const payload = {
         language: document.getElementById('set-language').value,
         deck_prefix: document.getElementById('set-deck-prefix').value,
@@ -81,7 +120,8 @@
         location.reload();
       } catch (e) {
         status.textContent = window.T('js.network_error');
-        status.className = 'err';
+        status.className = 'settings-feedback is-error';
+        saveBtn.disabled = false;
       }
     });
   })();

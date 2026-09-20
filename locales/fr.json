@@ -102,6 +102,8 @@
   "prompt.table_header": "[TABLEAU {n}]",
   "prompt.table_hint": "(écris {placeholder} pour réutiliser ce tableau dans une carte)",
   "settings.check_folder": "Vérifier le dossier",
+  "settings.interface_title": "Interface",
+  "settings.defaults_title": "Cours et exports",
   "settings.deck_prefix_help": "Pré-rempli à l'import d'un cours. Laisse vide pour aucun préfixe.",
   "settings.deck_prefix_label": "Préfixe de deck Anki par défaut",
   "settings.deck_prefix_placeholder": "ex. Économie",

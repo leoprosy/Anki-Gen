@@ -102,6 +102,8 @@
   "prompt.table_header": "[TABLE {n}]",
   "prompt.table_hint": "(write {placeholder} to reuse this table in a card)",
   "settings.check_folder": "Check folder",
+  "settings.interface_title": "Interface",
+  "settings.defaults_title": "Courses & exports",
   "settings.deck_prefix_help": "Prefilled when you import a course. Leave empty for no prefix.",
   "settings.deck_prefix_label": "Default Anki deck prefix",
   "settings.deck_prefix_placeholder": "e.g. Economics",

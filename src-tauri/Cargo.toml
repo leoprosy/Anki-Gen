@@ -1,6 +1,6 @@
 [package]
 name = "anki-esh"
-version = "1.2.0"
+version = "1.2.1"
 description = "Ankigen — Anki flashcard generator for .docx courses"
 authors = ["Leo"]
 license = "GPL-3.0-or-later"

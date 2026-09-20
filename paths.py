@@ -8,9 +8,8 @@ static — sous %APPDATA%/AnkiGen/app) et DATA_DIR (%APPDATA%/AnkiGen). On s'app
 dessus pour que projets, uploads, médias et exports survivent aux mises à jour et
 ne disparaissent pas dans le dossier temporaire de PyInstaller.
 
-L'import de `launcher` est tenté paresseusement : en mode dev l'import est
-circulaire (launcher importe app, app importe paths) et lève une exception —
-on retombe alors sur le dossier du script, ce qui est le comportement voulu.
+La résolution n'importe jamais launcher : cela relancerait son bootstrap
+lorsqu'il est déjà exécuté comme __main__.
 """
 
 import os
@@ -23,13 +22,12 @@ def is_frozen() -> bool:
 
 
 def _resolve_base_dirs():
-    """(APP_DIR, DATA_DIR) — délègue à launcher.py si disponible, sinon script."""
-    try:
-        from launcher import APP_DIR as _app, DATA_DIR as _data
-        return Path(_app), Path(_data)
-    except Exception:
-        root = Path(__file__).parent.resolve()
-        return root, root
+    """Resolve paths without importing the launcher (which runs bootstrap)."""
+    if is_frozen():
+        data = Path(os.environ.get("APPDATA") or Path.home()) / "AnkiGen"
+        return data / "app", data
+    root = Path(__file__).parent.resolve()
+    return root, root
 
 
 APP_DIR, DATA_DIR = _resolve_base_dirs()

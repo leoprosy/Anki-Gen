@@ -102,6 +102,23 @@ class TestUpdateAvailable(unittest.TestCase):
 
 
 class TestApplyStagedUpdate(SwapTestCase):
+    def test_pending_update_does_not_download_again(self):
+        self.stage()
+        with mock.patch.object(updater, '_get_app_dir', return_value=str(self.live)), \
+                mock.patch.object(updater, 'fetch_latest_release') as fetch:
+            self.assertEqual(updater.check_and_update()['status'], 'staged')
+            fetch.assert_not_called()
+
+    def test_check_offers_restart_for_pending_update_even_offline(self):
+        from app import app
+        self.stage()
+        with mock.patch.object(updater, '_get_app_dir', return_value=str(self.live)), \
+                mock.patch.object(updater, 'fetch_latest_release') as fetch:
+            result = app.test_client().get('/api/update/check').get_json()
+            self.assertTrue(result['restart_required'])
+            self.assertFalse(result['update_available'])
+            fetch.assert_not_called()
+
     def test_no_staging_is_a_no_op(self):
         self.assertFalse(updater.apply_staged_update(str(self.live)))
         self.assertEqual((self.live / "app.py").read_text(encoding="utf-8"),

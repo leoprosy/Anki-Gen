@@ -148,6 +148,14 @@
     // ── Vérification silencieuse des mises à jour ───────────────
     const updBanner = document.getElementById('update-banner');
     const updBtn = document.getElementById('update-btn');
+    let updateStaged = false;
+
+    function showRestart() {
+      updateStaged = true;
+      updBtn.textContent = window.T('js.restart_app');
+      updBtn.disabled = false;
+      updBanner.style.display = 'flex';
+    }
     document.getElementById('update-dismiss').addEventListener('click', () => {
       updBanner.style.display = 'none';
     });
@@ -156,7 +164,10 @@
       try {
         const res = await fetch('/api/update/check');
         const data = await res.json();
-        if (data.update_available) {
+        if (data.restart_required) {
+          document.getElementById('update-message').textContent = data.message;
+          showRestart();
+        } else if (data.update_available) {
           document.getElementById('update-message').textContent =
             window.T('js.update_available', { version: data.remote_version });
           updBanner.style.display = 'flex';
@@ -165,6 +176,17 @@
     }
 
     updBtn.addEventListener('click', async () => {
+      if (updateStaged) {
+        updBtn.disabled = true;
+        updBtn.textContent = window.T('js.restarting');
+        try {
+          await window.__TAURI__.core.invoke('restart_app');
+        } catch (_) {
+          document.getElementById('update-message').textContent = window.T('js.restart_failed');
+          showRestart();
+        }
+        return;
+      }
       updBtn.textContent = window.T('js.updating');
       updBtn.disabled = true;
       try {
@@ -172,10 +194,7 @@
         const data = await res.json();
         document.getElementById('update-message').textContent = data.message;
         if (data.status === 'staged') {
-          // L'echange a lieu au prochain demarrage : recharger la page ne
-          // suffit pas, il faut vraiment quitter puis relancer.
-          updBtn.textContent = window.T('js.quit_and_relaunch');
-          updBtn.disabled = true;
+          showRestart();
           return;
         }
         updBtn.textContent = window.T('js.retry');

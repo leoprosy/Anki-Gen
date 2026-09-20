@@ -520,8 +520,17 @@ def api_update_check():
             fetch_remote_manifest,
             get_local_commit,
             get_local_version,
+            get_staged_version,
             is_update_available,
         )
+        staged = get_staged_version()
+        if staged:
+            return jsonify({
+                "update_available": False,
+                "restart_required": True,
+                "remote_version": staged,
+                "message": tr("update.staged", version=staged),
+            })
         release = fetch_latest_release()
         local = get_local_version()
         manifest = fetch_remote_manifest(release)

@@ -8,6 +8,12 @@ use tauri_plugin_shell::ShellExt;
 /// Utilisé seulement si le sidecar meurt sans jamais annoncer son port.
 const FALLBACK_URL: &str = "http://127.0.0.1:5000";
 
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    // request_restart emits RunEvent::Exit so the sidecar is stopped first.
+    app.request_restart();
+}
+
 /// Extrait l'URL que `launcher.py` annonce sur sa sortie standard.
 ///
 /// Le port n'est pas fixe : `find_free_port` prend le premier libre à partir de
@@ -73,6 +79,7 @@ pub fn run() {
     let child_for_exit = Arc::clone(&sidecar_child);
 
     let app = tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![restart_app])
         .plugin(tauri_plugin_shell::init())
         .setup(move |app| {
             let shell = app.shell();

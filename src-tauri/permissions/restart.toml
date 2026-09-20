@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-restart-app"
+description = "Restart Ankigen after staging an update."
+commands.allow = ["restart_app"]

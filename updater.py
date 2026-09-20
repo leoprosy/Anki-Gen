@@ -26,12 +26,8 @@ RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 def _get_app_dir():
     """Résout le dossier applicatif (identique à launcher.get_app_dir)."""
-    try:
-        from launcher import APP_DIR
-        return APP_DIR
-    except ImportError:
-        # Fallback mode dev
-        return os.path.dirname(os.path.abspath(__file__))
+    from paths import APP_DIR
+    return str(APP_DIR)
 
 
 def get_local_version():
@@ -153,6 +149,16 @@ def _staging_dir(target_dir):
     return target_dir + "_staged"
 
 
+def get_staged_version():
+    """Read a completed pending update without contacting GitHub."""
+    try:
+        with open(os.path.join(_staging_dir(_get_app_dir()), 'version.json'),
+                  encoding='utf-8') as handle:
+            return json.load(handle).get('version')
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
 def download_and_apply(download_url, target_dir):
     """Télécharge le zip du release et le prépare pour application au prochain démarrage.
 
@@ -251,6 +257,13 @@ def check_and_update():
             - message_params: dict (paramètres d'interpolation)
     """
     try:
+        staged = get_staged_version()
+        if staged:
+            return {
+                "status": "staged", "version": staged,
+                "message_key": "update.staged",
+                "message_params": {"version": staged},
+            }
         release = fetch_latest_release()
         local_version = get_local_version()
         local_commit = get_local_commit()

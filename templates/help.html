@@ -2,45 +2,65 @@
 {% block title %}{{ t('nav.help') }} — {{ t('app.name') }}{% endblock %}
 
 {% block shell_body %}
-<main class="page">
-  <div class="page__head">
+<main class="page help-page">
+  <div class="page__head help-hero">
+    <span class="help-eyebrow">{{ t('nav.help') }}</span>
     <h2>{{ t('help.title') }}</h2>
     <p>{{ t('help.intro') }}</p>
   </div>
 
-  <section class="card">
-    <h3>{{ t('help.workflow_title') }}</h3>
-    <ol class="help-steps">
-      <li>{{ t('help.step_upload') }}</li>
-      <li>{{ t('help.step_chunks') }}</li>
-      <li>{{ t('help.step_claude') }}</li>
-      <li>{{ t('help.step_paste') }}</li>
-      <li>{{ t('help.step_export') }}</li>
-      <li>{{ t('help.step_import') }}</li>
+  <section class="card help-workflow" aria-labelledby="workflow-title">
+    <div class="help-section-head">
+      <h3 id="workflow-title">{{ t('help.workflow_title') }}</h3>
+      <span class="help-caption">.docx <span aria-hidden="true">→</span> Claude <span aria-hidden="true">→</span> Anki</span>
+    </div>
+    <ol class="help-workflow-grid" role="list">
+      {% for step in ['upload', 'chunks', 'claude', 'paste', 'export', 'import'] %}
+      <li>
+        <span class="help-step-number" aria-hidden="true">{{ '%02d' | format(loop.index) }}</span>
+        <h4>{{ t('help.label_' ~ step) }}</h4>
+        <p>{{ t('help.step_' ~ step) }}</p>
+      </li>
+      {% endfor %}
     </ol>
   </section>
 
-  <section class="card">
-    <h3>{{ t('help.skill_title') }}</h3>
-    <p class="muted">{{ t('help.skill_intro') }}</p>
-    <p class="muted">{{ t('help.skill_location') }}</p>
-
-    <div class="block-head">
-      <h4>{{ t('help.skill_template_title') }}</h4>
-      <button type="button" class="btn sm" id="copy-skill-btn">{{ t('help.copy') }}</button>
+  <section class="card help-section" aria-labelledby="skill-title">
+    <div class="help-section-head">
+      <h3 id="skill-title">{{ t('help.skill_title') }}</h3>
+      <span class="help-caption">{{ t('help.setup_once') }}</span>
     </div>
-    <p class="muted">{{ t('help.skill_template_help') }}</p>
-
-    <pre id="skill-template" class="prompt-text">{{ skill_template }}</pre>
+    <p>{{ t('help.skill_intro') }}</p>
+    <p>{{ t('help.skill_location') }}</p>
+    <div class="help-template">
+      <details class="help-template-details">
+        <summary>
+          <svg width="18" height="18" aria-hidden="true"><use href="#i-file"></use></svg>
+          <span class="help-template-label"><strong>{{ t('help.skill_template_title') }}</strong><span>SKILL.md</span></span>
+          <svg class="help-chevron" width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
+        </summary>
+        <div class="help-template-body">
+          <p>{{ t('help.skill_template_help') }}</p>
+          <pre id="skill-template" class="prompt-text" tabindex="0" role="region" aria-label="{{ t('help.skill_template_title') }}">{{ skill_template }}</pre>
+        </div>
+      </details>
+      <button type="button" class="btn sm help-copy" id="copy-skill-btn">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+        <span aria-live="polite">{{ t('help.copy') }}</span>
+      </button>
+    </div>
   </section>
 
-  <section class="card">
-    <h3>{{ t('help.anki_title') }}</h3>
-    <ol class="help-steps">
+  <section class="card help-section" aria-labelledby="anki-title">
+    <div class="help-section-head">
+      <h3 id="anki-title">{{ t('help.anki_title') }}</h3>
+      <svg width="20" height="20" aria-hidden="true"><use href="#i-download"></use></svg>
+    </div>
+    <ol class="help-import-steps">
       <li>{{ t('help.anki_media') }}</li>
       <li>{{ t('help.anki_import') }}</li>
-      <li>{{ t('help.anki_header') }}</li>
     </ol>
+    <p class="help-note"><svg width="18" height="18" aria-hidden="true"><use href="#i-check"></use></svg><span>{{ t('help.anki_header') }}</span></p>
   </section>
 </main>
 {% endblock %}
@@ -48,13 +68,15 @@
 {% block scripts %}
 <script>
   document.getElementById('copy-skill-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('copy-skill-btn');
+    const btn = document.querySelector('#copy-skill-btn span');
     try {
       await navigator.clipboard.writeText(document.getElementById('skill-template').textContent);
       btn.textContent = window.T('js.copied');
       setTimeout(() => { btn.textContent = window.T('js.copy'); }, 1400);
     } catch (e) {
       btn.textContent = window.T('js.copy_failed');
+      document.querySelector('.help-template-details').open = true;
+      document.getElementById('skill-template').focus();
     }
   });
 </script>

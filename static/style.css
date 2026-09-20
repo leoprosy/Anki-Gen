@@ -1091,6 +1091,55 @@ textarea#response:focus {
 }
 .card > p.muted { margin-bottom: var(--space-md); }
 
+/* Help: a short workflow, followed by setup and import references. */
+.help-page { max-width: 1040px; padding-top: 44px; }
+.help-hero { max-width: 680px; margin-bottom: 32px; }
+.help-eyebrow { display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+.help-hero h2 { font-size: clamp(28px, 4vw, 38px); line-height: 1.2; }
+.help-hero p { margin-top: 14px; font-size: 15px; line-height: 1.75; }
+.help-page > .card + .card { margin-top: 20px; }
+.help-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.help-section-head h3 { margin: 0; }
+.help-caption { font-size: 12px; color: var(--text-secondary); }
+.help-workflow-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 28px; list-style: none; }
+.help-step-number { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 10px; background: var(--surface-alt); font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+.help-workflow-grid h4 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.help-workflow-grid p { font-size: 13px; line-height: 1.7; }
+.help-section > p { font-size: 14px; line-height: 1.75; max-width: 85ch; margin-bottom: 12px; }
+.help-template { position: relative; background: var(--surface-alt); border-radius: var(--r-lg); margin-top: 24px; }
+.help-template-details summary { display: flex; align-items: center; gap: 12px; min-height: 80px; padding: 16px 144px 16px 20px; cursor: pointer; border-radius: var(--r-lg); list-style: none; transition: background 0.2s var(--ease); }
+.help-template-details summary::-webkit-details-marker { display: none; }
+.help-template-details summary:hover { background: var(--surface-alt-2); }
+.help-template-label { display: flex; flex-direction: column; min-width: 0; }
+.help-template-label strong { font-size: 14px; font-weight: 600; }
+.help-template-label > span { font-size: 12px; color: var(--text-secondary); }
+.help-chevron { margin-left: auto; transition: transform 0.2s var(--ease); }
+.help-template-details[open] .help-chevron { transform: rotate(90deg); }
+.help-copy { position: absolute; top: 20px; right: 16px; min-height: 40px; }
+.help-template-body { padding: 0 20px 20px; }
+.help-template-body > p { padding-top: 4px; margin-bottom: 16px; font-size: 13px; line-height: 1.7; }
+.help-template-body .prompt-text { max-height: 420px; overflow: auto; background: var(--surface); padding: 20px; font-size: 12px; tab-size: 4; }
+.help-import-steps { padding-left: 24px; font-size: 14px; }
+.help-import-steps li { padding-left: 8px; margin-bottom: 14px; line-height: 1.75; }
+.help-import-steps li::marker { font-weight: 600; }
+.help-section > .help-note { display: flex; align-items: flex-start; gap: 12px; max-width: none; margin: 20px 0 0; padding: 16px; border-radius: var(--r-md); background: var(--surface-alt); font-size: 13px; }
+.help-note svg { margin-top: 3px; }
+@media (max-width: 700px) {
+  .help-page { padding-top: 28px; }
+  .help-workflow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .help-section-head { flex-wrap: wrap; }
+}
+@media (max-width: 440px) {
+  .help-page .card { padding: 20px; }
+  .help-workflow-grid { grid-template-columns: 1fr; gap: 20px; }
+  .help-workflow-grid li { position: relative; padding-left: 46px; }
+  .help-step-number { position: absolute; left: 0; top: 0; }
+  .help-template-details summary { padding: 16px 12px; gap: 8px; }
+  .help-template { padding-bottom: 60px; }
+  .help-copy { top: auto; bottom: 12px; right: 12px; }
+  .help-template-body { padding: 0 12px 12px; }
+}
+
 .project-list { display: flex; flex-direction: column; gap: 10px; }
 .project-row {
   background: var(--surface-alt);

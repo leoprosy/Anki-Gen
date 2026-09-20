@@ -17,6 +17,7 @@ prompts.json
 version.json
 /media
 /exports
+/marketing
 /tests/fixtures
 /tests/__pycache__
 /settings.json

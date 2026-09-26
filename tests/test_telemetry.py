@@ -3,6 +3,7 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -45,6 +46,61 @@ class TelemetryTests(unittest.TestCase):
         self.config = None
         self.assertFalse(self.client.track("app_opened"))
         self.assertFalse(self.state_file.exists())
+
+    def test_creation_only_consent_never_emits_installation_or_activity(self):
+        self.prefs = {"analytics_usage_enabled": False, "analytics_product_enabled": True}
+        self.assertFalse(self.client.track("app_opened"))
+        self.assertFalse(self.state_file.exists())
+        self.assertTrue(self.client.track("cards_saved", card_count=3))
+        self.assertEqual([e["event"] for e in self.queued()], ["cards_saved"])
+        self.assertTrue(self.client.flush_once())
+        self.assertEqual([e["event"] for e in self.sent[0]], ["cards_saved"])
+        self.now += 3600
+        self.prefs["analytics_usage_enabled"] = True
+        self.client.preferences_changed()
+        first = next(e for e in self.queued() if e["event"] == "first_launch")
+        self.assertEqual(datetime.fromisoformat(first["timestamp"]).timestamp(), self.now)
+
+    def test_creation_only_restarts_pending_delivery_without_activity_event(self):
+        self.prefs = {"analytics_usage_enabled": False, "analytics_product_enabled": True}
+        self.client.track("cards_saved", card_count=3)
+        pending = self.queued()
+        restarted = self.make_client()
+        with patch.object(restarted, "_start_worker") as start:
+            self.assertFalse(restarted.track("app_opened"))
+            start.assert_called_once()
+        self.assertEqual(self.queued(), pending)
+
+    def test_disabling_one_category_purges_only_its_pending_events(self):
+        self.prefs = {"analytics_usage_enabled": True, "analytics_product_enabled": True}
+        self.client.track("cards_saved", card_count=3)
+        self.assertEqual([e["event"] for e in self.queued()], ["first_launch", "app_opened", "cards_saved"])
+        self.prefs["analytics_product_enabled"] = False
+        self.client.preferences_changed()
+        self.assertTrue(all(e["event"] != "cards_saved" for e in self.queued()))
+        self.assertTrue(self.client.flush_once())
+        self.assertTrue(all(e["event"] != "cards_saved" for e in self.sent[0]))
+        self.prefs["analytics_usage_enabled"] = False
+        self.prefs["analytics_product_enabled"] = True
+        self.client.preferences_changed()
+        self.assertTrue(self.client.track("cards_saved", card_count=2))
+        self.assertEqual([e["event"] for e in self.queued()], ["cards_saved"])
+
+    def test_flush_recovers_if_partial_withdrawal_purge_failed(self):
+        self.prefs = {"analytics_usage_enabled": True, "analytics_product_enabled": True}
+        self.client.track("cards_saved", card_count=3)
+        self.prefs["analytics_product_enabled"] = False
+        with patch.object(self.client, "_write", side_effect=OSError("temporary disk error")):
+            self.client.preferences_changed()
+        self.assertIn("cards_saved", [e["event"] for e in self.queued()])
+        self.assertTrue(self.client.flush_once())
+        self.assertEqual([e["event"] for e in self.sent[0]], ["first_launch", "app_opened"])
+        self.assertNotIn("cards_saved", [e["event"] for e in self.queued()])
+
+    def test_usage_only_records_activity_during_product_actions(self):
+        self.prefs = {"analytics_usage_enabled": True, "analytics_product_enabled": False}
+        self.assertTrue(self.client.track("cards_saved", card_count=3))
+        self.assertEqual([e["event"] for e in self.queued()], ["first_launch", "app_opened"])
 
     def test_payload_excludes_content_and_requires_valid_counts(self):
         self.prefs["analytics_enabled"] = True
@@ -179,11 +235,35 @@ class TelemetryTests(unittest.TestCase):
 
 
 class ConsentSettingTests(unittest.TestCase):
+    def test_saved_legacy_choice_and_granular_update(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            settings, "SETTINGS_FILE", Path(tmp) / "settings.json"
+        ):
+            settings.save_settings({"analytics_enabled": True})
+            self.assertTrue(settings.load_settings()["analytics_usage_enabled"])
+            self.assertTrue(settings.load_settings()["analytics_product_enabled"])
+            settings.save_settings({"analytics_product_enabled": False})
+            self.assertTrue(settings.load_settings()["analytics_usage_enabled"])
+            self.assertFalse(settings.load_settings()["analytics_product_enabled"])
+            settings.save_settings({"analytics_enabled": False})
+            self.assertFalse(settings.load_settings()["analytics_usage_enabled"])
+            self.assertFalse(settings.load_settings()["analytics_product_enabled"])
+
     def test_settings_default_and_validation_require_real_boolean(self):
         self.assertIs(settings.defaults().get("analytics_enabled"), False)
+        self.assertIs(settings.defaults().get("analytics_decided"), False)
         for value in ("true", 1, [], None):
             self.assertIs(settings._clean({"analytics_enabled": value})["analytics_enabled"], False)
+            self.assertIs(settings._clean({"analytics_decided": value})["analytics_decided"], False)
         self.assertIs(settings._clean({"analytics_enabled": True})["analytics_enabled"], True)
+        self.assertIs(settings._clean({"analytics_enabled": True})["analytics_decided"], True)
+        legacy = settings._clean({"analytics_enabled": True})
+        self.assertIs(legacy["analytics_usage_enabled"], True)
+        self.assertIs(legacy["analytics_product_enabled"], True)
+        custom = settings._clean({"analytics_usage_enabled": True, "analytics_product_enabled": False})
+        self.assertIs(custom["analytics_enabled"], True)
+        self.assertIs(custom["analytics_usage_enabled"], True)
+        self.assertIs(custom["analytics_product_enabled"], False)
 
 
 if __name__ == "__main__":

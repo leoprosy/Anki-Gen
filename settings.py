@@ -36,6 +36,9 @@ def defaults():
         "download_dir": default_download_dir(),
         "deck_prefix": "",
         "analytics_enabled": False,
+        "analytics_usage_enabled": False,
+        "analytics_product_enabled": False,
+        "analytics_decided": False,
     }
 
 
@@ -52,7 +55,12 @@ def _clean(raw):
     if not isinstance(raw, dict):
         return out
 
-    out["analytics_enabled"] = raw.get("analytics_enabled") is True
+    legacy = raw.get("analytics_enabled") is True
+    out["analytics_usage_enabled"] = raw.get("analytics_usage_enabled", legacy) is True
+    out["analytics_product_enabled"] = raw.get("analytics_product_enabled", legacy) is True
+    out["analytics_enabled"] = out["analytics_usage_enabled"] or out["analytics_product_enabled"]
+    # Une acceptation enregistrée avant l'ajout du panneau reste acquise.
+    out["analytics_decided"] = raw.get("analytics_decided") is True or out["analytics_enabled"]
 
     language = raw.get("language")
     if isinstance(language, str) and language in LANGUAGES:
@@ -89,6 +97,13 @@ def save_settings(partial):
     prochain démarrage traiterait comme corrompu.
     """
     merged = load_settings()
+    # Older clients use the single switch. An explicit legacy update controls
+    # both categories, while a granular update leaves the other one intact.
+    if isinstance(partial, dict) and "analytics_enabled" in partial and not any(
+        key in partial for key in ("analytics_usage_enabled", "analytics_product_enabled")
+    ):
+        merged["analytics_usage_enabled"] = partial["analytics_enabled"]
+        merged["analytics_product_enabled"] = partial["analytics_enabled"]
     for key in defaults():
         if isinstance(partial, dict) and key in partial:
             merged[key] = partial[key]

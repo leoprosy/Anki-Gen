@@ -55,12 +55,19 @@
     <div class="settings-section-heading">
       <h3 id="privacy-title">{{ t('settings.privacy_title') }}</h3>
     </div>
-    <label class="analytics-choice" for="set-analytics">
-      <input type="checkbox" id="set-analytics" aria-describedby="analytics-help"
-        {% if prefs.analytics_enabled %}checked{% endif %}>
-      <span>{{ t('settings.analytics_label') }}</span>
-    </label>
     <p class="analytics-help" id="analytics-help">{{ t('settings.analytics_help') }}</p>
+    <label class="analytics-choice" for="set-analytics-usage">
+      <input type="checkbox" id="set-analytics-usage" aria-describedby="analytics-usage-help"
+        {% if prefs.analytics_usage_enabled %}checked{% endif %}>
+      <span>{{ t('settings.analytics_usage_label') }}</span>
+    </label>
+    <p class="analytics-help" id="analytics-usage-help">{{ t('settings.analytics_usage_help') }}</p>
+    <label class="analytics-choice" for="set-analytics-product">
+      <input type="checkbox" id="set-analytics-product" aria-describedby="analytics-product-help"
+        {% if prefs.analytics_product_enabled %}checked{% endif %}>
+      <span>{{ t('settings.analytics_product_label') }}</span>
+    </label>
+    <p class="analytics-help" id="analytics-product-help">{{ t('settings.analytics_product_help') }}</p>
     <details class="analytics-details">
       <summary>{{ t('settings.analytics_details_title') }}</summary>
       <p>{{ t('settings.analytics_details') }}</p>
@@ -85,6 +92,8 @@
     const folderStatus = document.getElementById('folder-status');
     const checkBtn = document.getElementById('check-dir-btn');
     const saveBtn = document.getElementById('save-settings-btn');
+    const initialUsage = {{ prefs.analytics_usage_enabled | tojson }};
+    const initialProduct = {{ prefs.analytics_product_enabled | tojson }};
 
     checkBtn.addEventListener('click', async () => {
       checkBtn.disabled = true;
@@ -124,8 +133,14 @@
         language: document.getElementById('set-language').value,
         deck_prefix: document.getElementById('set-deck-prefix').value,
         download_dir: document.getElementById('set-download-dir').value,
-        analytics_enabled: document.getElementById('set-analytics').checked,
       };
+      const usage = document.getElementById('set-analytics-usage').checked;
+      const product = document.getElementById('set-analytics-product').checked;
+      if (usage !== initialUsage) payload.analytics_usage_enabled = usage;
+      if (product !== initialProduct) payload.analytics_product_enabled = product;
+      if (usage !== initialUsage || product !== initialProduct) {
+        payload.analytics_decided = true;
+      }
       try {
         const res = await fetch('/api/settings', {
           method: 'POST',

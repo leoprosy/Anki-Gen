@@ -12,6 +12,7 @@
 import json as _json
 import os as _os
 import subprocess as _subprocess
+import sys as _sys
 from pathlib import Path as _Path
 
 
@@ -35,6 +36,8 @@ _Path("version.json").write_text(
 )
 print(f"[spec] version.json généré : {_version} ({_commit[:7] if _commit else 'commit inconnu'})")
 
+_subprocess.run([_sys.executable, "scripts/configure_analytics.py"], check=True)
+
 
 
 a = Analysis(
@@ -54,6 +57,9 @@ a = Analysis(
         ('updater.py', 'app_bundle'),
         ('settings.py', 'app_bundle'),
         ('i18n.py', 'app_bundle'),
+        ('telemetry.py', 'app_bundle'),
+        ('analytics_config.py', 'app_bundle'),
+        ('analytics_config.json', 'app_bundle'),
         ('version.json', 'app_bundle'),
         ('templates', 'app_bundle/templates'),
         ('static', 'app_bundle/static'),

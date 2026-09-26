@@ -98,6 +98,8 @@ comments and docstrings are in French — keep writing them in the language of t
 | `build_anki_csv.py` | TSV/CSV assembly with the Anki header |
 | `project_store.py` | the project JSON format and its migrations |
 | `settings.py`, `i18n.py` | preferences and translations, both Flask-free |
+| `telemetry.py`, `analytics_config.py` | optional usage events, persistent outbox and public build configuration |
+| `scripts/setup_analytics_dashboard.py`, `scripts/release_downloads.py` | owner tooling; never bundled in the app |
 | `updater.py` | GitHub Releases check and the atomic swap of `app/` |
 | `templates/`, `static/` | Jinja templates, vanilla JS, native CSS — no framework, no build step |
 | `locales/` | flat JSON translation catalogs |
@@ -105,6 +107,13 @@ comments and docstrings are in French — keep writing them in the language of t
 | `src-tauri/` | the Rust/Tauri desktop shell and its sidecar configuration |
 
 ---
+
+## Analytics
+
+Analytics changes must preserve explicit consent, the payload allowlist and
+failure isolation. See [analytics setup and metric definitions](docs/analytics.md).
+The analytics tests use a substituted transport; never use production tokens in
+tests. The public token is supplied through Actions variables during builds.
 
 ## Adding a language
 

@@ -35,6 +35,7 @@ def defaults():
         "language": "en",
         "download_dir": default_download_dir(),
         "deck_prefix": "",
+        "analytics_enabled": False,
     }
 
 
@@ -50,6 +51,8 @@ def _clean(raw):
     out = defaults()
     if not isinstance(raw, dict):
         return out
+
+    out["analytics_enabled"] = raw.get("analytics_enabled") is True
 
     language = raw.get("language")
     if isinstance(language, str) and language in LANGUAGES:

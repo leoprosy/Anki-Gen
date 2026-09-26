@@ -1,4 +1,10 @@
 {
+  "settings.privacy_title": "Confidentialité",
+  "settings.analytics_label": "Partager des statistiques d’utilisation",
+  "settings.analytics_help": "Aidez à améliorer Ankigen en partageant avec le développeur, via PostHog, des compteurs d’activité, de projets, de sauvegardes de cartes et d’exports. Ce partage est facultatif et désactivé par défaut. Vos documents, noms de fichiers, questions et réponses ne sont jamais inclus. Enregistrez les paramètres pour appliquer votre choix.",
+  "settings.analytics_details_title": "Quelles données sont partagées ?",
+  "settings.analytics_details": "Les événements contiennent un identifiant d’installation aléatoire, un identifiant d’événement, la date, la version de l’application, la famille du système d’exploitation, des compteurs et le format d’export. Aucun enregistrement d’écran ni profil utilisateur. La géolocalisation est désactivée ; PostHog reçoit néanmoins votre adresse IP lors de la connexion. Les statistiques sont accessibles dans le tableau de bord privé du développeur.",
+  "settings.analytics_withdrawal": "Vous pouvez désactiver le partage puis enregistrer à tout moment. Les événements en attente sont supprimés ; une requête déjà en cours peut se terminer. Les événements déjà reçus restent soumis à la durée de conservation du tableau de bord. L’identifiant aléatoire reste sur cet appareil pour ne pas compter une nouvelle activation comme une installation supplémentaire. Hors ligne, 500 événements au maximum sont conservés pendant 7 jours.",
   "api.asset_not_found": "Image {id} introuvable.",
   "api.bad_id": "Identifiant manquant ou invalide.",
   "api.chunk_not_found": "Chunk {id} introuvable.",

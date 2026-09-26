@@ -92,6 +92,31 @@ class AnalyticsRouteTests(unittest.TestCase):
         self.create_project()
         self.assertEqual(self.events("project_created"), [])
 
+    def test_first_launch_choice_controls_tracking_and_is_remembered(self):
+        first_page = self.client.get("/").get_data(as_text=True)
+        self.assertIn('id="analytics-consent"', first_page)
+        self.assertFalse(self.analytics.state_file.exists())
+        refused = self.client.post("/api/settings", json={
+            "analytics_enabled": False, "analytics_decided": True,
+        })
+        self.assertEqual(refused.status_code, 200)
+        self.assertTrue(settings.load_settings()["analytics_decided"])
+        self.assertFalse(settings.load_settings()["analytics_enabled"])
+        self.assertNotIn('id="analytics-consent"', self.client.get("/").get_data(as_text=True))
+        self.assertFalse(self.analytics.state_file.exists())
+        accepted = self.client.post("/api/settings", json={
+            "analytics_enabled": True, "analytics_decided": True,
+        })
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(len(self.events("first_launch")), 1)
+
+    def test_saving_other_preferences_does_not_count_as_consent(self):
+        self.assertNotIn('id="analytics-consent"', self.client.get("/settings").get_data(as_text=True))
+        self.client.post("/api/settings", json={"language": "fr", "analytics_decided": False})
+        self.assertFalse(settings.load_settings()["analytics_decided"])
+        self.assertFalse(self.analytics.state_file.exists())
+        self.assertIn('id="analytics-consent"', self.client.get("/").get_data(as_text=True))
+
     def test_successful_pages_record_activity_but_background_checks_do_not(self):
         settings.save_settings({"analytics_enabled": True})
         self.client.get("/api/version")

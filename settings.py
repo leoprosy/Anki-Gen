@@ -36,6 +36,7 @@ def defaults():
         "download_dir": default_download_dir(),
         "deck_prefix": "",
         "analytics_enabled": False,
+        "analytics_decided": False,
     }
 
 
@@ -53,6 +54,8 @@ def _clean(raw):
         return out
 
     out["analytics_enabled"] = raw.get("analytics_enabled") is True
+    # Une acceptation enregistrée avant l'ajout du panneau reste acquise.
+    out["analytics_decided"] = raw.get("analytics_decided") is True or out["analytics_enabled"]
 
     language = raw.get("language")
     if isinstance(language, str) and language in LANGUAGES:

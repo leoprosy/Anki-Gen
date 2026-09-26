@@ -5,6 +5,12 @@ authenticated dashboard. Users of the desktop app do not need an account.
 Documents, filenames, project IDs, questions, answers, prompts and clipboard
 data are never event properties. There is no browser autocapture or replay.
 
+On first launch, a persistent bottom-right panel asks users to Allow or Decline.
+No installation ID or event is created until they allow. Declining is saved and
+the panel does not return; Settings can change either choice later. The Settings
+page shows the full privacy controls without the panel overlay. Saving unrelated
+preferences does not decide consent. Existing opt-ins remain enabled on update.
+
 ## Configure builds
 
 Use a separate **Ankigen** PostHog project within your existing account, with its
@@ -111,8 +117,9 @@ Tests use temporary files, real generated DOCX files and a substituted network
 boundary. They exercise consent, privacy, retry identity, queue limits, failures,
 save/export counts and dashboard reuse. No tests send events to production.
 
-UI check: open Settings, verify sharing starts unchecked, read the details,
-enable and save, verify persistence, then disable and save. Repeat in French.
+UI check: on a fresh installation verify the panel, decline, reload and confirm
+it stays dismissed without analytics state. In another fresh profile, allow and
+verify the checkbox in Settings. Test both languages and a narrow window.
 For live verification use a separate test project, enable developer reporting,
 complete an import/save/export and inspect its events in PostHog. Local tests
 alone do not prove live ingestion.

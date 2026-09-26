@@ -31,8 +31,9 @@ Le traitement des cours tourne sur votre machine. **Ni clé d'API ni compte** re
 les cartes sont écrites dans la conversation que vous payez déjà. Le contenu des cours
 reste sur votre ordinateur, sauf le paragraphe que vous choisissez de coller.
 
-Les statistiques d’utilisation sont facultatives et **désactivées par défaut**.
-Vous pouvez les activer dans les paramètres pour partager des compteurs d’activité
+Les statistiques d’utilisation sont facultatives et **désactivées jusqu’à votre accord**
+dans le message au premier lancement ou dans les paramètres. Vous pouvez refuser
+et changer d’avis plus tard. Votre accord permet de partager des compteurs d’activité
 et d’exports avec le développeur via PostHog. Aucun document, nom de fichier ou
 contenu de carte n’est transmis. Les champs et leur configuration sont détaillés
 dans le [guide du tableau de bord privé](docs/analytics.md).

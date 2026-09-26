@@ -181,9 +181,12 @@ class TelemetryTests(unittest.TestCase):
 class ConsentSettingTests(unittest.TestCase):
     def test_settings_default_and_validation_require_real_boolean(self):
         self.assertIs(settings.defaults().get("analytics_enabled"), False)
+        self.assertIs(settings.defaults().get("analytics_decided"), False)
         for value in ("true", 1, [], None):
             self.assertIs(settings._clean({"analytics_enabled": value})["analytics_enabled"], False)
+            self.assertIs(settings._clean({"analytics_decided": value})["analytics_decided"], False)
         self.assertIs(settings._clean({"analytics_enabled": True})["analytics_enabled"], True)
+        self.assertIs(settings._clean({"analytics_enabled": True})["analytics_decided"], True)
 
 
 if __name__ == "__main__":

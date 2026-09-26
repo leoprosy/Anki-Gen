@@ -963,6 +963,34 @@ textarea#response:focus {
 .toast.ok  { color: var(--success); }
 .toast.err { color: var(--error); }
 
+/* Choix de statistiques au premier lancement. Reste visible jusqu'à décision. */
+.analytics-consent {
+  position: fixed;
+  right: calc(20px + env(safe-area-inset-right, 0px));
+  bottom: calc(20px + var(--safe-b));
+  z-index: 85;
+  width: min(360px, calc(100vw - 24px));
+  padding: 20px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.shell--fixed + .analytics-consent { bottom: calc(84px + var(--safe-b)); }
+.analytics-consent h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.3; }
+.analytics-consent > p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.analytics-consent > a { display: inline-block; margin-top: 9px; font-size: 13px; color: var(--accent); }
+.analytics-consent__error:not([hidden]) { margin-top: 10px; color: var(--error); }
+.analytics-consent__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px; }
+.analytics-consent__action { min-height: 42px; padding: 8px 12px; border: 0; border-radius: var(--r-md); background: var(--surface-alt); color: var(--text-primary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.analytics-consent__action:hover { background: var(--surface-alt-2); }
+.analytics-consent__action:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 2px; }
+.analytics-consent__action:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 560px) {
+  .analytics-consent { right: 12px; bottom: calc(12px + var(--safe-b)); }
+  .shell--fixed + .analytics-consent { bottom: calc(72px + var(--safe-b)); }
+}
+
 /* ============================================================
    5. Menu d'export (popover ↔ feuille modale)
    ============================================================ */

@@ -85,6 +85,7 @@
     const folderStatus = document.getElementById('folder-status');
     const checkBtn = document.getElementById('check-dir-btn');
     const saveBtn = document.getElementById('save-settings-btn');
+    const initialAnalytics = {{ prefs.analytics_enabled | tojson }};
 
     checkBtn.addEventListener('click', async () => {
       checkBtn.disabled = true;
@@ -124,8 +125,12 @@
         language: document.getElementById('set-language').value,
         deck_prefix: document.getElementById('set-deck-prefix').value,
         download_dir: document.getElementById('set-download-dir').value,
-        analytics_enabled: document.getElementById('set-analytics').checked,
       };
+      const analyticsEnabled = document.getElementById('set-analytics').checked;
+      if (analyticsEnabled !== initialAnalytics) {
+        payload.analytics_enabled = analyticsEnabled;
+        payload.analytics_decided = true;
+      }
       try {
         const res = await fetch('/api/settings', {
           method: 'POST',

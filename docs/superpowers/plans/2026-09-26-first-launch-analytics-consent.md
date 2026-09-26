@@ -23,6 +23,11 @@
 - [x] Review the change independently, fix the stale Settings tab behavior,
   and rerun the relevant checks.
 - [x] Commit, push, create and attach PR #29 for issue #28; verify CI.
+- [x] Add two independent analytics categories in settings and telemetry, with
+  tests proving event filtering, migration and queued-event removal on partial
+  withdrawal. Add Customize to the panel while keeping one-click Allow all and
+  Decline all. Update EN/FR copy and docs, rebuild and verify the packaged UI,
+  then push to PR #29 and recheck CI.
 
 ## Execution record
 
@@ -33,3 +38,11 @@
   The browser scenario reproduced the failure, then passed once unrelated
   Settings saves omitted analytics fields.
 - PR #29 is attached. GitHub CI passed on Windows with Python 3.11 and 3.13.
+- The category refinement passed Python and JavaScript tests and a
+  packaged browser check in English and French, including granular acceptance,
+  failed-save retry, narrow layout and stale Settings tabs. The screenshot now
+  shows the expanded choices.
+- Independent review found and verified fixes for offline delivery after a
+  creation-only restart and retrying category purges after transient disk errors.
+  Final checks passed 159 Python tests and three JavaScript tests; the packaged
+  browser check was repeated after both fixes.

@@ -95,6 +95,7 @@ class AnalyticsRouteTests(unittest.TestCase):
     def test_first_launch_choice_controls_tracking_and_is_remembered(self):
         first_page = self.client.get("/").get_data(as_text=True)
         self.assertIn('id="analytics-consent"', first_page)
+        self.assertIn('id="analytics-customize"', first_page)
         self.assertFalse(self.analytics.state_file.exists())
         refused = self.client.post("/api/settings", json={
             "analytics_enabled": False, "analytics_decided": True,
@@ -109,6 +110,23 @@ class AnalyticsRouteTests(unittest.TestCase):
         })
         self.assertEqual(accepted.status_code, 200)
         self.assertEqual(len(self.events("first_launch")), 1)
+
+    def test_category_choices_filter_real_product_actions(self):
+        self.client.post("/api/settings", json={
+            "analytics_usage_enabled": True, "analytics_product_enabled": False,
+            "analytics_decided": True,
+        })
+        self.create_project()
+        self.assertEqual(len(self.events("first_launch")), 1)
+        self.assertEqual(self.events("project_created"), [])
+        self.client.post("/api/settings", json={
+            "analytics_usage_enabled": False, "analytics_product_enabled": True,
+            "analytics_decided": True,
+        })
+        self.assertEqual(self.events("first_launch"), [])
+        self.create_project()
+        self.assertEqual(len(self.events("project_created")), 1)
+        self.assertEqual(self.events("app_opened"), [])
 
     def test_saving_other_preferences_does_not_count_as_consent(self):
         self.assertNotIn('id="analytics-consent"', self.client.get("/settings").get_data(as_text=True))

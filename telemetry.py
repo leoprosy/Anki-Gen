@@ -30,6 +30,8 @@ EVENT_FIELDS = {
     "cards_saved": {"card_count": int},
     "export_completed": {"card_count": int, "format": str},
 }
+USAGE_EVENTS = frozenset(("first_launch", "app_opened"))
+PRODUCT_EVENTS = frozenset(EVENT_FIELDS) - USAGE_EVENTS
 
 
 def _safe_properties(event, properties):
@@ -70,10 +72,20 @@ class Telemetry:
         self._consent_generation = 0
 
     def _enabled_config(self):
-        if self.settings_loader().get("analytics_enabled") is not True:
+        if not any(self._choices(self.settings_loader())):
             return None
         config = self.config_loader()
-        return config if self.settings_loader().get("analytics_enabled") is True else None
+        return config if any(self._choices(self.settings_loader())) else None
+
+    @staticmethod
+    def _choices(prefs):
+        legacy = prefs.get("analytics_enabled") is True
+        return (prefs.get("analytics_usage_enabled", legacy) is True,
+                prefs.get("analytics_product_enabled", legacy) is True)
+
+    @classmethod
+    def _allowed(cls, event, choices):
+        return (event in USAGE_EVENTS and choices[0]) or (event in PRODUCT_EVENTS and choices[1])
 
     def _read(self):
         if not self.state_file.exists():
@@ -84,6 +96,8 @@ class Telemetry:
         uuid.UUID(state["installation_id"])
         if not isinstance(state.get("first_seen"), (int, float)):
             raise ValueError("Invalid first observation")
+        # Existing single-choice installations observed usage from first_seen.
+        state.setdefault("usage_first_seen", state["first_seen"])
         return state
 
     def _write(self, state):
@@ -124,21 +138,34 @@ class Telemetry:
             if clean is None:
                 return False
             with self._lock:
+                choices = self._choices(self.settings_loader())
+                if not self._allowed(event, choices) and not (choices[0] and event in PRODUCT_EVENTS):
+                    # A page visit cannot create an activity event without
+                    # consent, but it can resume delivery of permitted events
+                    # left offline by a previous session.
+                    if self._enabled_config():
+                        pending = self._read()
+                        if pending and any(self._allowed(e.get("event"), choices) for e in pending["queue"]):
+                            self._start_worker()
+                    return False
                 config = self._enabled_config()
                 if not config:
                     return False
                 now = self.clock()
                 state = self._read() or {"installation_id": str(uuid.uuid4()), "first_seen": now,
-                                         "announced": False, "queue": []}
+                                         "usage_first_seen": None, "announced": False, "queue": []}
                 self._prune(state)
-                if not state.get("announced") and not any(e["event"] == "first_launch" for e in state["queue"]):
+                if choices[0] and not state.get("announced") and not any(e["event"] == "first_launch" for e in state["queue"]):
+                    if state.get("usage_first_seen") is None:
+                        state["usage_first_seen"] = now
                     # Stable même si la file a été vidée par un retrait du consentement.
                     event_id = str(uuid.uuid5(uuid.UUID(state["installation_id"]), "first_launch"))
-                    state["queue"].append(self._event(state, config, "first_launch", {}, state["first_seen"], event_id))
+                    state["queue"].append(self._event(state, config, "first_launch", {}, state["usage_first_seen"], event_id))
                 # Chaque interaction réelle est horodatée. PostHog peut ainsi
                 # regrouper les installations uniques dans le fuseau du projet.
-                state["queue"].append(self._event(state, config, "app_opened", {}, now))
-                if event not in ("first_launch", "app_opened"):
+                if choices[0]:
+                    state["queue"].append(self._event(state, config, "app_opened", {}, now))
+                if event in PRODUCT_EVENTS and choices[1]:
                     state["queue"].append(self._event(state, config, event, clean, now))
                 self._prune(state)
                 self._write(state)
@@ -151,14 +178,14 @@ class Telemetry:
     def preferences_changed(self):
         try:
             with self._lock:
-                if self.settings_loader().get("analytics_enabled") is not True:
-                    self._consent_generation += 1
-                    state = self._read()
-                    if state is not None:
-                        state["queue"] = []
-                        self._write(state)
-                    return
-            self.track("app_opened")
+                self._consent_generation += 1
+                choices = self._choices(self.settings_loader())
+                state = self._read()
+                if state is not None:
+                    state["queue"] = [e for e in state["queue"] if self._allowed(e.get("event"), choices)]
+                    self._write(state)
+                if choices[0]:
+                    self.track("app_opened")
         except Exception:
             pass
 
@@ -184,11 +211,15 @@ class Telemetry:
                 if state is None:
                     return False
                 self._prune(state)
+                choices = self._choices(self.settings_loader())
+                state["queue"] = [e for e in state["queue"] if self._allowed(e.get("event"), choices)]
                 self._write(state)
                 batch = state["queue"][:BATCH_SIZE]
                 generation = self._consent_generation
             with self._lock:
-                if not batch or not self._enabled_config() or generation != self._consent_generation:
+                choices = self._choices(self.settings_loader())
+                if (not batch or not self._enabled_config() or generation != self._consent_generation
+                        or any(not self._allowed(e.get("event"), choices) for e in batch)):
                     return False
                 # Point de départ logique de la requête : un retrait antérieur
                 # invalide ce lot ; un retrait ultérieur ne peut plus le rappeler.

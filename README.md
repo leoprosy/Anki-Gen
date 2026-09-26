@@ -23,8 +23,8 @@ Ankigen keeps the document's structure instead of flattening it. It splits the c
 Course processing runs entirely on your machine. There is **no API key and no account** required — the cards are written in the chat you already pay for, and course contents stay on your computer except the paragraph you choose to paste.
 
 Optional usage statistics are **off until you agree** in the first-launch prompt
-or in Settings. You can decline and change your choice later. Agreeing shares
-basic activity and export counts with the developer through PostHog.
+or in Settings. You can allow all, decline all, or choose installation/activity
+and creation/export statistics separately. You can change your choice later.
 Documents, filenames and card contents are never included.
 See [privacy and owner dashboard setup](docs/analytics.md) for the exact fields
 and metric definitions.

@@ -23,6 +23,23 @@ retry. The Settings checkbox can change a previous choice. Saving unrelated
 preferences omits both analytics fields, including from a Settings tab left open
 while another window records a choice.
 
+The owner additionally chose genuine customization. Keep one-click **Allow all**
+and **Decline all** at equal prominence, and add **Customize** as a third action.
+It reveals two initially unchecked choices: installation/activity statistics
+(`first_launch`, `app_opened`) and creation statistics (`project_created`,
+`cards_saved`, `export_completed`). Each category is available in Settings too.
+The first-launch event and automatic activity events require activity consent;
+product actions require creation consent. Accepting only creation statistics
+must not emit installation or activity events. Existing single-switch opt-ins
+migrate to both categories. If one category is later disabled, queued events
+from that category are removed while the other category remains enabled.
+The local random installation ID is shared by permitted events; both choices
+explain this and still require a positive action. The panel calls these
+"usage statistics", not browser cookies, because the app stores its ID in its
+data directory. One-click refusal remains because the
+[CNIL guidance](https://www.cnil.fr/fr/questions-reponses-lignes-directrices-modificatives-et-recommandation-cookies-traceurs)
+requires refusal to be as easy as acceptance.
+
 Existing false `analytics_enabled` values cannot reliably distinguish an old
 explicit refusal from the previous default. Those installations may see the
 new prompt once after updating, without sending data before a new Allow.

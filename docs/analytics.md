@@ -5,9 +5,12 @@ authenticated dashboard. Users of the desktop app do not need an account.
 Documents, filenames, project IDs, questions, answers, prompts and clipboard
 data are never event properties. There is no browser autocapture or replay.
 
-On first launch, a persistent bottom-right panel asks users to Allow or Decline.
-No installation ID or event is created until they allow. Declining is saved and
-the panel does not return; Settings can change either choice later. The Settings
+On first launch, a persistent bottom-right panel offers Allow all, Decline all,
+and Customize. Customize has two initially unchecked categories: installation
+and activity (`first_launch`, `app_opened`), and projects/cards/exports
+(`project_created`, `cards_saved`, `export_completed`). No installation ID or
+event is created until at least one category is allowed. Declining is saved and
+the panel does not return; Settings can change either category later. The Settings
 page shows the full privacy controls without the panel overlay. Saving unrelated
 preferences does not decide consent. Existing opt-ins remain enabled on update.
 
@@ -64,7 +67,7 @@ after setup and remove its local file. The owner scripts and personal keys are
 excluded from installers and updater bundles.
 
 Choose a retention period in PostHog appropriate for these statistics. Turning
-reporting off clears pending events and stops collection; it does not delete
+either category off clears its pending events and stops its collection; it does not delete
 already received events. Person-profile processing and GeoIP enrichment are
 disabled, but the receiving service still sees the connection's IP address.
 
@@ -72,7 +75,7 @@ disabled, but the receiving service still sees the connection's IP address.
 
 | Event / chart | Meaning |
 | --- | --- |
-| `first_launch` | First consented observation of an installation data directory, including existing users receiving an update. Not an installer execution. |
+| `first_launch` | First observation after installation/activity consent, including existing users receiving an update. Not an installer execution. |
 | `app_opened` | Each successful page visit or product action. Update/version polling does not count. |
 | Active installations | Distinct installation IDs today, or over 7/30 calendar days including today, in the project's timezone. Two computers can count as two installations for one person. |
 | `project_created` | Successful DOCX parse and project save; `chunk_count`. |
@@ -84,6 +87,9 @@ Common fields are random installation/event UUIDs, timestamp, app version, OS
 family and schema version. No old projects are scanned or backfilled. Counts
 cover participating installations; deleting or copying a data directory affects
 identity. These are client-reported product metrics, not billing records.
+The installation/activity and creation charts can cover different groups of
+installations because consent is independent; do not use one as the denominator
+for the other without accounting for that choice.
 
 The outbox is `%APPDATA%/AnkiGen/analytics-state.json` in packaged builds, outside
 the updatable `app/` folder. Up to 500 events are retained for seven days. A daemon
@@ -117,9 +123,9 @@ Tests use temporary files, real generated DOCX files and a substituted network
 boundary. They exercise consent, privacy, retry identity, queue limits, failures,
 save/export counts and dashboard reuse. No tests send events to production.
 
-UI check: on a fresh installation verify the panel, decline, reload and confirm
-it stays dismissed without analytics state. In another fresh profile, allow and
-verify the checkbox in Settings. Test both languages and a narrow window.
+UI check: on a fresh installation verify the panel, decline all, reload and confirm
+it stays dismissed without analytics state. In another fresh profile, customize
+each category and verify both checkboxes in Settings. Test both languages and a narrow window.
 For live verification use a separate test project, enable developer reporting,
 complete an import/save/export and inspect its events in PostHog. Local tests
 alone do not prove live ingestion.

@@ -123,6 +123,14 @@
     <p>{{ t('consent.description') }}</p>
     <a href="{{ url_for('settings_page') }}#privacy-title">{{ t('consent.details') }}</a>
     <p class="analytics-consent__error" id="analytics-consent-error" role="alert" hidden></p>
+    <button type="button" class="analytics-consent__customize" id="analytics-customize" aria-expanded="false" aria-controls="analytics-options">{{ t('consent.customize') }}</button>
+    <div class="analytics-consent__options" id="analytics-options" hidden>
+      <label><input type="checkbox" id="consent-usage"> <span>{{ t('settings.analytics_usage_label') }}</span></label>
+      <p>{{ t('settings.analytics_usage_help') }}</p>
+      <label><input type="checkbox" id="consent-product"> <span>{{ t('settings.analytics_product_label') }}</span></label>
+      <p>{{ t('settings.analytics_product_help') }}</p>
+      <button type="button" class="analytics-consent__action analytics-consent__save" id="analytics-save-choices">{{ t('consent.save_choices') }}</button>
+    </div>
     <div class="analytics-consent__actions">
       <button type="button" class="analytics-consent__action" data-consent="false">{{ t('consent.decline') }}</button>
       <button type="button" class="analytics-consent__action" data-consent="true">{{ t('consent.allow') }}</button>

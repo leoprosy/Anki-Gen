@@ -51,6 +51,22 @@
       </div>
     </div>
   </section>
+  <section class="card settings-section" aria-labelledby="privacy-title">
+    <div class="settings-section-heading">
+      <h3 id="privacy-title">{{ t('settings.privacy_title') }}</h3>
+    </div>
+    <label class="analytics-choice" for="set-analytics">
+      <input type="checkbox" id="set-analytics" aria-describedby="analytics-help"
+        {% if prefs.analytics_enabled %}checked{% endif %}>
+      <span>{{ t('settings.analytics_label') }}</span>
+    </label>
+    <p class="analytics-help" id="analytics-help">{{ t('settings.analytics_help') }}</p>
+    <details class="analytics-details">
+      <summary>{{ t('settings.analytics_details_title') }}</summary>
+      <p>{{ t('settings.analytics_details') }}</p>
+      <p>{{ t('settings.analytics_withdrawal') }}</p>
+    </details>
+  </section>
   <div class="settings-footer">
     <p class="settings-feedback" id="settings-status" role="status"></p>
     <button type="submit" class="btn primary" id="save-settings-btn">
@@ -108,6 +124,7 @@
         language: document.getElementById('set-language').value,
         deck_prefix: document.getElementById('set-deck-prefix').value,
         download_dir: document.getElementById('set-download-dir').value,
+        analytics_enabled: document.getElementById('set-analytics').checked,
       };
       try {
         const res = await fetch('/api/settings', {

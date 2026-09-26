@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write
 
+env:
+  ANKIGEN_POSTHOG_TOKEN: ${{ vars.ANKIGEN_POSTHOG_TOKEN }}
+  ANKIGEN_POSTHOG_REGION: ${{ vars.ANKIGEN_POSTHOG_REGION || 'eu' }}
+
 jobs:
   # ── 1. app.zip : ce que l'updater intégré télécharge ────────────────────────
   bundle:
@@ -15,6 +19,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Générer la configuration publique des statistiques
+        run: python3 scripts/configure_analytics.py
+
       - name: Créer app.zip (modules Python + templates + static + locales)
         run: |
           mkdir -p release/app
@@ -22,7 +29,8 @@ jobs:
           # Copier les fichiers applicatifs
           cp app.py launcher.py parse_cours.py build_anki_csv.py \
              docx_blocks.py media_store.py render.py paths.py \
-             project_store.py updater.py settings.py i18n.py release/app/
+             project_store.py updater.py settings.py i18n.py \
+             telemetry.py analytics_config.py analytics_config.json release/app/
           cp -r templates static locales skill_templates release/app/
 
           # Générer version.json depuis le tag. Publié à la fois DANS app.zip

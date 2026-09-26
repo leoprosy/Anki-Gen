@@ -1166,6 +1166,13 @@ textarea#response:focus {
 .settings-feedback.is-error { color: var(--error); }
 .settings-footer { display: flex; align-items: center; justify-content: flex-end; gap: 20px; margin-top: 24px; }
 .settings-footer .btn { flex-shrink: 0; min-width: 132px; }
+.analytics-choice { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; font-size: 14px; font-weight: 500; }
+.analytics-choice input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--accent); }
+.analytics-help, .analytics-details { font-size: 13px; line-height: 1.7; color: var(--text-secondary); }
+.analytics-help { margin-top: 8px; }
+.analytics-details { margin-top: 14px; }
+.analytics-details summary { cursor: pointer; padding: 8px 0; color: var(--text-primary); }
+.analytics-details p + p { margin-top: 10px; }
 @media (max-width: 620px) {
   .settings-page { padding-top: 28px; }
   .settings-section { padding: 20px; }

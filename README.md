@@ -20,7 +20,13 @@ Making flashcards is the slowest part of studying, and pasting a whole chapter i
 
 Ankigen keeps the document's structure instead of flattening it. It splits the course along its heading styles, hands you **one paragraph at a time** — with the images and tables that belong to it — and turns each heading path into an Anki deck path. You send that paragraph to Claude (or any assistant you like), paste the answer back, and Ankigen takes care of the plumbing: placeholders for media, HTML tables, the `#separator:tab` header, the media files copied into your Anki collection.
 
-It runs entirely on your machine. There is **no API key and no account** — the cards are written in the chat you already pay for, and nothing about your courses leaves your computer except the paragraph you choose to paste.
+Course processing runs entirely on your machine. There is **no API key and no account** required — the cards are written in the chat you already pay for, and course contents stay on your computer except the paragraph you choose to paste.
+
+Optional usage statistics are **off by default**. Enable them in Settings to
+share basic activity and export counts with the developer through PostHog.
+Documents, filenames and card contents are never included.
+See [privacy and owner dashboard setup](docs/analytics.md) for the exact fields
+and metric definitions.
 
 ---
 

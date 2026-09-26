@@ -27,9 +27,15 @@ paragraphe à Claude (ou à l'assistant de votre choix), vous recollez la répon
 s'occupe de la plomberie : marqueurs de médias, tableaux HTML, en-tête `#separator:tab`, copie des
 images dans votre collection Anki.
 
-Tout tourne sur votre machine. **Ni clé d'API ni compte** : les cartes sont écrites dans la
-conversation que vous payez déjà, et rien de vos cours ne quitte votre ordinateur en dehors du
-paragraphe que vous choisissez de coller.
+Le traitement des cours tourne sur votre machine. **Ni clé d'API ni compte** requis :
+les cartes sont écrites dans la conversation que vous payez déjà. Le contenu des cours
+reste sur votre ordinateur, sauf le paragraphe que vous choisissez de coller.
+
+Les statistiques d’utilisation sont facultatives et **désactivées par défaut**.
+Vous pouvez les activer dans les paramètres pour partager des compteurs d’activité
+et d’exports avec le développeur via PostHog. Aucun document, nom de fichier ou
+contenu de carte n’est transmis. Les champs et leur configuration sont détaillés
+dans le [guide du tableau de bord privé](docs/analytics.md).
 
 ---
 

@@ -21,3 +21,7 @@ version.json
 /tests/fixtures
 /tests/__pycache__
 /settings.json
+/analytics-state.json
+/analytics_config.json
+/.posthog-admin-key
+/scripts/__pycache__/

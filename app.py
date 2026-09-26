@@ -47,6 +47,7 @@ from project_store import (
     set_asset_alt,
 )
 from render import resolve_placeholders
+from telemetry import client as analytics
 
 ROOT = paths.DATA_DIR
 UPLOAD_DIR = paths.UPLOAD_DIR
@@ -70,6 +71,16 @@ app = Flask(
     static_folder=str(paths.APP_DIR / "static"),
 )
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB
+
+
+@app.after_request
+def record_app_activity(response):
+    # Les sondages updater et API ne prouvent pas une utilisation de l'interface.
+    if request.method == "GET" and response.status_code == 200 and request.endpoint in {
+        "index", "work", "settings_page", "help_page",
+    }:
+        analytics.track("app_opened")
+    return response
 
 
 # ──────────────────────────────────────────────────────────────
@@ -223,6 +234,7 @@ def upload():
         "prompts": build_prompts(chunks, assets, current_lang()),
     }
     save_project(project_id, project)
+    analytics.track("project_created", chunk_count=len(project["prompts"]))
     return redirect(url_for("work", project_id=project_id))
 
 
@@ -267,7 +279,8 @@ def api_settings():
     if request.method == "GET":
         return jsonify(user_settings.load_settings())
     data = request.get_json(silent=True) or {}
-    return jsonify(ok=True, settings=user_settings.save_settings(data))
+    saved = analytics.save_preferences(data)
+    return jsonify(ok=True, settings=saved)
 
 
 @app.route("/api/settings/check-dir", methods=["POST"])
@@ -339,6 +352,7 @@ def api_save(project_id):
 
     for p in project["prompts"]:
         if p["id"] == chunk_id:
+            changed = response != (p.get("response") or "").strip()
             p["response"] = response
             if response and mark_done:
                 p["status"] = "done"
@@ -346,6 +360,8 @@ def api_save(project_id):
                 p["status"] = "pending"
             save_project(project_id, project)
             cards = parse_tsv_response(response) if response else []
+            if changed and cards:
+                analytics.track("cards_saved", card_count=len(cards))
             return jsonify(
                 ok=True,
                 id=chunk_id,
@@ -420,7 +436,9 @@ def export_tsv(project_id):
         as_attachment=True,
         download_name=filename,
     )
-    return _with_export_headers(response, filename, data)
+    response = _with_export_headers(response, filename, data)
+    analytics.track("export_completed", card_count=len(rows), format="tsv")
+    return response
 
 
 @app.route("/export.zip/<project_id>")
@@ -465,7 +483,9 @@ def export_zip(project_id):
         as_attachment=True,
         download_name=filename,
     )
-    return _with_export_headers(response, filename, data)
+    response = _with_export_headers(response, filename, data)
+    analytics.track("export_completed", card_count=len(rows), format="zip")
+    return response
 
 
 @app.route("/api/export/report/<project_id>")

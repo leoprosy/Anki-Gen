@@ -62,10 +62,11 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(active["series"][0]["math"], "dau")
         self.assertEqual(active["dateRange"]["date_from"], "-29d")
 
-    def test_daily_chart_matches_utc_calendar_sampling(self):
+    def test_daily_chart_uses_project_calendar(self):
         metrics = {item["key"]: item for item in dashboard_insights()}
         self.assertEqual(metrics["active-day"]["query"]["source"]["dateRange"]["date_from"], "dStart")
-        self.assertIn("today (UTC)", metrics["active-day"]["name"])
+        self.assertIn("today", metrics["active-day"]["name"])
+        self.assertNotIn("UTC", metrics["active-day"]["name"])
 
 
 class DownloadsTests(unittest.TestCase):

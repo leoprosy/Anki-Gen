@@ -8,7 +8,7 @@ data are never event properties. There is no browser autocapture or replay.
 ## Configure builds
 
 Use a separate **Ankigen** PostHog project within your existing account, with its
-timezone set to UTC so daily activity matches the app's measurement.
+timezone set to your preferred reporting timezone. Daily activity uses that project's calendar.
 Set these GitHub repository Actions variables:
 
 | Variable | Value |
@@ -67,8 +67,8 @@ disabled, but the receiving service still sees the connection's IP address.
 | Event / chart | Meaning |
 | --- | --- |
 | `first_launch` | First consented observation of an installation data directory, including existing users receiving an update. Not an installer execution. |
-| `app_opened` | Once per UTC date with a successful page visit or product action. Update/version polling does not count. |
-| Active installations | Distinct installation IDs today (UTC), or over 7/30 calendar days including today. Two computers can count as two installations for one person. |
+| `app_opened` | Each successful page visit or product action. Update/version polling does not count. |
+| Active installations | Distinct installation IDs today, or over 7/30 calendar days including today, in the project's timezone. Two computers can count as two installations for one person. |
 | `project_created` | Successful DOCX parse and project save; `chunk_count`. |
 | `cards_saved` | A changed, nonempty response saved successfully; `card_count`. Identical saves do not count again, edited responses do. |
 | `export_completed` | Export assembled and response prepared; `card_count`, `format` (`tsv`/`zip`). Repeat exports count. Does not prove file delivery or Anki import. |

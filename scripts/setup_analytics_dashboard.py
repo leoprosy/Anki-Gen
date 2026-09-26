@@ -19,7 +19,7 @@ MANAGED_TAG = "ankigen-usage-v1"
 def dashboard_insights():
     definitions = [
         ("observed-installs", "First observed installations · 30 days", "first_launch", "dau", "-29d", False),
-        ("active-day", "Active installations · today (UTC)", "app_opened", "dau", "dStart", False),
+        ("active-day", "Active installations · today", "app_opened", "dau", "dStart", False),
         ("active-7d", "Active installations · 7 calendar days", "app_opened", "dau", "-6d", False),
         ("active-30d", "Active installations · 30 calendar days", "app_opened", "dau", "-29d", False),
         ("projects", "Projects created · 30 days", "project_created", "total", "-29d", False),
@@ -71,7 +71,7 @@ def ensure_dashboard(api):
         raise RuntimeError("Multiple managed Ankigen dashboards exist; resolve duplicates before rerunning.")
     dashboard = dashboards[0] if dashboards else api.request("POST", "dashboards/", {
         "name": "Ankigen — usage",
-        "description": "Consented, observed installations only. Downloads are separate. Card-save and export volumes include revisions/re-exports; no verified Anki imports. First observations include existing users who update. All activity dates use UTC.",
+        "description": "Consented, observed installations only. Downloads are separate. Card-save and export volumes include revisions/re-exports; no verified Anki imports. First observations include existing users who update. Dates use this project's timezone.",
         "tags": [MANAGED_TAG], "pinned": True,
     })
     dashboard_id = dashboard["id"]
@@ -122,8 +122,6 @@ def main():
     api = PostHogAPI(args.region, args.project, key)
     try:
         project = api.request("GET", "")
-        if project.get("timezone") != "UTC":
-            raise RuntimeError("Set the Ankigen project's timezone to UTC before creating its daily charts.")
         config_path = ROOT / "analytics_config.json"
         if config_path.is_file():
             expected = json.loads(config_path.read_text(encoding="utf-8-sig")).get("project_token")

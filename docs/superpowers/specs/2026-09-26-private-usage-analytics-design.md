@@ -34,7 +34,7 @@ Previously delivered events remain subject to the owner's PostHog retention poli
 | Event | Trigger / properties |
 | --- | --- |
 | `first_launch` | First consented observation; stable event ID, once per installation data directory. Label as first observed installations, including upgrades. |
-| `app_opened` | Once per UTC date on successful page visits or product actions. No background update polling. Unique installation IDs provide observed DAU/WAU/MAU. |
+| `app_opened` | Each successful page visit or product action, with a timestamp so the project's timezone defines the reporting day. No background update polling. Unique installation IDs provide observed DAU/WAU/MAU. |
 | `project_created` | Successful parse and project save; `chunk_count`. |
 | `cards_saved` | Successful changed response save; `card_count`. Repeated identical saves emit no event. This measures saves, not unique lifetime cards. |
 | `export_completed` | TSV or ZIP assembled and response prepared; `card_count`, `format`. Repeated exports are distinct actions. Does not prove filesystem delivery or Anki import. |

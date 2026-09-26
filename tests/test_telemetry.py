@@ -65,17 +65,18 @@ class TelemetryTests(unittest.TestCase):
         self.assertFalse(self.client.track("course contents"))
         self.assertEqual(len(self.queued()), 3)
 
-    def test_restart_preserves_id_and_only_records_activity_once_per_day(self):
+    def test_restart_preserves_id_and_records_each_real_activity(self):
         self.prefs["analytics_enabled"] = True
         self.client.track("app_opened")
         first = self.queued()
         self.client.flush_once()
         restarted = self.make_client()
         restarted.track("app_opened")
-        self.assertEqual(self.queued(), [])
+        self.assertEqual([e["event"] for e in self.queued()], ["app_opened"])
+        self.assertEqual(first[0]["distinct_id"], self.queued()[0]["distinct_id"])
         self.now += 86400
         restarted.track("app_opened")
-        self.assertEqual([e["event"] for e in self.queued()], ["app_opened"])
+        self.assertEqual([e["event"] for e in self.queued()], ["app_opened", "app_opened"])
         self.assertEqual(first[0]["distinct_id"], self.queued()[0]["distinct_id"])
 
     def test_failed_upload_retries_same_uuid_and_original_timestamp(self):

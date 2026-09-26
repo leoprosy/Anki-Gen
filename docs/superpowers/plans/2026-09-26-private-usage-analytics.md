@@ -29,7 +29,7 @@ dashboard setup and read GitHub download counts outside the desktop app.
 - [x] 3. Build `scripts/configure_analytics.py`, package config and telemetry in
   PyInstaller and both updater workflows. Add owner dashboard and GitHub download
   scripts with contract tests, plus a setup guide and README/CONTRIBUTING links.
-- [ ] 4. Review the full diff and failures with a fresh reviewer. Run full tests,
+- [x] 4. Review the full diff and failures with a fresh reviewer. Run full tests,
   check packaging, render the changed settings UI if tooling is available, commit,
   open and attach a PR, and report any live-account setup still pending.
 
@@ -44,14 +44,22 @@ while a request is pending. Audit every property for accidental document content
 - Initial checkout passed 106 tests. Updated the clean feature branch to the
   current GitHub main before implementation; current-main baseline rerun follows.
 - Owner supplied the EU public token. Local generated configuration and both
-  GitHub Actions variables are configured. Personal key/project ID are pending
-  for live dashboard creation; no synthetic production events have been sent.
+  GitHub Actions variables are configured. No synthetic production events have
+  been sent.
 - Current-main baseline: 122 Python and 3 JavaScript tests passed. Added tests
   first, observed missing modules/hooks fail, implemented and passed 147 tests.
 - Independent review found a consent-withdrawal dispatch race and an inaccurate
   rolling-24-hour label. Added failing regression tests, then synchronized
   preference changes/dispatch authorization and invalidated revoked snapshots.
-  Changed charts to UTC calendar periods. Final suite: 150 Python + 3 JS passed.
+  Initially changed charts to UTC calendar periods. The live Ankigen project uses
+  Europe/Paris and the scoped key cannot change it, so activity is now recorded
+  for each successful page visit or product action and PostHog groups unique
+  installations by the project's calendar. Final suite: 150 Python + 3 JS passed.
 - PyInstaller build passed. Headless Chrome against the packaged executable with
   isolated APPDATA verified default-off consent, persistence, withdrawal, EN/FR,
   800px layout, packaged EU configuration and no telemetry with config disabled.
+- The private dashboard was created in PostHog project 285049, ID 976865, with
+  nine insights and public sharing disabled; the owner URL is
+  https://eu.posthog.com/project/285049/dashboard/976865. Organization membership
+  could not be audited with the scoped API key (HTTP 403). The owner must confirm
+  sole membership or restrict project access to ensure only they can see it.

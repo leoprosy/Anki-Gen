@@ -129,16 +129,15 @@ class Telemetry:
                     return False
                 now = self.clock()
                 state = self._read() or {"installation_id": str(uuid.uuid4()), "first_seen": now,
-                                         "announced": False, "active_day": None, "queue": []}
+                                         "announced": False, "queue": []}
                 self._prune(state)
                 if not state.get("announced") and not any(e["event"] == "first_launch" for e in state["queue"]):
                     # Stable même si la file a été vidée par un retrait du consentement.
                     event_id = str(uuid.uuid5(uuid.UUID(state["installation_id"]), "first_launch"))
                     state["queue"].append(self._event(state, config, "first_launch", {}, state["first_seen"], event_id))
-                day = datetime.fromtimestamp(now, timezone.utc).date().isoformat()
-                if state.get("active_day") != day:
-                    state["queue"].append(self._event(state, config, "app_opened", {}, now))
-                    state["active_day"] = day
+                # Chaque interaction réelle est horodatée. PostHog peut ainsi
+                # regrouper les installations uniques dans le fuseau du projet.
+                state["queue"].append(self._event(state, config, "app_opened", {}, now))
                 if event not in ("first_launch", "app_opened"):
                     state["queue"].append(self._event(state, config, event, clean, now))
                 self._prune(state)
@@ -157,7 +156,6 @@ class Telemetry:
                     state = self._read()
                     if state is not None:
                         state["queue"] = []
-                        state["active_day"] = None
                         self._write(state)
                     return
             self.track("app_opened")

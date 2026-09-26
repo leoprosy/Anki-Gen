@@ -98,7 +98,7 @@ class AnalyticsRouteTests(unittest.TestCase):
         self.assertFalse(self.analytics.state_file.exists())
         self.client.get("/")
         self.client.get("/settings")
-        self.assertEqual(len(self.events("app_opened")), 1)
+        self.assertEqual(len(self.events("app_opened")), 2)
 
     def test_failed_actions_do_not_count_as_success(self):
         settings.save_settings({"analytics_enabled": True})

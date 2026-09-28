@@ -58,6 +58,7 @@ MARKER_RING = 1.5           # anneau couleur du fond autour des marqueurs (skill
 BAR_H, BAR_PAD, BAR_MIN = 18, 6, 8
 BADGE_R = 8
 BREAK_PX = 40
+CLUSTER_GUARD = 24          # px de part et d'autre d'un bloc de temps, quand l'axe est interrompu
 MAX_BREAKS = 3
 WIDTH_MIN, WIDTH_MAX = 900, 12000
 TARGET_GAP_PX = 24          # écart visé au 20e percentile des évènements d'une piste
@@ -86,20 +87,20 @@ WARNING_CODES = ("label_truncated", "labels_in_notes", "label_unsupported_chars"
 THEMES = {
     "light": {
         "bg": "#FFFFFF", "ink": "#1D1D1F", "secondary": "#6E6E73", "axis": "#AEAEB2",
-        "grid": "#EBEBEF", "lane_bg": ("#F6F6F8", None), "era_bg": ("#EEEEF3", "#F7F7FA"),
+        "grid": "#EBEBEF", "lane_bg": ("#F6F6F8", None), "era_bg": ("#C9C9DA", None), "era_opacity": 0.28,
         "palette": ("#0371B1", "#169D74", "#6A3E99", "#D45E00",
                     "#3F9CCF", "#C58801", "#974E40", "#CB7AA7"),
     },
     "dark": {
         "bg": "#1C1C1E", "ink": "#F5F5F7", "secondary": "#AEAEB2", "axis": "#636366",
-        "grid": "#2C2C2E", "lane_bg": ("#232326", None), "era_bg": ("#29292D", "#222225"),
+        "grid": "#2C2C2E", "lane_bg": ("#232326", None), "era_bg": ("#5A5A66", None), "era_opacity": 0.28,
         "palette": ("#0371B1", "#169D74", "#7E52AF", "#D45E00",
                     "#429FD2", "#C18501", "#9C5344", "#C574A1"),
     },
     # Impression : fond blanc, encre noire, pistes en niveaux de gris, pas de fonds pâles.
     "print": {
         "bg": "#FFFFFF", "ink": "#000000", "secondary": "#3A3A3C", "axis": "#000000",
-        "grid": "#D4D4D8", "lane_bg": (None, None), "era_bg": None,
+        "grid": "#D4D4D8", "lane_bg": (None, None), "era_bg": None, "era_opacity": 0,
         "palette": ("#1D1D1F", "#767676", "#454545", "#8A8A8A"),
     },
 }
@@ -460,14 +461,15 @@ def _merge_intervals(intervals):
     return merged
 
 
-def _domain_and_breaks(items, allow_breaks):
+def _clusters(items, allow_breaks):
     """
-    Domaine [début, fin] avec 2 % de marge, et vides compressibles.
+    Blocs de temps conservés sur l'axe : un seul sans rupture, sinon ceux que
+    séparent les vides compressés.
 
-    Un vide est compressible s'il dépasse 25 % du domaine ; on n'en compresse que
-    si l'ensemble retenu (au plus 3) couvre au moins la moitié du domaine, c'est-à-
-    dire si la densité utile au moins double. Les intervalles occupés comprennent
-    périodes et ères : une rupture ne tombe jamais dans l'une d'elles (I9).
+    Un vide est compressible s'il dépasse 25 % de l'étendue des données ; on n'en
+    compresse que si l'ensemble retenu (au plus 3) en couvre au moins la moitié,
+    c'est-à-dire si la densité utile au moins double. Les intervalles occupés
+    comprennent périodes et ères : une rupture ne tombe jamais dans l'une d'elles (I9).
     """
     t_min = min(a for a, _, _ in items)
     t_max = max(b for _, b, _ in items)
@@ -475,33 +477,76 @@ def _domain_and_breaks(items, allow_breaks):
     if span < MIN_SPAN_YEARS:
         middle = (t_min + t_max) / 2
         t_min, t_max, span = middle - MIN_SPAN_YEARS / 2, middle + MIN_SPAN_YEARS / 2, MIN_SPAN_YEARS
-    pad = span * 0.02
-    domain = (t_min - pad, t_max + pad)
     if not allow_breaks:
-        return domain, []
-    total = domain[1] - domain[0]
-    guard = total * 0.02
-    occupied = _merge_intervals(
-        [(a - guard, b + guard) if point else (a, b) for a, b, point in items])
+        return [(t_min, t_max)]
+    occupied = _merge_intervals([(a, b) for a, b, _ in items])
     gaps = [(occupied[i][1], occupied[i + 1][0]) for i in range(len(occupied) - 1)]
-    candidates = sorted((g for g in gaps if g[1] - g[0] > 0.25 * total),
+    candidates = sorted((g for g in gaps if g[1] - g[0] > 0.25 * span),
                         key=lambda g: (-(g[1] - g[0]), g[0]))[:MAX_BREAKS]
-    if sum(b - a for a, b in candidates) < 0.5 * total:
-        return domain, []
-    return domain, sorted(candidates)
+    if sum(b - a for a, b in candidates) < 0.5 * span:
+        return [(t_min, t_max)]
+    clusters, start = [], t_min
+    for a, b in sorted(candidates):
+        clusters.append((start, a))
+        start = b
+    clusters.append((start, t_max))
+    return clusters
 
 
-def _build_scale(domain, breaks, x0, x1):
-    kept = domain[1] - domain[0] - sum(b - a for a, b in breaks)
-    ppy = (x1 - x0 - BREAK_PX * len(breaks)) / kept
-    segments, t, x = [], domain[0], x0
-    for a, b in breaks:
-        segments.append((t, a, x, x + (a - t) * ppy, False))
-        x += (a - t) * ppy
-        segments.append((a, b, x, x + BREAK_PX, True))
-        x += BREAK_PX
-        t = b
-    segments.append((t, domain[1], x, x1, False))
+def _cluster_years(clusters):
+    """Années effectivement dessinées : l'étendue (+ 2 % de marge) sans rupture, la somme des blocs sinon."""
+    if len(clusters) == 1:
+        a, b = clusters[0]
+        return (b - a) * 1.04
+    return max(sum(b - a for a, b in clusters), MIN_SPAN_YEARS)
+
+
+def _build_scale(clusters, x0, x1, min_cluster_px=0.0):
+    """
+    Échelle linéaire par morceaux. Sans rupture : 2 % de marge de chaque côté.
+
+    Avec ruptures, les marges sont en px et non en années : 2 % d'un domaine de
+    5 000 ans donneraient à un évènement isolé la moitié de la largeur. Chaque bloc
+    garde CLUSTER_GUARD px de chaque côté, et au moins `min_cluster_px` au total
+    (de quoi poser une étiquette) : un bloc trop court montre alors plus de temps
+    vide autour de lui, au MÊME nombre de px par an que les autres blocs. La marge
+    en temps ne mord jamais sur plus de 40 % du vide voisin.
+    """
+    if len(clusters) == 1:
+        a, b = clusters[0]
+        pad = (b - a) * 0.02
+        return Scale(((a - pad, b + pad, x0, x1, False),)), (x1 - x0) / ((b - a) * 1.04)
+    n = len(clusters)
+    free = x1 - x0 - BREAK_PX * (n - 1)
+    lengths = [max(b - a, 0.0) for a, b in clusters]
+    fixed = set()
+    ppy = None
+    for _ in range(n + 1):
+        flexible = sum(lengths[i] for i in range(n) if i not in fixed)
+        budget = free - sum(max(min_cluster_px, 2 * CLUSTER_GUARD) for i in fixed) - 2 * CLUSTER_GUARD * (n - len(fixed))
+        ppy = budget / max(flexible, MIN_SPAN_YEARS * 1e-3)
+        grown = {i for i in range(n) if lengths[i] * ppy + 2 * CLUSTER_GUARD < min_cluster_px}
+        if grown <= fixed:
+            break
+        fixed |= grown
+    gaps = [clusters[i + 1][0] - clusters[i][1] for i in range(n - 1)]
+    guards = []
+    for i in range(n):
+        wanted = max(min_cluster_px - lengths[i] * ppy, 2 * CLUSTER_GUARD) / 2 / ppy
+        room = min([gaps[j] * 0.4 for j in (i - 1, i) if 0 <= j < n - 1])
+        guards.append(min(wanted, room))
+    segments, x = [], x0
+    for i, (a, b) in enumerate(clusters):
+        start, end = a - guards[i], b + guards[i]
+        width = (end - start) * ppy
+        segments.append((start, end, x, x + width, False))
+        x += width
+        if i + 1 < n:
+            segments.append((end, clusters[i + 1][0] - guards[i + 1], x, x + BREAK_PX, True))
+            x += BREAK_PX
+    # Les arrondis de la dernière passe se rattrapent sur le dernier bloc.
+    last = segments[-1]
+    segments[-1] = (last[0], last[1], last[2], max(x1, last[2] + 1), False)
     return Scale(tuple(segments)), ppy
 
 
@@ -682,9 +727,12 @@ def _attempt(doc, options, measure, forced_width, iteration):
     for _, date in events:
         point = date.precision in ("day", "month", "year")
         items.append((date.position, date.position, True) if point else (date.t0, date.t1, False))
-    domain, breaks = _domain_and_breaks(items, options.axis_breaks == "auto")
-    kept_years = domain[1] - domain[0] - sum(b - a for a, b in breaks)
-    chrome = plot_left + MARGIN + BREAK_PX * len(breaks)
+    clusters = _clusters(items, options.axis_breaks == "auto")
+    kept_years = _cluster_years(clusters)
+    chrome = plot_left + MARGIN
+    min_cluster = label_max + 2 * CLUSTER_GUARD
+    if len(clusters) > 1:
+        chrome += BREAK_PX * (len(clusters) - 1) + min_cluster * len(clusters)
 
     if options.width_mode == "fixed":
         width = int(options.width_px)
@@ -706,7 +754,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
             natural = 1200
         width = int(max(WIDTH_MIN, min(WIDTH_MAX, math.ceil(natural))))
     plot_right = width - MARGIN
-    scale, ppy = _build_scale(domain, breaks, plot_left, plot_right)
+    scale, ppy = _build_scale(clusters, plot_left, plot_right, min_cluster)
 
     # Zones interdites aux étiquettes : ruptures d'axe.
     break_boxes = [(x0 - 2, -1e6, x1 + 2, 1e6) for _, _, x0, x1 in scale.breaks]
@@ -890,6 +938,11 @@ def _attempt(doc, options, measure, forced_width, iteration):
         prims.append(_text(lx, y + r * row_h + ASCENT * SIZES["era"], [era["label"]], SIZES["era"], 600,
                            secondary, "start", measure, "era-label", era["id"]))
     y += len(era_rows) * row_h + (4 if era_rows else 0)
+    # Impression : pas de fond pâle, un crochet par ère sous sa rangée de libellés.
+    bracket_y = None
+    if era_rows and not theme["era_bg"]:
+        bracket_y = y
+        y += 8
 
     # Axe haut : libellés de graduation, puis la ligne.
     unit_name, step = _tick_unit(ppy, density["min_tick_px"])
@@ -917,7 +970,6 @@ def _attempt(doc, options, measure, forced_width, iteration):
                               rx=8, fill=lane_bg, role="lane-bg", lane=state.index))
         for prim in local:
             prims.append(_shift(prim, offset, state.index))
-        prims.extend(_lane_paths(state, offset, scale, ink))
         lane_bounds.append((top, bottom))
         cursor = bottom + LANE_GAP
     lanes_bottom = cursor - LANE_GAP
@@ -941,13 +993,16 @@ def _attempt(doc, options, measure, forced_width, iteration):
     band_bottom = lanes_bottom + (8 if bottom_axis else 0)
     for i, (era, x0, x1) in enumerate(era_bands):
         if theme["era_bg"]:
-            bands.append(Rect(x=round(x0, 2), y=round(axis_y, 2), w=round(x1 - x0, 2),
-                              h=round(band_bottom - axis_y, 2), fill=theme["era_bg"][i % 2], opacity=1.0,
-                              role="era-band", ref=era["id"]))
-        else:
-            for x in (x0, x1):
-                bands.append(Line(x1=round(x, 2), y1=axis_y, x2=round(x, 2), y2=band_bottom,
-                                  stroke=theme["axis"], width=1, dash="4 4", role="era-band", ref=era["id"]))
+            fill = theme["era_bg"][i % 2]
+            if fill:
+                bands.append(Rect(x=round(x0, 2), y=round(axis_y, 2), w=round(x1 - x0, 2),
+                                  h=round(band_bottom - axis_y, 2), fill=fill, opacity=theme["era_opacity"],
+                                  role="era-band", ref=era["id"]))
+        elif bracket_y is not None:
+            left, right = round(x0 + 1.5, 2), round(max(x0 + 3, x1 - 1.5), 2)
+            bands.append(Path(points=(("M", left, round(bracket_y - 3, 2)), ("L", left, round(bracket_y, 2)),
+                                      ("L", right, round(bracket_y, 2)), ("L", right, round(bracket_y - 3, 2))),
+                              stroke=theme["axis"], width=1, role="era-band", ref=era["id"]))
     y = lanes_bottom
     if bottom_axis:
         y += 8
@@ -1186,10 +1241,10 @@ def _place_cluster(state, members, measure, left, right, d_first, d_step, d_limi
     r = max(u["r"] for u in members)
     ref = "+".join(u["ref"] for u in members)
     y0, y1 = r + 3, r + 6
-    brace = ((x0, y0), (x0, y1), (x1, y1), (x1, y0))
-    brace_box = (x0 - 1, y0 - 1, x1 + 1, y1 + 1)
-    state.grid.add(brace_box, "brace")
-    state.prims.append(("brace", brace, ref))
+    brace = Path(points=(("M", x0, y0), ("L", x0, y1), ("L", x1, y1), ("L", x1, y0)),
+                 stroke=state.color, width=1.5, role="brace", ref=ref, lane=state.index)
+    state.grid.add(brace.bbox, "brace")
+    state.prims.append(brace)
     label = f"×{len(members)}"
     w = badge_diameter(label, measure)
     cx_stem = (x0 + x1) / 2
@@ -1206,32 +1261,29 @@ def _place_cluster(state, members, measure, left, right, d_first, d_step, d_limi
 
 def _assemble_lane(state, label_lines, measure, density, numbers, ink, bg, secondary):
     """Primitives de la piste dans son repère, plus ses bornes verticales (haut, bas)."""
-    prims = []
-    for prim in state.prims:
-        if isinstance(prim, tuple):
-            continue
-        prims.append(_resolve_colors(prim, ink, bg))
+    prims = [_resolve_colors(prim, ink, bg) for prim in state.prims]
     extents = [p.bbox for p in prims]
-    for prim in state.prims:
-        if isinstance(prim, tuple):       # accolade de grappe : Path construit à la translation
-            xs = [x for x, _ in prim[1]]
-            ys = [y for _, y in prim[1]]
-            extents.append((min(xs), min(ys) - 1, max(xs), max(ys) + 1))
-    top = min([-12.0] + [b[1] for b in extents])
-    bottom = max([12.0] + [b[3] for b in extents])
+    if state.units:
+        top = min([-12.0] + [b[1] for b in extents])
+        bottom = max([12.0] + [b[3] for b in extents])
+    else:
+        top = bottom = 0.0                # piste sans évènement : pas de zone vide
+    middle = 0.0
     # Périodes : rangées au-dessus de la zone des évènements.
     if state.period_rows:
         row_step = BAR_H + density["row_gap"]
-        block_bottom = top - 8
+        block_bottom = top - 8 if state.units else 0.0
         block_top = block_bottom - state.period_rows * row_step + density["row_gap"]
         for entry in state.periods:
             y = block_top + entry["row"] * row_step
             prims.extend(_period_prims(state, entry, y, measure, numbers, ink, bg))
         top = block_top
-    # Libellé de la piste, centré sur la ligne de base, dans la gouttière.
+        if not state.units:
+            middle = (block_top + block_bottom) / 2
+    # Libellé de la piste, centré sur la ligne de base (ou sur ses périodes), dans la gouttière.
     if label_lines:
         h = _text_height(SIZES["lane"], len(label_lines))
-        label_top = -h / 2
+        label_top = middle - h / 2
         label = _text(MARGIN + 4, label_top + ASCENT * SIZES["lane"], label_lines, SIZES["lane"], 600,
                       ink, "start", measure, "lane-label", state.track["id"], state.index)
         prims.append(label)
@@ -1248,6 +1300,9 @@ def _period_prims(state, entry, y, measure, numbers, ink, bg):
     fade = "end" if entry["end"].present else ("both" if period.get("approx") else "")
     out = [Rect(x=x0, y=y, w=x1 - x0, h=BAR_H, rx=BAR_H / 2, fill=state.color, fade=fade,
                 role="period-bar", ref=ref, lane=state.index)]
+    if entry["end"].present:
+        out.append(Path(points=(("M", x1 + 1, y + 4), ("L", x1 + 5, y + BAR_H / 2), ("L", x1 + 1, y + BAR_H - 4)),
+                        stroke=state.color, width=1.5, role="period-bar", ref=ref, lane=state.index))
     baseline = y + BAR_H / 2 + (ASCENT - DESCENT) / 2 * SIZES["label"]
     if entry["mode"] == "inside":
         fill = best_text_on(state.color, ["#FFFFFF", "#1D1D1F"])
@@ -1286,19 +1341,9 @@ def _shift(prim, dy, lane):
         return replace(prim, x1=r2(prim.x1), y1=r2(prim.y1 + dy), x2=r2(prim.x2), y2=r2(prim.y2 + dy), lane=lane)
     if isinstance(prim, Marker):
         return replace(prim, cx=r2(prim.cx), cy=r2(prim.cy + dy), lane=lane)
+    if isinstance(prim, Path):
+        return replace(prim, points=tuple((c, r2(x), r2(y + dy)) for c, x, y in prim.points), lane=lane)
     return prim
-
-
-def _lane_paths(state, offset, scale, ink):
-    """Accolades des grappes, en coordonnées absolues (les Path ne se translatent pas)."""
-    out = []
-    for prim in state.prims:
-        if isinstance(prim, tuple) and prim[0] == "brace":
-            points = tuple(("M" if i == 0 else "L", round(x, 2), round(y + offset, 2))
-                           for i, (x, y) in enumerate(prim[1]))
-            out.append(Path(points=points, stroke=state.color, width=1.5, role="brace", ref=prim[2],
-                            lane=state.index))
-    return out
 
 
 def _zigzag_h(x0, x1, y, stroke):

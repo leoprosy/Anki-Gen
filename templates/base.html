@@ -170,6 +170,17 @@
     const updBanner = document.getElementById('update-banner');
     const updBtn = document.getElementById('update-btn');
     let updateStaged = false;
+    let installerRequired = false;
+
+    // Le nouveau code exige un exécutable plus récent : app.zip ne suffit pas,
+    // le bouton ouvre la page de l'installateur au lieu de télécharger.
+    function showInstaller(message) {
+      installerRequired = true;
+      document.getElementById('update-message').textContent = message;
+      updBtn.textContent = window.T('js.get_installer');
+      updBtn.disabled = false;
+      updBanner.style.display = 'flex';
+    }
 
     function showRestart() {
       updateStaged = true;
@@ -185,7 +196,9 @@
       try {
         const res = await fetch('/api/update/check');
         const data = await res.json();
-        if (data.restart_required) {
+        if (data.installer_required) {
+          showInstaller(data.message);
+        } else if (data.restart_required) {
           document.getElementById('update-message').textContent = data.message;
           showRestart();
         } else if (data.update_available) {
@@ -197,6 +210,14 @@
     }
 
     updBtn.addEventListener('click', async () => {
+      if (installerRequired) {
+        try {
+          await fetch('/api/update/open-installer', { method: 'POST' });
+        } catch (_) {
+          document.getElementById('update-message').textContent = window.T('js.network_error');
+        }
+        return;
+      }
       if (updateStaged) {
         updBtn.disabled = true;
         updBtn.textContent = window.T('js.restarting');
@@ -216,6 +237,10 @@
         document.getElementById('update-message').textContent = data.message;
         if (data.status === 'staged') {
           showRestart();
+          return;
+        }
+        if (data.status === 'installer_required') {
+          showInstaller(data.message);
           return;
         }
         updBtn.textContent = window.T('js.retry');

@@ -59,3 +59,24 @@ test('an up-to-date check leaves the update banner hidden', async () => {
   await state.check();
   assert.notEqual(state.elements['update-banner'].style.display, 'flex');
 });
+
+test('an update needing a new installer opens the installer page instead of downloading', async () => {
+  const state = ui({ installer_required: true, message: 'Needs installer' });
+  await state.check();
+  assert.equal(state.elements['update-banner'].style.display, 'flex');
+  assert.equal(state.elements['update-message'].textContent, 'Needs installer');
+  assert.equal(state.elements['update-btn'].textContent, 'js.get_installer');
+  await state.elements['update-btn'].click();
+  assert.deepEqual(state.requests, ['/api/update/check', '/api/update/open-installer']);
+  assert.deepEqual(state.commands, []);
+});
+
+test('apply answering installer_required switches the banner to the installer', async () => {
+  const state = ui({ update_available: true }, { status: 'installer_required', message: 'Needs installer' });
+  await state.check();
+  await state.elements['update-btn'].click();
+  assert.equal(state.elements['update-btn'].textContent, 'js.get_installer');
+  await state.elements['update-btn'].click();
+  assert.deepEqual(state.requests,
+    ['/api/update/check', '/api/update/apply', '/api/update/open-installer']);
+});

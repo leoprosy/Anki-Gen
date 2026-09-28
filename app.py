@@ -539,9 +539,11 @@ def api_update_check():
             fetch_latest_release,
             fetch_remote_manifest,
             get_local_commit,
+            get_local_runtime,
             get_local_version,
             get_staged_version,
             is_update_available,
+            runtime_supports,
         )
         staged = get_staged_version()
         if staged:
@@ -555,8 +557,19 @@ def api_update_check():
         local = get_local_version()
         manifest = fetch_remote_manifest(release)
         remote = (manifest or {}).get("version") or release["tag_name"].lstrip("v")
+        available = is_update_available(manifest, local, get_local_commit())
+        if available and not runtime_supports(manifest, get_local_runtime()):
+            # Le nouveau code a besoin d'un exécutable plus récent : app.zip ne
+            # suffit pas, on oriente vers l'installateur au lieu de le préparer.
+            return jsonify({
+                "update_available": False,
+                "installer_required": True,
+                "local_version": local,
+                "remote_version": remote,
+                "message": tr("update.installer_required", version=remote),
+            })
         return jsonify({
-            "update_available": is_update_available(manifest, local, get_local_commit()),
+            "update_available": available,
             "local_version": local,
             "remote_version": remote,
             "release_notes": release.get("body", ""),
@@ -576,6 +589,21 @@ def api_update_apply():
     result["message"] = tr(result.pop("message_key"), **result.pop("message_params"))
     status_code = 200 if result["status"] != "error" else 500
     return jsonify(result), status_code
+
+
+@app.route("/api/update/open-installer", methods=["POST"])
+def api_update_open_installer():
+    """
+    Ouvre la page de l'installateur dans le navigateur par défaut.
+
+    C'est le serveur qui l'ouvre : la fenêtre Tauri n'a pas le droit d'ouvrir un
+    lien externe, et le serveur tourne de toute façon sur la machine de
+    l'utilisateur. L'URL est une constante, jamais reçue de la requête.
+    """
+    import webbrowser
+
+    from updater import INSTALLER_PAGE_URL
+    return jsonify(ok=webbrowser.open(INSTALLER_PAGE_URL))
 
 
 @app.route("/api/version")

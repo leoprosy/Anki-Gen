@@ -11,67 +11,59 @@
 # version que la dernière release ne serait jamais détecté comme différent.
 import json as _json
 import os as _os
-import subprocess as _subprocess
 import sys as _sys
 from pathlib import Path as _Path
 
+_sys.path.insert(0, _os.path.join(SPECPATH, "scripts"))
+from build_app_payload import build_payload, current_commit, tauri_version  # noqa: E402
+from runtime_contract import runtime_import_names, stdlib_modules  # noqa: E402
+from PyInstaller.utils.hooks import collect_submodules  # noqa: E402
 
-def _resolve_commit():
-    sha = _os.environ.get("GITHUB_SHA")
-    if sha:
-        return sha
-    try:
-        return _subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], text=True, stderr=_subprocess.DEVNULL
-        ).strip()
-    except Exception:
-        return ""
-
-
-_conf = _json.loads(_Path("src-tauri/tauri.conf.json").read_text(encoding="utf-8"))
-_version = _conf["version"]
-_commit = _resolve_commit()
+_version = tauri_version()
+_commit = current_commit()
+# Copie à la racine pour le mode dev (`python app.py` lit la version ici).
 _Path("version.json").write_text(
     _json.dumps({"version": _version, "commit": _commit}, indent=2) + "\n", encoding="utf-8"
 )
 print(f"[spec] version.json généré : {_version} ({_commit[:7] if _commit else 'commit inconnu'})")
 
-_subprocess.run([_sys.executable, "scripts/configure_analytics.py"], check=True)
+# ── Contenu : rien n'est listé à la main ─────────────────────────────────────
+# Le code de l'app est embarqué comme données (`app_bundle/`), puis déployé sous
+# %APPDATA% et remplaçable par app.zip. Son contenu est calculé par
+# scripts/build_app_payload.py à partir des imports réels, exactement comme
+# app.zip dans les workflows : les deux livraisons ne peuvent plus diverger.
+#
+# Comme ce code n'est pas analysé par PyInstaller, l'exécutable embarque TOUTE
+# la bibliothèque standard et TOUS les sous-modules des dépendances runtime.
+# Un nouvel import dans l'app n'exige donc jamais de nouvel exécutable ; seule
+# une nouvelle dépendance le fait, et runtime.json le signale (voir
+# scripts/runtime_contract.py).
+_bundle_dir = _Path(SPECPATH) / "build" / "app_bundle"
+_manifest = build_payload(_bundle_dir, _version, _commit)
+print(f"[spec] app_bundle : {len(_manifest['modules'])} modules, runtime {_manifest['requires_runtime']}")
 
 
+def _is_test_module(name):
+    parts = name.split(".")
+    return any(part in ("test", "tests", "testing", "conftest") for part in parts[1:])
+
+
+_hidden = list(stdlib_modules())
+for _package in runtime_import_names():
+    _hidden += collect_submodules(_package, filter=lambda n: not _is_test_module(n),
+                                  on_error="ignore")
+print(f"[spec] hiddenimports : {len(_hidden)} modules")
 
 a = Analysis(
     ['launcher.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('app.py', 'app_bundle'),
-        ('launcher.py', 'app_bundle'),
-        ('parse_cours.py', 'app_bundle'),
-        ('build_anki_csv.py', 'app_bundle'),
-        ('docx_blocks.py', 'app_bundle'),
-        ('media_store.py', 'app_bundle'),
-        ('render.py', 'app_bundle'),
-        ('paths.py', 'app_bundle'),
-        ('project_store.py', 'app_bundle'),
-        ('updater.py', 'app_bundle'),
-        ('settings.py', 'app_bundle'),
-        ('i18n.py', 'app_bundle'),
-        ('telemetry.py', 'app_bundle'),
-        ('analytics_config.py', 'app_bundle'),
-        ('analytics_config.json', 'app_bundle'),
-        ('version.json', 'app_bundle'),
-        ('templates', 'app_bundle/templates'),
-        ('static', 'app_bundle/static'),
-        ('locales', 'app_bundle/locales'),
-        ('skill_templates', 'app_bundle/skill_templates'),
+        (str(_bundle_dir), 'app_bundle'),
+        # Identité du runtime : lue par launcher --self-check et par l'updater.
+        ('runtime.json', '.'),
     ],
-    hiddenimports=[
-        'waitress', 'flask', 'jinja2.ext', 'docx', 'lxml', 'lxml._elementpath', 'lxml.etree',
-        # Conversion / redimensionnement des images extraites du .docx
-        'PIL', 'PIL._imaging', 'PIL.Image', 'PIL.PngImagePlugin', 'PIL.JpegImagePlugin',
-        'PIL.BmpImagePlugin', 'PIL.TiffImagePlugin', 'PIL.WmfImagePlugin',
-    ],
+    hiddenimports=_hidden,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

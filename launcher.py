@@ -74,6 +74,114 @@ def deploy_bundle(bundle_dir, app_dir):
     return False
 
 
+# ── Contrat de runtime et auto-vérification ────────────────────
+# L'exécutable embarque runtime.json (voir scripts/runtime_contract.py). Un
+# exécutable antérieur au contrat n'en a pas : il vaut 0, et toute mise à jour
+# qui déclare `requires_runtime` lui demandera un nouvel installateur.
+
+def read_runtime(path=None):
+    """Numéro de runtime de l'exécutable courant, 0 s'il est inconnu."""
+    if path is None:
+        base = getattr(sys, '_MEIPASS', None) or os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base, 'runtime.json')
+    try:
+        with open(path, encoding='utf-8') as handle:
+            return int(json.load(handle)['runtime'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+
+
+def default_check_dir():
+    """Le code embarqué dans l'exe, sans passer par %APPDATA% ; la racine en dev."""
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, 'app_bundle')
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _modules_without_manifest(app_dir):
+    """
+    Modules à importer quand version.json ne les liste pas.
+
+    Dans un dossier livré (payload antérieur au manifeste), tout .py en fait
+    partie. Dans le dépôt, la racine contient aussi des scripts et des notes :
+    on reprend alors le calcul de scripts/build_app_payload.py.
+    """
+    scripts = os.path.join(app_dir, 'scripts')
+    if os.path.isfile(os.path.join(scripts, 'build_app_payload.py')):
+        sys.path.insert(0, scripts)
+        from build_app_payload import local_modules
+        return [name[:-3] for name in local_modules(app_dir)]
+    return sorted(name[:-3] for name in os.listdir(app_dir) if name.endswith('.py'))
+
+
+def self_check(app_dir, runtime):
+    """
+    Vérifie que ce runtime fait tourner le code de `app_dir`, sans démarrer le serveur.
+
+    Importe chaque module déclaré par version.json, puis exécute runtime_probe,
+    qui exerce les capacités réellement utilisées (encodeurs Pillow, lxml…).
+    C'est ce qu'appelle la CI sur l'exe neuf, et sur l'exe de la release
+    précédente avec le nouveau code (`--app-dir`).
+
+    Returns:
+        (report, exit_code) — 0 : tout passe ; 1 : un import ou une sonde échoue ;
+        3 : le code exige un runtime plus récent (échec attendu, pas un bug).
+    """
+    import importlib
+
+    try:
+        with open(os.path.join(app_dir, 'version.json'), encoding='utf-8') as handle:
+            manifest = json.load(handle)
+    except (OSError, ValueError):
+        manifest = {}
+    required = int(manifest.get('requires_runtime') or 0)
+    report = {
+        'app_dir': app_dir,
+        'version': manifest.get('version'),
+        'runtime': runtime,
+        'requires_runtime': required,
+        'modules': {},
+        'probes': {},
+    }
+    if required > runtime:
+        report['status'] = 'runtime_too_old'
+        return report, 3
+
+    if app_dir not in sys.path:
+        sys.path.insert(0, app_dir)
+    modules = manifest.get('modules') or _modules_without_manifest(app_dir)
+    for name in modules:
+        if name == 'launcher':      # c'est ce script : l'importer relancerait le bootstrap
+            continue
+        try:
+            importlib.import_module(name)
+            report['modules'][name] = None
+        except Exception as error:
+            report['modules'][name] = f'{type(error).__name__}: {error}'
+
+    # Les sondes viennent du code vérifié, jamais d'un module déjà chargé ailleurs.
+    if 'runtime_probe' in report['modules'] and report['modules']['runtime_probe'] is None:
+        report['probes'] = sys.modules['runtime_probe'].run()
+
+    failed = [v for v in list(report['modules'].values()) + list(report['probes'].values()) if v]
+    report['status'] = 'failed' if failed else 'ok'
+    return report, 1 if failed else 0
+
+
+def run_self_check(argv):
+    app_dir = default_check_dir()
+    if '--app-dir' in argv:
+        app_dir = argv[argv.index('--app-dir') + 1]
+    report, code = self_check(os.path.abspath(app_dir), read_runtime())
+    # ensure_ascii : la console Windows de la CI n'est pas forcément en UTF-8.
+    print(json.dumps(report, indent=2, ensure_ascii=True), flush=True)
+    return code
+
+
+if '--self-check' in sys.argv:
+    sys.exit(run_self_check(sys.argv))
+
+
 # ── Bootstrap : première exécution en mode frozen ─────────────
 if getattr(sys, 'frozen', False):
     os.makedirs(APP_DIR, exist_ok=True)

@@ -182,3 +182,7 @@ and the layout of the code. Card-writing Skills, deck conventions and workflow i
 
 Ankigen is free software, released under the **GNU General Public License v3.0 or later**.
 See [LICENSE](LICENSE). Copyright (C) 2026 leoprosy.
+
+Timelines are drawn with the [Inter](https://github.com/rsms/inter) typeface (v4.1),
+Copyright (c) 2016 The Inter Project Authors, shipped in `static/fonts/` under the
+[SIL Open Font License 1.1](static/fonts/OFL.txt).

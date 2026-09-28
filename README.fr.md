@@ -196,3 +196,7 @@ les idées de flux de travail vont dans les
 
 Ankigen est un logiciel libre, publié sous **GNU General Public License v3.0 ou ultérieure**.
 Voir [LICENSE](LICENSE). Copyright (C) 2026 leoprosy.
+
+Les frises sont dessinées avec la police [Inter](https://github.com/rsms/inter) (v4.1),
+Copyright (c) 2016 The Inter Project Authors, livrée dans `static/fonts/` sous
+[SIL Open Font License 1.1](static/fonts/OFL.txt).

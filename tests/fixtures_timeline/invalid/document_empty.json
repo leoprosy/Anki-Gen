@@ -1,0 +1,12 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Frise vide",
+  "eras": [
+    {
+      "id": "era",
+      "label": "Ère",
+      "start": "1870",
+      "end": "1914"
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "as_of_invalid.json": {
+    "code": "as_of_invalid",
+    "path": "/as_of"
+  },
+  "color_invalid.json": {
+    "code": "color_invalid",
+    "path": "/tracks/0/color"
+  },
+  "date_day_invalid.json": {
+    "code": "date_day_invalid",
+    "path": "/events/0/date"
+  },
+  "date_invalid.json": {
+    "code": "date_invalid",
+    "path": "/events/0/date"
+  },
+  "date_month_invalid.json": {
+    "code": "date_month_invalid",
+    "path": "/events/0/date"
+  },
+  "date_year_zero.json": {
+    "code": "date_year_zero",
+    "path": "/events/0/date"
+  },
+  "document_empty.json": {
+    "code": "document_empty",
+    "path": ""
+  },
+  "end_before_start.json": {
+    "code": "end_before_start",
+    "path": "/periods/0/end"
+  },
+  "enum_invalid.json": {
+    "code": "enum_invalid",
+    "path": "/events/0/origin"
+  },
+  "eras_overlap.json": {
+    "code": "eras_overlap",
+    "path": "/eras/1"
+  },
+  "id_duplicate.json": {
+    "code": "id_duplicate",
+    "path": "/events/1/id"
+  },
+  "id_invalid.json": {
+    "code": "id_invalid",
+    "path": "/events/0/id"
+  },
+  "json_invalid.json": {
+    "code": "json_invalid",
+    "path": ""
+  },
+  "json_missing.json": {
+    "code": "json_missing",
+    "path": ""
+  },
+  "json_smart_quotes.json": {
+    "code": "json_smart_quotes",
+    "path": ""
+  },
+  "json_trailing_comma.json": {
+    "code": "json_trailing_comma",
+    "path": ""
+  },
+  "key_duplicate.json": {
+    "code": "key_duplicate",
+    "path": "/title"
+  },
+  "key_unknown.json": {
+    "code": "key_unknown",
+    "path": "/events/0/lable"
+  },
+  "lang_invalid.json": {
+    "code": "lang_invalid",
+    "path": "/lang"
+  },
+  "link_unknown_ref.json": {
+    "code": "link_unknown_ref",
+    "path": "/links/0/to"
+  },
+  "out_of_range.json": {
+    "code": "out_of_range",
+    "path": "/events/0/importance"
+  },
+  "precision_invalid.json": {
+    "code": "precision_invalid",
+    "path": "/events/0/precision"
+  },
+  "precision_mismatch.json": {
+    "code": "precision_mismatch",
+    "path": "/events/0/date"
+  },
+  "present_not_allowed.json": {
+    "code": "present_not_allowed",
+    "path": "/events/0/date"
+  },
+  "required_missing.json": {
+    "code": "required_missing",
+    "path": "/events/0/label"
+  },
+  "schema_unknown.json": {
+    "code": "schema_unknown",
+    "path": "/schema"
+  },
+  "string_empty.json": {
+    "code": "string_empty",
+    "path": "/events/0/label"
+  },
+  "too_long.json": {
+    "code": "too_long",
+    "path": "/title"
+  },
+  "too_many.json": {
+    "code": "too_many",
+    "path": "/tracks"
+  },
+  "track_missing.json": {
+    "code": "track_missing",
+    "path": "/events/0"
+  },
+  "track_unknown.json": {
+    "code": "track_unknown",
+    "path": "/events/0/track"
+  },
+  "type_invalid.json": {
+    "code": "type_invalid",
+    "path": "/events/0/importance"
+  }
+}

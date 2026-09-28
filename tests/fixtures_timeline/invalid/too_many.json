@@ -1,0 +1,66 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Frise fautive",
+  "events": [
+    {
+      "id": "e1",
+      "date": "1971",
+      "label": "Évènement",
+      "track": "t0"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "t0",
+      "label": "Piste 0"
+    },
+    {
+      "id": "t1",
+      "label": "Piste 1"
+    },
+    {
+      "id": "t2",
+      "label": "Piste 2"
+    },
+    {
+      "id": "t3",
+      "label": "Piste 3"
+    },
+    {
+      "id": "t4",
+      "label": "Piste 4"
+    },
+    {
+      "id": "t5",
+      "label": "Piste 5"
+    },
+    {
+      "id": "t6",
+      "label": "Piste 6"
+    },
+    {
+      "id": "t7",
+      "label": "Piste 7"
+    },
+    {
+      "id": "t8",
+      "label": "Piste 8"
+    },
+    {
+      "id": "t9",
+      "label": "Piste 9"
+    },
+    {
+      "id": "t10",
+      "label": "Piste 10"
+    },
+    {
+      "id": "t11",
+      "label": "Piste 11"
+    },
+    {
+      "id": "t12",
+      "label": "Piste 12"
+    }
+  ]
+}

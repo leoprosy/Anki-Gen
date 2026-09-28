@@ -1,0 +1,98 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "1944-1946 : de la Libération à la guerre froide",
+  "lang": "fr",
+  "tracks": [],
+  "events": [
+    {
+      "id": "debarquement",
+      "date": "1944-06-06",
+      "label": "Débarquement de Normandie",
+      "importance": 3
+    },
+    {
+      "id": "bretton_woods",
+      "date": "1944-07-22",
+      "label": "Clôture de la conférence de Bretton Woods",
+      "importance": 2
+    },
+    {
+      "id": "liberation_paris",
+      "date": "1944-08-25",
+      "label": "Libération de Paris",
+      "importance": 2
+    },
+    {
+      "id": "yalta",
+      "date": "1945-02-04",
+      "label": "Ouverture de la conférence de Yalta",
+      "importance": 2
+    },
+    {
+      "id": "san_francisco",
+      "date": "1945-04-25",
+      "label": "Ouverture de la conférence de San Francisco",
+      "importance": 1
+    },
+    {
+      "id": "capitulation_allemande",
+      "date": "1945-05-08",
+      "label": "Capitulation allemande",
+      "importance": 3
+    },
+    {
+      "id": "charte_onu",
+      "date": "1945-06-26",
+      "label": "Signature de la Charte des Nations unies",
+      "importance": 2
+    },
+    {
+      "id": "potsdam",
+      "date": "1945-07-17",
+      "label": "Ouverture de la conférence de Potsdam",
+      "importance": 1
+    },
+    {
+      "id": "hiroshima",
+      "date": "1945-08-06",
+      "label": "Bombardement d'Hiroshima",
+      "importance": 2
+    },
+    {
+      "id": "nagasaki",
+      "date": "1945-08-09",
+      "label": "Bombardement de Nagasaki",
+      "importance": 2
+    },
+    {
+      "id": "capitulation_japon",
+      "date": "1945-09-02",
+      "label": "Capitulation du Japon",
+      "importance": 3
+    },
+    {
+      "id": "onu",
+      "date": "1945-10-24",
+      "label": "Entrée en vigueur de la Charte de l'ONU",
+      "importance": 2
+    },
+    {
+      "id": "fmi_bird",
+      "date": "1945-12-27",
+      "label": "Entrée en vigueur des statuts du FMI et de la BIRD",
+      "importance": 2
+    },
+    {
+      "id": "fulton",
+      "date": "1946-03-05",
+      "label": "Discours de Fulton sur le rideau de fer",
+      "importance": 2
+    },
+    {
+      "id": "ive_republique",
+      "date": "1946-10-27",
+      "label": "Promulgation de la Constitution de la IVe République",
+      "importance": 1
+    }
+  ]
+}

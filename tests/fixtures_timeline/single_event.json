@@ -1,0 +1,13 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Un seul évènement",
+  "lang": "fr",
+  "events": [
+    {
+      "id": "bastille",
+      "date": "1789-07-14",
+      "label": "Prise de la Bastille",
+      "importance": 3
+    }
+  ]
+}

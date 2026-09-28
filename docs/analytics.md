@@ -26,15 +26,19 @@ Set these GitHub repository Actions variables:
 | `ANKIGEN_POSTHOG_REGION` | `eu` or `us` |
 
 Only the public token belongs in the app. Personal API keys must never ship.
-PyInstaller generates `analytics_config.json`; both release workflows include
-it and the telemetry modules in `app.zip`. Missing configuration disables
-reporting. The generated file is Git-ignored; no runtime dependency is added.
-For a local build, set the same environment variables, then run:
+`scripts/build_app_payload.py` generates `analytics_config.json` inside the app
+payload, which both the executable (`flask-server.spec`) and `app.zip` (both
+release workflows) are built from; the telemetry modules are picked up from the
+imports like every other module. Missing configuration disables reporting. The
+generated file is Git-ignored; no runtime dependency is added. For a local
+build, set the same environment variables, then run:
 
 ```powershell
-.venv/Scripts/python.exe scripts/configure_analytics.py
 .venv/Scripts/pyinstaller.exe --noconfirm flask-server.spec
 ```
+
+`scripts/configure_analytics.py` still writes the root `analytics_config.json`,
+which development runs read and the payload build uses as defaults.
 
 Development runs require `ANKIGEN_ANALYTICS_DEV=1` as well as explicit consent.
 Use a separate test PostHog project so test events do not inflate real usage.
@@ -107,7 +111,8 @@ consent toggles as new installations.
 ```
 
 The read-only script paginates releases and separates `.exe`/`.msi` installers
-from `app.zip` updater downloads and other assets. Downloads are not unique
+from `app.zip` updater downloads and other assets (including `flask-server.exe`,
+which CI downloads on every build to check compatibility). Downloads are not unique
 users or confirmed installations. The build-latest workflow replaces release
 assets; replacement/deletion can reset their counters. Current assets cannot
 recover those old values.

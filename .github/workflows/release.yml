@@ -19,29 +19,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Générer la configuration publique des statistiques
-        run: python3 scripts/configure_analytics.py
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
 
-      - name: Créer app.zip (modules Python + templates + static + locales)
-        run: |
-          mkdir -p release/app
-
-          # Copier les fichiers applicatifs
-          cp app.py launcher.py parse_cours.py build_anki_csv.py \
-             docx_blocks.py media_store.py render.py paths.py \
-             project_store.py updater.py settings.py i18n.py \
-             telemetry.py analytics_config.py analytics_config.json release/app/
-          cp -r templates static locales skill_templates release/app/
-
-          # Générer version.json depuis le tag. Publié à la fois DANS app.zip
-          # (utilisé par l'app pour afficher sa propre version) et comme asset
-          # séparé du release (permet à l'updater de lire version+commit sans
-          # télécharger app.zip juste pour vérifier — voir updater.fetch_remote_manifest).
-          VERSION="${GITHUB_REF_NAME#v}"
-          echo "{\"version\": \"${VERSION}\", \"commit\": \"${GITHUB_SHA}\"}" > release/app/version.json
-
-          # Créer l'archive
-          cd release && zip -r ../app.zip app/
+      # Même calcul que flask-server.spec : les modules viennent des imports
+      # réels, rien n'est listé ici. version.json (version, commit,
+      # requires_runtime, modules) est publié à la fois DANS app.zip et comme
+      # asset séparé : l'updater le lit sans télécharger app.zip juste pour
+      # vérifier (voir updater.fetch_remote_manifest). analytics_config.json est
+      # généré dans le payload à partir de ANKIGEN_POSTHOG_* (env du workflow).
+      - name: Créer app.zip
+        run: >
+          python scripts/build_app_payload.py --dest release/app --zip app.zip
+          --version "${GITHUB_REF_NAME#v}" --commit "$GITHUB_SHA"
 
       - name: Créer le GitHub Release
         uses: softprops/action-gh-release@v2
@@ -91,9 +82,26 @@ jobs:
             Set-Content src-tauri/Cargo.toml -Encoding utf8
           Write-Host "Version : $version"
 
+      - name: Vérifier le contrat de runtime (runtime.json couvre requirements.txt)
+        run: python scripts/runtime_contract.py --check
+
       # flask-server.spec régénère version.json depuis tauri.conf.json.
       - name: Compiler le sidecar Flask (PyInstaller)
         run: pyinstaller --noconfirm flask-server.spec
+
+      - name: Auto-vérifier le sidecar
+        run: dist/flask-server.exe --self-check
+
+      # Le cas que crée l'updater : le code de cette release sur l'exe que les
+      # utilisateurs ont déjà. La release du tag courant est ignorée : elle
+      # vient d'être créée et ne porte pas encore d'exe. La version du payload
+      # vient de tauri.conf.json, déjà aligné sur le tag plus haut.
+      - name: Vérifier la compatibilité avec l'exe publié
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/build_app_payload.py --dest release/app
+          python scripts/check_runtime_compat.py --app-dir release/app --exclude-tag "${{ github.ref_name }}"
 
       - name: Placer le sidecar sous sa cible de compilation
         shell: pwsh
@@ -111,5 +119,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            dist/flask-server.exe
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi

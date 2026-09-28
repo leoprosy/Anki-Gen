@@ -80,3 +80,11 @@ class DownloadsTests(unittest.TestCase):
         rows, totals = summarize_releases([release, {**release, "draft": True}])
         self.assertEqual(totals, {"installer": 15, "updater": 47, "other": 120})
         self.assertEqual(len(rows), 4)
+
+    def test_the_sidecar_downloaded_by_ci_is_not_an_installer(self):
+        release = {"tag_name": "v1.3.0", "draft": False, "assets": [
+            {"name": "Ankigen-setup.exe", "download_count": 12},
+            {"name": "flask-server.exe", "download_count": 90},
+        ]}
+        _, totals = summarize_releases([release])
+        self.assertEqual(totals, {"installer": 12, "updater": 0, "other": 90})

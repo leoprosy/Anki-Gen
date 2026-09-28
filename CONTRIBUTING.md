@@ -70,6 +70,15 @@ docs(readme): add the Windows install section
 
 **Dependencies.** The runtime set is small on purpose — Flask, Waitress, python-docx, lxml, Pillow.
 Adding one is a discussion, not a detail of a PR. The standard library is preferred everywhere else.
+A new runtime dependency also means a new installer for every user, because updates only replace
+the app's code: run `python scripts/runtime_contract.py --bump` in the same PR, or the tests fail.
+
+**Packaging lists nothing by hand.** `app.zip` and the executable's bundle are built by
+`scripts/build_app_payload.py`, which follows the imports from `app.py` and `launcher.py`. A new
+module is shipped as soon as something imports it; a new *data folder* goes in `DATA_DIRS` there.
+When a feature needs a runtime capability that an import alone does not prove (a Pillow codec,
+FreeType…), add a probe to `runtime_probe.py`: CI runs it on the new executable and on the one
+users already have.
 
 **User-facing strings go through i18n.** No literal text in templates, `app.py` or `static/app.js`:
 add the key to **both** `locales/en.json` and `locales/fr.json` and use `t("namespace.key")` in
@@ -101,6 +110,8 @@ comments and docstrings are in French — keep writing them in the language of t
 | `telemetry.py`, `analytics_config.py` | optional usage events, persistent outbox and public build configuration |
 | `scripts/setup_analytics_dashboard.py`, `scripts/release_downloads.py` | owner tooling; never bundled in the app |
 | `updater.py` | GitHub Releases check and the atomic swap of `app/` |
+| `runtime_probe.py`, `runtime.json` | what the code needs from the executable, and which runtime the executable is |
+| `scripts/` | payload build, runtime contract and compatibility check, used by the spec and CI |
 | `templates/`, `static/` | Jinja templates, vanilla JS, native CSS — no framework, no build step |
 | `locales/` | flat JSON translation catalogs |
 | `skill_templates/` | the Claude Skill template offered on the *How to use* page |

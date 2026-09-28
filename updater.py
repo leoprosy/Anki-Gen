@@ -22,6 +22,9 @@ from urllib.request import Request, urlopen
 
 GITHUB_REPO = "leoprosy/Anki-Gen"
 RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+# Page ouverte quand une mise à jour exige un nouvel installateur. Constante,
+# jamais reçue du client : c'est le serveur qui l'ouvre (voir app.py).
+INSTALLER_PAGE_URL = f"https://github.com/{GITHUB_REPO}/releases/latest"
 
 
 def _get_app_dir():
@@ -58,6 +61,38 @@ def get_local_commit():
             return json.load(f).get("commit", "")
     except (json.JSONDecodeError, OSError):
         return ""
+
+
+def get_local_runtime():
+    """Numéro de runtime de l'exécutable qui fait tourner ce code.
+
+    L'exécutable embarque runtime.json à la racine de son dossier d'extraction
+    (voir scripts/runtime_contract.py). Ce module-ci, lui, arrive par app.zip et
+    peut tourner sur un exécutable antérieur au contrat, qui n'a pas ce fichier :
+    il vaut alors 0. En dev, c'est le runtime.json du dépôt qui fait foi.
+    """
+    import sys
+    base = getattr(sys, "_MEIPASS", None) or _get_app_dir()
+    try:
+        with open(os.path.join(base, "runtime.json"), encoding="utf-8") as f:
+            return int(json.load(f)["runtime"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+
+
+def required_runtime(manifest):
+    """Runtime exigé par un manifeste version.json (0 : manifeste antérieur au contrat)."""
+    if not isinstance(manifest, dict):
+        return 0
+    try:
+        return int(manifest.get("requires_runtime") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def runtime_supports(manifest, local_runtime):
+    """L'exécutable local peut-il faire tourner le code décrit par ce manifeste ?"""
+    return required_runtime(manifest) <= local_runtime
 
 
 def _parse_semver(version):
@@ -216,6 +251,19 @@ def apply_staged_update(target_dir):
     if not os.path.isdir(staging_dir):
         return False
 
+    # Garde-fou : check_and_update() ne prépare jamais une mise à jour que cet
+    # exécutable ne peut pas faire tourner, mais un staging peut dater d'un
+    # ancien updater qui ignorait le contrat. Mieux vaut le jeter que démarrer
+    # sur du code qui plantera à l'import.
+    try:
+        with open(os.path.join(staging_dir, "version.json"), encoding="utf-8") as f:
+            staged_manifest = json.load(f)
+    except (OSError, ValueError):
+        staged_manifest = {}
+    if not runtime_supports(staged_manifest, get_local_runtime()):
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        return False
+
     backup_dir = target_dir + "_backup"
     try:
         if os.path.exists(backup_dir):
@@ -251,7 +299,9 @@ def check_and_update():
 
     Returns:
         dict: Résultat avec les clés :
-            - status: 'up_to_date' | 'staged' | 'error'
+            - status: 'up_to_date' | 'staged' | 'installer_required' | 'error'
+              ('installer_required' : le code distant exige un exécutable plus
+              récent que celui installé ; seul un nouvel installateur convient)
             - version: str (version courante ou nouvelle)
             - message_key: str (clé de traduction)
             - message_params: dict (paramètres d'interpolation)
@@ -278,6 +328,14 @@ def check_and_update():
             }
 
         remote_version = (manifest or {}).get("version") or release["tag_name"].lstrip("v")
+
+        if not runtime_supports(manifest, get_local_runtime()):
+            return {
+                "status": "installer_required",
+                "version": remote_version,
+                "message_key": "update.installer_required",
+                "message_params": {"version": remote_version},
+            }
 
         asset = _find_asset(release, "app.zip")
         if asset is None:

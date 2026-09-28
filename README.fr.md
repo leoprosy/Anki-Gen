@@ -137,8 +137,9 @@ L'application desktop est une coque [Tauri](https://tauri.app) autour du serveur
 compilé en binaire « sidecar » autonome par PyInstaller.
 
 ```powershell
-# 1. Sidecar — le fichier flask-server.spec versionné contient déjà les imports cachés
+# 1. Sidecar — rien à lister : le spec déduit les modules de l'app de ses imports
 .venv\Scripts\pyinstaller.exe --noconfirm flask-server.spec
+.\dist\flask-server.exe --self-check   # importe le code embarqué, exerce Pillow, lxml…
 
 # 2. Le placer pour Tauri, sous le nom de la cible de compilation (-gnu si toolchain GNU)
 Copy-Item dist\flask-server.exe src-tauri\binaries\flask-server-x86_64-pc-windows-msvc.exe -Force
@@ -150,6 +151,14 @@ npm run build
 Les installeurs se trouvent dans `src-tauri/target/release/bundle/`. Pousser un tag `v*` rejoue les
 mêmes étapes en CI ([`.github/workflows/release.yml`](.github/workflows/release.yml)) et attache le
 `.exe` et le `.msi` à la release.
+
+**Les mises à jour livrent le code, pas le runtime.** L'updater intégré remplace le code de l'app
+(`app.zip`) mais garde l'exécutable installé par l'utilisateur. Cet exécutable embarque donc toute
+la bibliothèque standard et tous les sous-modules des dépendances runtime : un nouvel `import` ne
+demande jamais de nouvel installateur. Seule une nouvelle dépendance le fait : `runtime.json`
+numérote le runtime, `app.zip` déclare celui qu'il exige, et l'updater oriente vers l'installateur
+au lieu de casser l'application. Avant chaque release, la CI fait tourner le nouveau code sur
+l'exécutable de la release précédente ([`scripts/check_runtime_compat.py`](scripts/check_runtime_compat.py)).
 
 ---
 

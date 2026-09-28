@@ -5,6 +5,10 @@ import json
 import re
 from urllib.request import Request, urlopen
 
+# Publié pour la CI (scripts/check_runtime_compat.py le télécharge à chaque build),
+# pas pour les utilisateurs : ce n'est pas un installateur malgré son .exe.
+CI_ASSETS = {"flask-server.exe"}
+
 
 def summarize_releases(releases):
     rows = []
@@ -14,7 +18,9 @@ def summarize_releases(releases):
             continue
         for asset in release.get("assets", []):
             name = asset["name"]
-            category = "installer" if name.lower().endswith((".exe", ".msi")) else "updater" if name == "app.zip" else "other"
+            category = ("other" if name in CI_ASSETS
+                        else "installer" if name.lower().endswith((".exe", ".msi"))
+                        else "updater" if name == "app.zip" else "other")
             count = asset.get("download_count", 0)
             rows.append({"release": release["tag_name"], "asset": name, "category": category, "downloads": count})
             totals[category] += count

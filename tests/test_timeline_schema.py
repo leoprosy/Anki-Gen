@@ -515,8 +515,9 @@ class TestMessages(unittest.TestCase):
                     self.assertIn(f"timeline.{prefix}.{code}", catalog, lang)
 
     def test_no_orphan_message(self):
+        import timeline_layout
         declared = ({f"timeline.err.{c}" for c in ts.ERROR_CODES}
-                    | {f"timeline.warn.{c}" for c in ts.WARNING_CODES}
+                    | {f"timeline.warn.{c}" for c in ts.WARNING_CODES + timeline_layout.WARNING_CODES}
                     | {f"timeline.norm.{c}" for c in ts.NORMALIZATION_CODES}
                     | {f"timeline.hint.{c}" for c in ts.HINT_CODES})
         catalog = i18n.load_catalog("en")

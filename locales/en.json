@@ -283,5 +283,12 @@
   "timeline.hint.eras_overlap": "Eras are successive backgrounds: make each one start where the previous one ends.",
   "timeline.hint.century_ambiguous": "Write the first year of the century: \"1501\" for the 16th century.",
   "timeline.hint.millennium_ambiguous": "Write the first year of the millennium: \"2001\" for the 3rd millennium.",
-  "timeline.hint.label_contains_year": "Remove the year from the label."
+  "timeline.hint.label_contains_year": "Remove the year from the label.",
+  "timeline.date.day_month": "{day} {month}",
+  "timeline.legend.off_course": "* not in the course (added by the model)",
+  "timeline.legend.axis_break": "Zigzag: interrupted axis (empty stretch of time compressed)",
+  "timeline.warn.label_truncated": "The label is too long to be drawn in full: it is cut after three lines.",
+  "timeline.warn.labels_in_notes": "{count} label(s) moved to numbered notes to avoid overlaps.",
+  "timeline.warn.label_unsupported_chars": "Characters missing from the timeline font: {chars}. They will be drawn with a replacement glyph.",
+  "timeline.warn.layout_violation": "The layout check found {count} problem(s): the drawing may contain overlaps."
 }

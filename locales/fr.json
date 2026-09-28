@@ -283,5 +283,12 @@
   "timeline.hint.eras_overlap": "Les ères sont des fonds successifs : faire commencer chacune là où la précédente se termine.",
   "timeline.hint.century_ambiguous": "Écrire la première année du siècle : \"1501\" pour le XVIe siècle.",
   "timeline.hint.millennium_ambiguous": "Écrire la première année du millénaire : \"2001\" pour le IIIe millénaire.",
-  "timeline.hint.label_contains_year": "Retirer l'année du libellé."
+  "timeline.hint.label_contains_year": "Retirer l'année du libellé.",
+  "timeline.date.day_month": "{day} {month}",
+  "timeline.legend.off_course": "* hors cours (ajouté par le modèle)",
+  "timeline.legend.axis_break": "Zigzag : axe interrompu (période vide compressée)",
+  "timeline.warn.label_truncated": "Le libellé est trop long pour être dessiné en entier : il est coupé après trois lignes.",
+  "timeline.warn.labels_in_notes": "{count} étiquette(s) renvoyée(s) en notes numérotées pour éviter les chevauchements.",
+  "timeline.warn.label_unsupported_chars": "Caractères absents de la police de la frise : {chars}. Ils seront dessinés avec un glyphe de remplacement.",
+  "timeline.warn.layout_violation": "La vérification de la mise en page a trouvé {count} problème(s) : le dessin peut contenir des chevauchements."
 }

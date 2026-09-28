@@ -127,6 +127,30 @@ class TestSvg(unittest.TestCase):
         self.assertIn("label_unsupported_chars", codes)
         self.assertNotIn("layout_violation", codes)
 
+    def test_a_violation_triggers_the_next_fallback(self):
+        from unittest import mock
+        import timeline_layout
+        from timeline_layout import Violation
+        real = timeline_layout.check_layout
+        calls = []
+
+        def flaky(layout):
+            calls.append(layout)
+            return [Violation("I1", "simulée")] if len(calls) == 1 else real(layout)
+
+        with mock.patch.object(rs, "check_layout", side_effect=flaky):
+            result = rs.render(self.docs["mondialisation.json"])
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("layout_violation", [w["code"] for w in result.warnings])
+
+    def test_a_persistent_violation_is_reported(self):
+        from unittest import mock
+        from timeline_layout import Violation
+        with mock.patch.object(rs, "check_layout", return_value=[Violation("I1", "simulée")]),                 self.assertLogs("timeline_render_svg", level="ERROR"):
+            result = rs.render(self.docs["single_event.json"])
+        warning = [w for w in result.warnings if w["code"] == "layout_violation"]
+        self.assertEqual(warning, [{"code": "layout_violation", "params": {"count": 1}}])
+
     def test_dark_theme(self):
         result = rs.render(self.docs["mondialisation.json"], LayoutOptions(theme="dark"))
         self.assertIn('fill="#1C1C1E"', result.svg)

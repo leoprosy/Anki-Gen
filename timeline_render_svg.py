@@ -23,11 +23,11 @@ import base64
 import logging
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from xml.sax.saxutils import escape
 
 from timeline_fonts import FAMILY, default_fonts, weight_key
-from timeline_layout import Line, Marker, Path, Rect, Text, _num, check_layout
+from timeline_layout import WIDTH_MAX, LayoutOptions, Line, Marker, Path, Rect, Text, _num, check_layout
 from timeline_layout import layout as layout_document
 
 log = logging.getLogger(__name__)
@@ -231,9 +231,23 @@ def render(doc, options=None, *, fonts=None, embed_font=False, id_prefix="tl") -
     journalisée et remonte comme avertissement visible.
     """
     fonts = fonts or default_fonts()
+    options = options or LayoutOptions()
     result = layout_document(doc, options, fonts.measure)
-    warnings = list(result.warnings)
     violations = check_layout(result)
+    # Ne doit pas arriver (fixtures et fuzz le vérifient) ; si c'est le cas, on
+    # repasse par les crans de repli restants avant de livrer quoi que ce soit.
+    for fallback in (replace(options, density="compact"),
+                     replace(options, width_mode="fixed",
+                             width_px=min(WIDTH_MAX, math.ceil(result.width * 1.5)))):
+        if not violations:
+            break
+        log.warning("frise %s : %d violation(s), nouvel essai (%s, %s)", doc.get("title"),
+                    len(violations), fallback.density, fallback.width_mode)
+        retry = layout_document(doc, fallback, fonts.measure)
+        retry_violations = check_layout(retry)
+        if len(retry_violations) < len(violations):
+            result, violations = retry, retry_violations
+    warnings = list(result.warnings)
     if violations:
         for violation in violations[:20]:
             log.error("frise %s : %s %s", doc.get("title"), violation.invariant, violation.message)

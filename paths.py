@@ -35,10 +35,12 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 PROJECTS_DIR = DATA_DIR / "projects"
 MEDIA_DIR = DATA_DIR / "media"
 EXPORT_DIR = DATA_DIR / "exports"
+# Jamais sous projects/ : list_projects() y prend tous les *.json pour des projets.
+TIMELINES_DIR = DATA_DIR / "timelines"
 
 
 def ensure_dirs() -> None:
-    for d in (UPLOAD_DIR, PROJECTS_DIR, MEDIA_DIR, EXPORT_DIR):
+    for d in (UPLOAD_DIR, PROJECTS_DIR, MEDIA_DIR, EXPORT_DIR, TIMELINES_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 

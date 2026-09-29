@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}{{ timeline.title or t('timeline.ui.untitled') }} — {{ t('app.name') }}{% endblock %}
+{% block shell_class %}shell--fixed{% endblock %}
+
+{% block head %}
+{# La frise se mesure avec ces fichiers-là : l'aperçu doit les charger, jamais une autre version d'Inter. #}
+<link rel="preload" href="{{ url_for('static', filename='fonts/Inter-Regular.ttf') }}" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="{{ url_for('static', filename='fonts/Inter-SemiBold.ttf') }}" as="font" type="font/ttf" crossorigin>
+{% endblock %}
+
+{% block topbar %}
+<button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="{{ t('timeline.ui.elements') }}"
+  aria-expanded="false" aria-controls="rail" title="{{ t('timeline.ui.elements') }}">
+  <svg width="18" height="18" aria-hidden="true"><use href="#i-list"></use></svg>
+</button>
+
+<div class="topbar__context">
+  <span class="project-name tl-name" id="tl-name" title="{{ timeline.title }}">{{ timeline.title or t('timeline.ui.untitled') }}</span>
+  <span class="tl-state muted" id="tl-state" aria-live="polite"></span>
+  <div class="topbar__spacer"></div>
+</div>
+
+<div class="topbar__actions">
+  <a class="btn ghost" href="{{ url_for('index') }}" title="{{ t('nav.home') }}">
+    <svg width="16" height="16" aria-hidden="true"><use href="#i-home"></use></svg>
+    <span class="lbl">{{ t('nav.home') }}</span>
+  </a>
+</div>
+{% endblock %}
+
+{% block shell_body %}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></symbol>
+  <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></symbol>
+</svg>
+
+<main class="work tl-work">
+  <!-- ── Rail : l'éditeur structuré ─────────────────────────────── -->
+  <aside class="rail tl-rail" id="rail" aria-label="{{ t('timeline.ui.elements') }}">
+    <div class="rail__head">
+      <span class="rail__title">{{ t('timeline.ui.elements') }}</span>
+      <details class="menu tl-add" id="tl-add">
+        <summary class="btn sm" title="{{ t('timeline.ui.add') }}">
+          <svg width="14" height="14" aria-hidden="true"><use href="#i-plus"></use></svg>
+          <span>{{ t('timeline.ui.add') }}</span>
+        </summary>
+        <div class="menu__panel tl-add__panel">
+          <button type="button" class="export-item" data-add="events"><strong>{{ t('timeline.ui.kind_events') }}</strong></button>
+          <button type="button" class="export-item" data-add="periods"><strong>{{ t('timeline.ui.kind_periods') }}</strong></button>
+          <button type="button" class="export-item" data-add="eras"><strong>{{ t('timeline.ui.kind_eras') }}</strong></button>
+          <button type="button" class="export-item" data-add="tracks"><strong>{{ t('timeline.ui.kind_tracks') }}</strong></button>
+        </div>
+      </details>
+      <button type="button" class="icon-btn rail__close" id="rail-close" aria-label="{{ t('timeline.ui.close') }}">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="tl-editor" id="tl-editor"></div>
+  </aside>
+  <div class="rail-scrim" id="rail-scrim"></div>
+
+  <!-- ── Panneau principal ──────────────────────────────────────── -->
+  <section class="panes">
+    <article class="pane tl-pane">
+      <header class="pane__head">
+        <div class="seg" role="tablist" id="tl-tabs" aria-label="{{ t('timeline.ui.views') }}">
+          <button type="button" role="tab" id="tl-tab-preview" data-tab="preview" class="active"
+            aria-selected="true" aria-controls="tl-panel-preview">{{ t('timeline.ui.tab_preview') }}</button>
+          <button type="button" role="tab" id="tl-tab-json" data-tab="json" aria-selected="false"
+            aria-controls="tl-panel-json" tabindex="-1">{{ t('timeline.ui.tab_json') }}</button>
+        </div>
+        <div class="pane__tools tl-tools" id="tl-tools">
+          <div class="seg" id="tl-theme" role="radiogroup" aria-label="{{ t('timeline.ui.theme') }}">
+            <button type="button" role="radio" data-theme="auto" class="active" aria-checked="true">{{ t('timeline.ui.theme_auto') }}</button>
+            <button type="button" role="radio" data-theme="light" aria-checked="false">{{ t('timeline.ui.theme_light') }}</button>
+            <button type="button" role="radio" data-theme="dark" aria-checked="false">{{ t('timeline.ui.theme_dark') }}</button>
+            <button type="button" role="radio" data-theme="print" aria-checked="false">{{ t('timeline.ui.theme_print') }}</button>
+          </div>
+          <div class="seg" id="tl-density" role="radiogroup" aria-label="{{ t('timeline.ui.density') }}">
+            <button type="button" role="radio" data-density="comfortable" class="active" aria-checked="true">{{ t('timeline.ui.density_comfortable') }}</button>
+            <button type="button" role="radio" data-density="compact" aria-checked="false">{{ t('timeline.ui.density_compact') }}</button>
+          </div>
+          <div class="tl-zoom" role="group" aria-label="{{ t('timeline.ui.zoom') }}">
+            <button type="button" class="icon-btn" id="tl-zoom-out" title="{{ t('timeline.ui.zoom_out') }} (Ctrl + −)" aria-label="{{ t('timeline.ui.zoom_out') }}">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-minus"></use></svg>
+            </button>
+            <span class="tl-zoom__value" id="tl-zoom-value" aria-live="polite">100 %</span>
+            <button type="button" class="icon-btn" id="tl-zoom-in" title="{{ t('timeline.ui.zoom_in') }} (Ctrl + +)" aria-label="{{ t('timeline.ui.zoom_in') }}">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-plus"></use></svg>
+            </button>
+            <button type="button" class="icon-btn" id="tl-zoom-fit" title="{{ t('timeline.ui.zoom_fit') }} (Ctrl + 0)" aria-label="{{ t('timeline.ui.zoom_fit') }}">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-fit"></use></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <details class="tl-issues" id="tl-issues" hidden>
+        <summary>
+          <svg width="16" height="16" aria-hidden="true"><use href="#i-alert"></use></svg>
+          <span id="tl-issues-summary"></span>
+        </summary>
+        <ul class="tl-issues__list" id="tl-issues-list"></ul>
+      </details>
+
+      <div class="pane__body tl-body" id="tl-panel-preview" role="tabpanel" aria-labelledby="tl-tab-preview">
+        <div class="tl-viewport" id="tl-viewport" tabindex="0" aria-label="{{ t('timeline.ui.tab_preview') }}">
+          <div class="tl-canvas" id="tl-canvas"></div>
+        </div>
+        <div class="tl-empty" id="tl-empty" hidden>
+          <h3>{{ t('timeline.ui.empty_title') }}</h3>
+          <p class="muted">{{ t('timeline.ui.empty_help') }}</p>
+          <div class="tl-empty__actions">
+            <button type="button" class="btn" id="tl-empty-paste">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
+              <span>{{ t('timeline.ui.paste') }}</span>
+            </button>
+            <button type="button" class="btn ghost" id="tl-empty-json">{{ t('timeline.ui.open_json') }}</button>
+          </div>
+        </div>
+        <div class="tl-tooltip" id="tl-tooltip" role="tooltip" hidden></div>
+      </div>
+
+      <div class="pane__body pane__body--flush tl-body" id="tl-panel-json" role="tabpanel" aria-labelledby="tl-tab-json" hidden>
+        <textarea id="tl-json" class="tl-json" spellcheck="false" aria-label="{{ t('timeline.ui.tab_json') }}"
+          placeholder="{{ t('timeline.ui.json_placeholder') }}"></textarea>
+        <div class="tl-json-bar">
+          <button type="button" class="btn sm" id="tl-json-validate">{{ t('timeline.ui.json_validate') }}</button>
+          <span class="muted" id="tl-json-status" aria-live="polite"></span>
+        </div>
+        <ul class="tl-json-errors" id="tl-json-errors"></ul>
+      </div>
+    </article>
+  </section>
+
+  <!-- ── Tiroir d'édition d'un élément ─────────────────────────────── -->
+  <aside class="tl-drawer" id="tl-drawer" role="dialog" aria-modal="false" aria-labelledby="tl-drawer-title" hidden>
+    <header class="tl-drawer__head">
+      <h2 id="tl-drawer-title"></h2>
+      <button type="button" class="icon-btn" id="tl-drawer-close" aria-label="{{ t('timeline.ui.close') }}">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </header>
+    <form class="tl-drawer__body" id="tl-form" novalidate></form>
+    <footer class="tl-drawer__foot">
+      <button type="button" class="btn danger" id="tl-drawer-delete">{{ t('timeline.ui.delete') }}</button>
+      <span class="tl-drawer__spacer"></span>
+      <button type="button" class="btn ghost" id="tl-drawer-cancel">{{ t('timeline.ui.cancel') }}</button>
+      <button type="submit" class="btn primary" form="tl-form" id="tl-drawer-apply">{{ t('timeline.ui.apply') }}</button>
+    </footer>
+  </aside>
+</main>
+
+<!-- ── Dock d'actions : visible à toutes les tailles ──────────── -->
+<footer class="dock" aria-label="{{ t('work.actions') }}">
+  <div class="dock__group">
+    <button type="button" class="btn" id="tl-paste" title="{{ t('timeline.ui.paste_title') }}">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
+      <span class="lbl">{{ t('timeline.ui.paste') }}</span>
+    </button>
+  </div>
+  <div class="dock__group dock__group--main">
+    <button type="button" class="btn primary btn-save-next" id="tl-save" title="{{ t('timeline.ui.save') }} (Ctrl+Entrée)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
+      <span class="lbl">{{ t('timeline.ui.save') }}</span>
+    </button>
+  </div>
+</footer>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.__TIMELINE__ = {{ timeline | tojson }};
+  window.__TIMELINE_I18N__ = {{ timeline_i18n | tojson }};
+  window.__TIMELINE_URLS__ = {
+    api: {{ url_for('api_timeline', tid=timeline.id) | tojson }},
+    render: {{ url_for('api_timeline_render', tid=timeline.id) | tojson }},
+    validate: {{ url_for('api_timeline_validate') | tojson }},
+    date: {{ url_for('api_timeline_date') | tojson }},
+  };
+</script>
+<script src="{{ url_for('static', filename='timeline-core.js') }}"></script>
+<script src="{{ url_for('static', filename='timeline.js') }}"></script>
+{% endblock %}

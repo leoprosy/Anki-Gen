@@ -317,6 +317,9 @@ class LayoutOptions:
     max_levels_per_side: object = None  # défaut selon la densité (4 / 6)
     show_descriptions: bool = False
     show_unverified: bool = True
+    # Éléments dont la citation est introuvable dans le cours (§6.5) : marqueur cerclé
+    # d'encre et barre contournée. L'aperçu les montre ; l'export, sur option (phase 5).
+    unverified: tuple = ()
     theme: str = "light"                # light | dark | print — n'influe que sur les couleurs
     lang: object = None                 # langue des textes dessinés : défaut, celle du document
 
@@ -643,8 +646,9 @@ def _lanes(doc):
 class _LaneState:
     """Tout ce qu'une piste accumule d'une passe à l'autre, dans son propre repère."""
 
-    def __init__(self, index, track, color, shape, date_fill):
+    def __init__(self, index, track, color, shape, date_fill, marked=frozenset()):
         self.index = index
+        self.marked = marked        # éléments à signaler « citation introuvable »
         self.track = track
         self.color = color
         self.shape = shape
@@ -697,6 +701,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
 
     # ── Couleurs et formes des pistes (couple unique par piste) ──────────
     palette = theme["palette"]
+    marked = frozenset(options.unverified) if options.show_unverified else frozenset()
     lane_states = []
     for i, track in enumerate(lanes_spec):
         color = palette[i % len(palette)]
@@ -704,7 +709,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
             color = readable(track["color"], [bg], 3.0)
         lane_bg = theme["lane_bg"][i % 2]
         date_fill = readable(color, [bg, lane_bg], 4.5)
-        lane_states.append(_LaneState(i, track, color, SHAPES[i % len(SHAPES)], date_fill))
+        lane_states.append(_LaneState(i, track, color, SHAPES[i % len(SHAPES)], date_fill, marked))
 
     def lane_index(element):
         return lane_of.get(element.get("track"), 0) if tracks else 0
@@ -1149,6 +1154,7 @@ def _make_unit(members, lang, measure, label_max, state, scale):
     weight = 600 if importance == 3 else 400
     r = MARKER_R[importance]
     hollow = all(e.get("origin") == "model" for e in events)
+    unverified = not hollow and any(i in state.marked for i in ids)
     approx = all(e.get("approx") for e in events)
     ref = "+".join(ids)
     graphics = []
@@ -1162,8 +1168,9 @@ def _make_unit(members, lang, measure, label_max, state, scale):
                 graphics.append(Line(x1=cap, y1=-4.0, x2=cap, y2=4.0, stroke=state.color, width=1.5,
                                      role="whisker", ref=event_id, lane=state.index))
     marker = Marker(shape=state.shape, cx=x, cy=0.0, r=r,
-                    fill=None if hollow else state.color, stroke=state.color if hollow else "bg",
-                    stroke_width=2.0 if hollow else MARKER_RING, dashed=approx,
+                    fill=None if hollow else state.color,
+                    stroke=state.color if hollow else "ink" if unverified else "bg",
+                    stroke_width=2.0 if hollow or unverified else MARKER_RING, dashed=approx,
                     role="marker", ref=ref, lane=state.index)
     graphics.append(marker)
     return {
@@ -1302,7 +1309,7 @@ def _period_prims(state, entry, y, measure, numbers, ink, bg):
     x0, x1 = entry["x0"], entry["x1"]
     fade = "end" if entry["end"].present else ("both" if period.get("approx") else "")
     out = [Rect(x=x0, y=y, w=x1 - x0, h=BAR_H, rx=BAR_H / 2, fill=state.color, fade=fade,
-                role="period-bar", ref=ref, lane=state.index)]
+                stroke=ink if ref in state.marked else None, role="period-bar", ref=ref, lane=state.index)]
     if entry["end"].present:
         out.append(Path(points=(("M", x1 + 1, y + 4), ("L", x1 + 5, y + BAR_H / 2), ("L", x1 + 1, y + BAR_H - 4)),
                         stroke=state.color, width=1.5, role="period-bar", ref=ref, lane=state.index))
@@ -1329,7 +1336,7 @@ def _resolve_colors(prim, ink, bg):
         return replace(prim, fill=ink)
     if isinstance(prim, Marker):
         return replace(prim, fill=bg if prim.fill is None else prim.fill,
-                       stroke=bg if prim.stroke == "bg" else prim.stroke)
+                       stroke=bg if prim.stroke == "bg" else ink if prim.stroke == "ink" else prim.stroke)
     return prim
 
 
@@ -1416,6 +1423,9 @@ def _legend(doc, tracks, lane_states, notes, numbers, scale, y, width, measure, 
     symbols = []
     if any(e.get("origin") == "model" for e, _ in events) or any(p.get("origin") == "model" for p, _, _ in periods):
         symbols.append(lang_text("timeline.legend.off_course"))
+    marked = lane_states[0].marked if lane_states else frozenset()
+    if any(e["id"] in marked for e, _ in events if e.get("origin") != "model")             or any(p["id"] in marked for p, _, _ in periods):
+        symbols.append(lang_text("timeline.legend.unverified"))
     if scale.breaks:
         symbols.append(lang_text("timeline.legend.axis_break"))
     if symbols:

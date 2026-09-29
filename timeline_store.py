@@ -14,9 +14,11 @@ Format (version 1) :
 {
   "version": 1, "id": "mondialisation-3f9a", "created_at", "updated_at",
   "title": "…", "lang": "fr",          // avant la première extraction ; ensuite data.title prime
-  "source": {"kind", "project_id", "deck_path", "chunk_ids", "text_hash"},
-  "source_text": "…",
-  "extraction": {"mode": "strict", "strategy": "single", "per_chunk": {}},
+  "source": {"kind", "project_id", "deck_path", "chunk_ids", "spans", "text_hash"},
+  "source_text": "…",                  // instantané ; spans = [[chunk_id, début, fin], …] dedans
+  "extraction": {"mode": "strict", "strategy": "single", "skill": false,
+                 "per_chunk": {"3": {"status", "raw"}},
+                 "merge": {"keep_separate": [], "report": {…}, "hash": "…"}},
   "data": {…document ankigen.timeline/1 normalisé…} | null,
   "raw_responses": [ …5 derniers collages bruts… ],
   "render_options": {}, "card_options": {}, "cards_deck": null, "disabled_cards": []
@@ -112,6 +114,7 @@ def _source(source, source_text):
         "project_id": source.get("project_id"),
         "deck_path": source.get("deck_path"),
         "chunk_ids": list(source.get("chunk_ids") or []),
+        "spans": [list(span) for span in source.get("spans") or []],
         "text_hash": text_hash(source_text),
     }
 
@@ -155,7 +158,13 @@ def normalize_record(record: dict) -> dict:
     extraction = dict(record.get("extraction") or {})
     extraction.setdefault("mode", "strict")
     extraction.setdefault("strategy", "single")
-    extraction.setdefault("per_chunk", {})
+    extraction.setdefault("skill", False)
+    extraction["per_chunk"] = dict(extraction.get("per_chunk") or {})
+    merge = dict(extraction.get("merge") or {})
+    merge["keep_separate"] = list(merge.get("keep_separate") or [])
+    merge.setdefault("report", None)
+    merge.setdefault("hash", None)
+    extraction["merge"] = merge
     record["extraction"] = extraction
     record.setdefault("data", None)
     record["raw_responses"] = list(record.get("raw_responses") or [])[-MAX_RAW_RESPONSES:]

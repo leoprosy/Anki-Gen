@@ -246,6 +246,28 @@ class TestFixtures(unittest.TestCase):
         refs = {p.ref for p in result.primitives if p.role == "event-label"}
         self.assertIn("cee+euratom", refs)
 
+    def test_unverified_quotes_are_ringed_in_ink(self):
+        doc = load("mondialisation.json")
+        ink = tl.THEMES["light"]["ink"]
+        marked = tl.layout(doc, LayoutOptions(unverified=("gatt", "bretton_woods")), fake_measure)
+        # Une unité peut regrouper des évènements proches : sa réf est « a+b ».
+        markers = {ref: p for p in marked.primitives if isinstance(p, Marker) and p.role == "marker"
+                   for ref in p.ref.split("+")}
+        self.assertEqual(markers["gatt"].stroke, ink)
+        self.assertNotEqual(markers["omc"].stroke, ink)
+        bars = {p.ref: p for p in marked.primitives if isinstance(p, Rect) and p.role == "period-bar"}
+        self.assertEqual(bars["bretton_woods"].stroke, ink)
+        self.assertIsNone(bars["etalon_or"].stroke)
+        legend = " ".join(" ".join(p.lines) for p in marked.primitives if p.role == "legend" and isinstance(p, Text))
+        self.assertIn("Marqueur cerclé", legend)
+        self.assertEqual(violations(marked), [])
+        # Sans l'option, ou sans élément à signaler : aucune trace.
+        for options in (LayoutOptions(unverified=("gatt",), show_unverified=False), LayoutOptions()):
+            plain = tl.layout(doc, options, fake_measure)
+            self.assertNotIn(ink, {p.stroke for p in plain.primitives if isinstance(p, (Marker, Rect))})
+            legend = " ".join(" ".join(p.lines) for p in plain.primitives if p.role == "legend" and isinstance(p, Text))
+            self.assertNotIn("cerclé", legend)
+
 
 class TestPeriods(unittest.TestCase):
     def periods_doc(self, spans):

@@ -516,8 +516,10 @@ class TestMessages(unittest.TestCase):
 
     def test_no_orphan_message(self):
         import timeline_layout
+        import timeline_quotes
+        warnings = ts.WARNING_CODES + timeline_layout.WARNING_CODES + timeline_quotes.WARNING_CODES
         declared = ({f"timeline.err.{c}" for c in ts.ERROR_CODES}
-                    | {f"timeline.warn.{c}" for c in ts.WARNING_CODES + timeline_layout.WARNING_CODES}
+                    | {f"timeline.warn.{c}" for c in warnings}
                     | {f"timeline.norm.{c}" for c in ts.NORMALIZATION_CODES}
                     | {f"timeline.hint.{c}" for c in ts.HINT_CODES})
         catalog = i18n.load_catalog("en")

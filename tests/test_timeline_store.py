@@ -93,7 +93,10 @@ class TestRecords(StoreTestCase):
         self.assertEqual((record["created_at"], record["updated_at"]), (self.NOW, self.NOW))
         self.assertEqual(record["source"]["kind"], "text")
         self.assertEqual(record["source"]["text_hash"], store.text_hash("Le traité de 1860."))
-        self.assertEqual(record["extraction"], {"mode": "strict", "strategy": "single", "per_chunk": {}})
+        self.assertEqual(record["source"]["spans"], [])
+        self.assertEqual(record["extraction"], {
+            "mode": "strict", "strategy": "single", "skill": False, "per_chunk": {},
+            "merge": {"keep_separate": [], "report": None, "hash": None}})
         for key, empty in (("raw_responses", []), ("render_options", {}), ("card_options", {}),
                            ("disabled_cards", [])):
             self.assertEqual(record[key], empty)

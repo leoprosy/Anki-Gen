@@ -2061,6 +2061,51 @@ body.tl-drawer-open .tl-work {
 .tl-scope-existing { font-size: 13px; }
 .tl-scope-existing[hidden] { display: none; }
 
+/* ── Onglet Cartes ───────────────────────────────────────────── */
+/* Réglages et cartes défilent d'un bloc : en 800 × 600, la liste garde de la place. */
+#tl-panel-cards { padding: 0 var(--space-md) var(--space-md); gap: 10px; overflow-y: auto; overscroll-behavior: contain; }
+#tl-panel-cards[hidden] { display: none; }
+.tl-cards-bar { flex: none; display: flex; flex-direction: column; gap: 8px; }
+.tl-cards-bar [hidden] { display: none; }
+.tl-card-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+.tl-card-types legend { margin-bottom: 2px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.tl-card-types .tl-check { min-height: 32px; }
+.tl-card-types__count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.tl-cards-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 12px; }
+.tl-cards-deck { flex: 1 1 260px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tl-cards-deck span { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.tl-cards-deck input {
+  min-height: 36px;
+  padding: 6px 10px;
+  background: var(--surface-alt);
+  border: 1.5px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.tl-cards-deck input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+.tl-cards-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.tl-cards-summary { font-size: 13px; color: var(--text-secondary); }
+.tl-cards-list { flex: none; transition: opacity 0.15s ease; }
+.tl-cards-list.is-busy { opacity: 0.6; }
+.tl-card.is-off { opacity: 0.45; }
+.tl-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.tl-card__head .card-label { margin-bottom: 0; }
+.tl-card__toggle { min-height: 28px; font-size: 12px; }
+.tl-card .card-body img { display: block; margin-bottom: 6px; }
+/* Vue de travail : « Inclure les cartes des frises liées » dans le menu d'export. */
+.export-option { display: flex; align-items: center; gap: 8px; padding: 4px 10px 8px; font-size: 12px; }
+.export-option input { width: 16px; height: 16px; accent-color: var(--accent); }
+
 /* ── Modale d'export ─────────────────────────────────────────── */
 .tl-export { width: min(640px, 94vw); }
 .tl-export [hidden] { display: none; }

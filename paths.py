@@ -53,6 +53,14 @@ def migrate_legacy_data() -> list:
     return []
 
 
+def timeline_media_dir(timeline_id: str) -> Path:
+    """
+    Images des cartes d'une frise (non créé ici : elles se rendent à la demande).
+    Un dossier par frise, supprimé avec elle ; supprimer le projet d'origine n'y touche pas.
+    """
+    return MEDIA_DIR / "_timelines" / timeline_id
+
+
 def project_media_dir(project_id: str) -> Path:
     """Dossier médias d'un projet (créé à la demande)."""
     d = MEDIA_DIR / project_id

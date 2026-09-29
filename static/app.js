@@ -362,12 +362,19 @@
   const exportReport = $("export-report");
   const exportProfiles = $("export-profiles");
   const exportStatus = $("export-status");
+  const exportTimelines = $("export-timelines");   // présent si le cours a des frises
   let lastReport = null;
+
+  /** « Inclure les cartes des frises liées » (désactivé par défaut) : ?timelines=1. */
+  function withTimelines(url) {
+    if (!exportTimelines || !exportTimelines.checked) return url;
+    return url + (url.includes("?") ? "&" : "?") + "timelines=1";
+  }
 
   async function loadReport() {
     exportReport.textContent = window.T("js.computing_report");
     try {
-      const r = await fetch(window.__API_REPORT_URL__);
+      const r = await fetch(withTimelines(window.__API_REPORT_URL__));
       const data = await r.json();
       lastReport = data;
       const bits = [window.T("js.cards_count", { n: data.cards }),
@@ -403,7 +410,7 @@
       const r = await fetch(window.__API_ANKI_MEDIA_URL__, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({ path, timelines: !!(exportTimelines && exportTimelines.checked) }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Erreur");
@@ -465,8 +472,9 @@
     $("copy-media-btn").addEventListener("click", renderProfiles);
     ["export-tsv-btn", "export-zip-btn"].forEach((id) => {
       const btn = $(id);
-      if (btn) btn.addEventListener("click", () => runExport(btn.dataset.exportUrl));
+      if (btn) btn.addEventListener("click", () => runExport(withTimelines(btn.dataset.exportUrl)));
     });
+    if (exportTimelines) exportTimelines.addEventListener("change", loadReport);
     exportProfiles.addEventListener("click", (ev) => {
       const btn = ev.target.closest(".profile-btn");
       if (btn) copyMedia(btn.dataset.path);

@@ -35,6 +35,7 @@
   <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></symbol>
   <symbol id="i-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></symbol>
   <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></symbol>
+  <symbol id="i-cards" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="14" height="14" rx="2"></rect><path d="M7 2h12a2 2 0 0 1 2 2v12"></path></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></symbol>
 </svg>
 
@@ -76,6 +77,8 @@
           <button type="button" role="tab" id="tl-tab-prompt" data-tab="prompt" aria-selected="false"
             aria-controls="tl-panel-prompt" tabindex="-1">{{ t('timeline.ui.tab_prompt') }}</button>
           {% endif %}
+          <button type="button" role="tab" id="tl-tab-cards" data-tab="cards" aria-selected="false"
+            aria-controls="tl-panel-cards" tabindex="-1">{{ t('timeline.ui.tab_cards') }}</button>
         </div>
         <div class="pane__tools tl-tools" id="tl-tools">
           <div class="seg" id="tl-theme" role="radiogroup" aria-label="{{ t('timeline.ui.theme') }}">
@@ -187,6 +190,38 @@
         <pre class="tl-prompt" id="tl-prompt" tabindex="0" aria-label="{{ t('timeline.ui.tab_prompt') }}"></pre>
       </div>
       {% endif %}
+
+      <div class="pane__body pane__body--flush tl-body" id="tl-panel-cards" role="tabpanel" aria-labelledby="tl-tab-cards" hidden>
+        <div class="tl-cards-bar">
+          <fieldset class="tl-card-types" id="tl-card-types">
+            <legend>{{ t('timeline.ui.cards_types') }}</legend>
+            {% for kind in ('event_to_date', 'date_to_event', 'period_bounds', 'ordering', 'neighbors', 'whole_image', 'masked_image') %}
+            <label class="tl-check" title="{{ t('timeline.ui.card_type_' ~ kind ~ '_help') }}">
+              <input type="checkbox" value="{{ kind }}"> {{ t('timeline.ui.card_type_' ~ kind) }}
+              <span class="tl-card-types__count" data-count="{{ kind }}"></span>
+            </label>
+            {% endfor %}
+          </fieldset>
+          <div class="tl-cards-row">
+            <label class="tl-cards-deck">
+              <span>{{ t('timeline.ui.cards_deck') }}</span>
+              <input type="text" id="tl-cards-deck" maxlength="200" spellcheck="false" autocomplete="off">
+            </label>
+            <div class="tl-cards-actions">
+              <button type="button" class="btn sm" id="tl-cards-tsv" title="{{ t('work.export_tsv_help') }}">{{ t('work.export_tsv') }}</button>
+              <button type="button" class="btn sm" id="tl-cards-zip" title="{{ t('work.export_zip_help') }}">{{ t('work.export_zip') }}</button>
+              <button type="button" class="btn sm" id="tl-cards-anki" title="{{ t('work.copy_media_help') }}">{{ t('work.copy_media') }}</button>
+            </div>
+          </div>
+          <div class="export-profiles" id="tl-cards-profiles" hidden></div>
+          <p class="tl-cards-summary" id="tl-cards-summary" aria-live="polite"></p>
+          <div class="tl-export__unsaved" id="tl-cards-unsaved" hidden>
+            <span>{{ t('timeline.ui.cards_unsaved') }}</span>
+            <button type="button" class="btn sm" id="tl-cards-save">{{ t('timeline.ui.export_save_first') }}</button>
+          </div>
+        </div>
+        <div class="tl-cards-list" id="tl-cards-list"></div>
+      </div>
     </article>
   </section>
 
@@ -238,6 +273,10 @@
     <button type="button" class="btn" id="tl-export-open" title="{{ t('timeline.ui.export_title') }}">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
       <span class="lbl">{{ t('timeline.ui.export') }}</span>
+    </button>
+    <button type="button" class="btn" id="tl-cards-open" title="{{ t('timeline.ui.cards_title') }}">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-cards"></use></svg>
+      <span class="lbl">{{ t('timeline.ui.tab_cards') }}</span>
     </button>
   </div>
   <div class="dock__group dock__group--main">
@@ -378,9 +417,14 @@
     exportPreview: {{ url_for('api_timeline_export_preview', tid=timeline.id) | tojson }},
     // « FORMAT » est remplacé par l'extension choisie.
     export: {{ url_for('export_timeline', tid=timeline.id, fmt='FORMAT') | tojson }},
+    cards: {{ url_for('api_timeline_cards', tid=timeline.id) | tojson }},
+    cardsTsv: {{ url_for('export_timeline_cards_tsv', tid=timeline.id) | tojson }},
+    cardsZip: {{ url_for('export_timeline_cards_zip', tid=timeline.id) | tojson }},
+    cardsAnkiMedia: {{ url_for('api_timeline_anki_media', tid=timeline.id) | tojson }},
   };
 </script>
 <script src="{{ url_for('static', filename='timeline-core.js') }}"></script>
 <script src="{{ url_for('static', filename='timeline.js') }}"></script>
 <script src="{{ url_for('static', filename='timeline-export.js') }}"></script>
+<script src="{{ url_for('static', filename='timeline-cards.js') }}"></script>
 {% endblock %}

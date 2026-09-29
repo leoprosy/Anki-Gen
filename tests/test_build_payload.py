@@ -50,7 +50,7 @@ class TestLocalModules(unittest.TestCase):
         self.assertLessEqual({"timeline_dates.py", "timeline_schema.py", "timeline_store.py",
                               "timeline_layout.py", "timeline_fonts.py", "timeline_render_svg.py",
                               "timeline_prompt.py", "timeline_extract.py", "timeline_merge.py",
-                              "timeline_quotes.py", "timeline_render_raster.py"}, modules)
+                              "timeline_quotes.py", "timeline_render_raster.py", "timeline_cards.py"}, modules)
 
     def test_leaves_out_scripts_notes_and_tests(self):
         modules = set(local_modules())

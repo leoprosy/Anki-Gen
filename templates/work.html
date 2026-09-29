@@ -33,6 +33,12 @@
     <div class="menu__panel">
       <div class="menu__title">{{ t('work.export') }}</div>
       <div class="export-report" id="export-report">{{ t('work.export_computing') }}</div>
+      {% if linked_timelines %}
+      <label class="export-option">
+        <input type="checkbox" id="export-timelines">
+        <span>{{ t('timeline.ui.export_include_timelines', n=linked_timelines) }}</span>
+      </label>
+      {% endif %}
       <button type="button" class="export-item" id="export-tsv-btn"
         data-export-url="{{ url_for('export_tsv', project_id=project_id) }}">
         <strong>{{ t('work.export_tsv') }}</strong>

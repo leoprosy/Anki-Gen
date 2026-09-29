@@ -318,7 +318,12 @@ def copy_media(project_id: str, filenames, destination: Path) -> dict:
     référencent le nom d'origine, un renommage afficherait silencieusement la
     mauvaise image. Le conflit est signalé à l'utilisateur.
     """
-    src_dir = project_media_dir(project_id)
+    return copy_files(project_media_dir(project_id), filenames, destination)
+
+
+def copy_files(src_dir: Path, filenames, destination: Path) -> dict:
+    """Copie `filenames` de `src_dir` vers `destination`, avec les règles de copy_media."""
+    src_dir = Path(src_dir)
     destination = Path(destination)
     destination.mkdir(parents=True, exist_ok=True)
 

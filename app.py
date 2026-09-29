@@ -34,6 +34,7 @@ from i18n import DEFAULT_LANG, available_languages, catalog_for_js, translate
 from parse_cours import build_prompts, parse_docx
 from project_store import (
     PROJECT_VERSION,
+    copy_files,
     copy_media,
     delete_project,
     export_rows,
@@ -254,6 +255,7 @@ def work(project_id):
         missing_alt=missing_alt_count(project),
         warnings=project.get("warnings", []),
         timeline_i18n=catalog_for_js(current_lang(), prefix="timeline.ui."),
+        linked_timelines=sum(1 for t in _timeline_summaries() if t.get("project_id") == project_id),
     )
 
 
@@ -431,6 +433,10 @@ def export_tsv(project_id):
     only_done = request.args.get("only_done") == "1"
 
     rows, report = export_rows(project, only_done=only_done)
+    # « Inclure les cartes des frises liées » : désactivé par défaut (§10.4).
+    if request.args.get("timelines") == "1":
+        for timeline_rows, _, _ in _linked_timeline_exports(project_id, render_media=False):
+            rows += timeline_rows
     data = tsv_bytes(rows)
     filename = f"{project_id}_export.tsv"
 
@@ -453,12 +459,19 @@ def export_zip(project_id):
 
     rows, report = export_rows(project, only_done=only_done)
     media_dir = MEDIA_DIR / project_id
+    media = [(media_dir, name) for name in report["media"]]
+    if request.args.get("timelines") == "1":
+        for timeline_rows, directory, names in _linked_timeline_exports(project_id):
+            rows += timeline_rows
+            media += [(directory, name) for name in names]
+        report["cards"] = len(rows)
+        report["media"] = [name for _, name in media]
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(f"{project_id}_export.tsv", tsv_bytes(rows))
-        for name in report["media"]:
-            src = media_dir / name
+        for directory, name in media:
+            src = directory / name
             if src.exists():
                 zf.write(src, f"media/{name}")
         # Le nom du fichier suit la langue : un francophone ne cherche pas README.txt.
@@ -498,6 +511,11 @@ def api_export_report(project_id):
     project = require_project(project_id)
     only_done = request.args.get("only_done") == "1"
     _, report = export_rows(project, only_done=only_done)
+    if request.args.get("timelines") == "1":
+        # Le rapport compte les cartes et les images des frises sans les dessiner.
+        for timeline_rows, _, names in _linked_timeline_exports(project_id, render_media=False):
+            report["cards"] += len(timeline_rows)
+            report["media"] = report["media"] + names
     report["anki_profiles"] = paths.anki_media_dirs()
     return jsonify(report)
 
@@ -518,12 +536,17 @@ def api_export_anki_media(project_id):
         return jsonify(error=tr("api.unknown_media_dir")), 400
 
     _, report = export_rows(project, only_done=only_done)
-    if not report["media"]:
+    linked = _linked_timeline_exports(project_id) if data.get("timelines") else []
+    if not report["media"] and not any(names for _, _, names in linked):
         return jsonify(ok=True, result={"copied": [], "identical": [], "conflicts": [],
                                         "missing": [], "destination": destination},
                        message=tr("api.no_media_used"))
 
     result = copy_media(project_id, report["media"], Path(destination))
+    for _, directory, names in linked:
+        more = copy_files(directory, names, Path(destination))
+        for key in ("copied", "identical", "conflicts", "missing"):
+            result[key] += more[key]
     return jsonify(ok=True, result=result)
 
 
@@ -800,7 +823,8 @@ def _timeline_from_scope(payload, lang):
     tid, _ = timeline_store.create_timeline(
         title=title[:120],
         lang=payload.get("lang") if payload.get("lang") in ("en", "fr") else timeline_prompt.guess_lang(text, lang),
-        source={"kind": scope["kind"], "project_id": project_id, "deck_path": scope.get("deck_path"),
+        source={"kind": scope["kind"], "project_id": project_id,
+                "deck_path": timeline_prompt.scope_deck(project, scope),
                 "chunk_ids": [span[0] for span in spans], "spans": spans},
         source_text=text, extraction={"mode": mode, "strategy": strategy})
     return jsonify(ok=True, id=tid, url=url_for("timeline_page", tid=tid))
@@ -1188,6 +1212,245 @@ def api_timeline_export_preview(tid):
     warnings = _export_warnings(output.pop("warnings"))
     return jsonify(ok=True, svg=rendered.svg, width=layout.width, height=layout.height, output=output,
                    warnings=warnings, filename=f"{timeline_store.slugify_title(doc.get('title'))}.{extension}")
+
+
+# ── Cartes Anki (§10) ──────────────────────────────────────────
+def _card_state(record):
+    """(document, cartes, types choisis, mise en page des images ou None) de la frise enregistrée."""
+    import timeline_cards
+    from timeline_render_svg import render
+    doc = record.get("data")
+    options = record.get("card_options") or {}
+    wanted = options.get("types", timeline_cards.DEFAULT_TYPES)
+    types = [kind for kind in timeline_cards.CARD_TYPES if kind in (wanted or ())]
+    if not doc:
+        return None, [], types, None
+    layout_options = timeline_cards.card_layout_options(record.get("render_options"))
+    layout = None
+    if {"whole_image", "masked_image"} & set(types):
+        layout = render(doc, layout_options).layout
+    cards = timeline_cards.generate(
+        doc, types=types, layout=layout,
+        media_prefix=timeline_cards.media_prefix(record["id"], record["source"].get("project_id")),
+        render_key=f"{layout_options.theme}/{layout_options.density}")
+    return doc, cards, types, layout
+
+
+def _scope_base_deck(record):
+    """Deck de la portée : enregistré à la création, retrouvé dans le projet, sinon le titre."""
+    import timeline_prompt
+    from timeline_store import display_title
+    source = record["source"]
+    if source.get("deck_path"):
+        return source["deck_path"]
+    project = load_project(source["project_id"]) if source.get("project_id") else None
+    if project and source["kind"] in ("chunk", "project"):
+        try:
+            return timeline_prompt.scope_deck(project, {"kind": source["kind"],
+                                                        "chunk_ids": (source.get("chunk_ids") or [])[:1]})
+        except (ValueError, TypeError):
+            pass
+    return display_title(record).replace("::", ":")
+
+
+def _cards_deck(record):
+    """
+    (deck, fixé à l'instant ?) Le deck est figé dans la frise à la première génération :
+    jamais retraduit, pour la même raison que DEFAULT_DECK_NAME dans project_store.
+    """
+    import timeline_cards
+    if record.get("cards_deck"):
+        return record["cards_deck"], False
+    lang = (record.get("data") or {}).get("lang") or record.get("lang") or current_lang()
+    record["cards_deck"] = timeline_cards.default_deck(_scope_base_deck(record), lang)
+    return record["cards_deck"], True
+
+
+def _enabled_cards(record):
+    """(cartes actives, mise en page) : les cartes désactivées une à une restent hors des exports."""
+    _, cards, _, layout = _card_state(record)
+    disabled = set(record.get("disabled_cards") or [])
+    return [card for card in cards if card.id not in disabled], layout
+
+
+def _card_media(cards):
+    names = []
+    for card in cards:
+        for name in card.media:
+            if name not in names:
+                names.append(name)
+    return names
+
+
+def _timeline_card_export(record, *, render_media=True):
+    """(lignes TSV, dossier des images, noms des images) des cartes actives d'une frise."""
+    import timeline_cards
+    import timeline_store
+    deck, fixed = _cards_deck(record)
+    if fixed:
+        timeline_store.save_timeline(record["id"], record)
+    cards, layout = _enabled_cards(record)
+    directory = paths.timeline_media_dir(record["id"])
+    if render_media and layout is not None:
+        timeline_cards.ensure_media(cards, layout, directory)
+    return [[deck, card.front, card.back] for card in cards], directory, _card_media(cards)
+
+
+def _linked_timeline_exports(project_id, *, render_media=True):
+    """Cartes des frises tirées d'un projet, pour « Inclure les cartes des frises liées »."""
+    import timeline_store
+    out = []
+    for summary in _timeline_summaries():
+        if summary.get("project_id") != project_id:
+            continue
+        try:
+            record = timeline_store.load_timeline(summary["id"])
+        except timeline_store.TimelineStoreError:
+            continue
+        if record and record.get("data"):
+            rows, directory, names = _timeline_card_export(record, render_media=render_media)
+            if rows:
+                out.append((rows, directory, names))
+    return out
+
+
+def _card_view(card, tid, disabled):
+    """Carte pour l'aperçu : les images pointent vers la route qui les rend à la demande."""
+    base = url_for("timeline_card_media", tid=tid, filename="__NAME__")
+    front, back = card.front, card.back
+    for name in card.media:
+        url = base.replace("__NAME__", name)
+        front = front.replace(f'src="{name}"', f'src="{url}" loading="lazy" alt=""')
+        back = back.replace(f'src="{name}"', f'src="{url}" loading="lazy" alt=""')
+    return {"id": card.id, "type": card.type, "ref": card.ref, "front": front, "back": back,
+            "enabled": card.id not in disabled}
+
+
+@app.route("/api/timeline/<tid>/cards", methods=["POST"])
+def api_timeline_cards(tid):
+    """
+    Aperçu des cartes de la frise enregistrée. `{types}` choisit les types, `{deck}`
+    renomme le deck, `{toggle: {id, enabled}}` active ou désactive une carte.
+    """
+    import timeline_cards
+    import timeline_store
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    payload = request.get_json(silent=True) or {}
+    changed = False
+    if isinstance(payload.get("types"), list):
+        record["card_options"]["types"] = [k for k in timeline_cards.CARD_TYPES if k in payload["types"]]
+        changed = True
+    if isinstance(payload.get("deck"), str) and payload["deck"].strip():
+        deck = " ".join(payload["deck"].split())[:200]
+        record["cards_deck"] = "::".join(part.strip() for part in deck.split("::") if part.strip())
+        changed = bool(record["cards_deck"]) or changed
+    toggle = payload.get("toggle")
+    if isinstance(toggle, dict) and isinstance(toggle.get("id"), str):
+        disabled = set(record.get("disabled_cards") or [])
+        (disabled.discard if toggle.get("enabled") else disabled.add)(toggle["id"])
+        record["disabled_cards"] = sorted(disabled)
+        changed = True
+    deck, fixed = _cards_deck(record) if record.get("data") else (record.get("cards_deck"), False)
+    if changed or fixed:
+        record = timeline_store.save_timeline(tid, record)
+    doc, cards, types, _ = _card_state(record)
+    disabled = set(record.get("disabled_cards") or [])
+    views = [_card_view(card, tid, disabled) for card in cards]
+    return jsonify(ok=True, has_data=bool(doc), deck=deck, types=types, cards=views,
+                   counts={kind: sum(1 for c in cards if c.type == kind) for kind in timeline_cards.CARD_TYPES},
+                   enabled=sum(1 for view in views if view["enabled"]),
+                   anki_profiles=paths.anki_media_dirs())
+
+
+@app.route("/media/timeline/<tid>/<filename>")
+def timeline_card_media(tid, filename):
+    """Image d'une carte : rendue à la première demande, puis servie depuis le disque."""
+    import timeline_cards
+    import timeline_store
+    if not timeline_store.valid_id(tid) or not SAFE_MEDIA_NAME.match(filename):
+        abort(404)
+    directory = paths.timeline_media_dir(tid)
+    if not (directory / filename).is_file():
+        record, error = _load_timeline_or_error(tid)
+        if error:
+            abort(404)
+        _, cards, _, layout = _card_state(record)
+        owners = [card for card in cards if filename in card.media]
+        if not owners or layout is None:
+            abort(404)
+        timeline_cards.ensure_media(owners, layout, directory, names={filename})
+    return send_from_directory(directory, filename, max_age=3600)
+
+
+def _timeline_card_file(tid, extension):
+    """(frise, lignes, dossier, noms, nom de fichier) ou (None, réponse d'erreur)."""
+    import timeline_store
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return None, error
+    if not record.get("data"):
+        return None, _timeline_error("timeline.api.empty", 404)
+    rows, directory, names = _timeline_card_export(record, render_media=extension != "tsv")
+    filename = f"{timeline_store.slugify_title(timeline_store.display_title(record))}-cards.{extension}"
+    return (record, rows, directory, names, filename), None
+
+
+@app.route("/export/timeline/<tid>/cards.tsv")
+def export_timeline_cards_tsv(tid):
+    found, error = _timeline_card_file(tid, "tsv")
+    if error:
+        return error
+    _, rows, _, _, filename = found
+    data = tsv_bytes(rows)
+    response = send_file(io.BytesIO(data), mimetype="text/tab-separated-values; charset=utf-8",
+                         as_attachment=True, download_name=filename)
+    return _with_export_headers(response, filename, data)
+
+
+@app.route("/export/timeline/<tid>/cards.zip")
+def export_timeline_cards_zip(tid):
+    """TSV + images des cartes, dans une archive prête à décompresser (comme l'export du projet)."""
+    import timeline_store
+    found, error = _timeline_card_file(tid, "zip")
+    if error:
+        return error
+    record, rows, directory, names, filename = found
+    title = timeline_store.display_title(record)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(filename[:-4] + ".tsv", tsv_bytes(rows))
+        for name in names:
+            if (directory / name).is_file():
+                archive.write(directory / name, f"media/{name}")
+        archive.writestr(tr("export.readme_filename"), "\r\n".join([
+            tr("export.readme_title", project=title), "",
+            tr("export.readme_counts", cards=len(rows), images=len(names)), "",
+            tr("export.readme_step_media"), tr("export.readme_step_media_path"),
+            tr("export.readme_step_import"), tr("export.readme_step_header"), "",
+            tr("export.readme_tip"),
+        ]))
+    data = buffer.getvalue()
+    response = send_file(io.BytesIO(data), mimetype="application/zip", as_attachment=True, download_name=filename)
+    return _with_export_headers(response, filename, data)
+
+
+@app.route("/api/timeline/<tid>/anki-media", methods=["POST"])
+def api_timeline_anki_media(tid):
+    """Copie les images des cartes dans le collection.media d'un profil Anki choisi (même contrôle)."""
+    payload = request.get_json(silent=True) or {}
+    destination = (payload.get("path") or "").strip()
+    if destination not in {p["path"] for p in paths.anki_media_dirs()}:
+        return jsonify(error=tr("api.unknown_media_dir")), 400
+    found, error = _timeline_card_file(tid, "zip")
+    if error:
+        return error
+    _, _, directory, names, _ = found
+    if not names:
+        return jsonify(ok=True, result={"copied": [], "identical": [], "conflicts": [], "missing": [],
+                                        "destination": destination}, message=tr("api.no_media_used"))
+    return jsonify(ok=True, result=copy_files(directory, names, Path(destination)))
 
 
 @app.route("/api/timeline/date")

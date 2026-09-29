@@ -33,10 +33,12 @@ import json
 import os
 import re
 import secrets
+import shutil
 import tempfile
 import unicodedata
 from pathlib import Path
 
+import paths
 from paths import TIMELINES_DIR
 
 TIMELINE_VERSION = 1
@@ -238,7 +240,11 @@ def create_timeline(**fields):
 
 
 def delete_timeline(tid) -> bool:
+    """Supprime la frise et les images de ses cartes (elles ne servent qu'à elle)."""
     path = timeline_path(tid)
+    media = paths.timeline_media_dir(tid)
+    if media.is_dir():
+        shutil.rmtree(media, ignore_errors=True)
     if not path.exists():
         return False
     path.unlink()

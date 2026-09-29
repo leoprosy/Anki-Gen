@@ -796,10 +796,13 @@
     els.panelPreview.hidden = tab !== "preview";
     els.panelJson.hidden = tab !== "json";
     if (els.panelPrompt) els.panelPrompt.hidden = tab !== "prompt";
+    $("tl-panel-cards").hidden = tab !== "cards";
     els.tools.hidden = tab !== "preview";
     if (tab === "json" && !state.jsonDirty) els.json.value = C.serialize(state.doc);
     if (tab === "preview" && state.fit) applyZoom(fitZoom(state.fit));
     if (tab === "prompt" && state.prompt.url !== promptUrl()) loadPrompt();
+    // Les autres scripts de la page (cartes) se chargent quand leur onglet s'ouvre.
+    document.dispatchEvent(new CustomEvent("timeline:tab", { detail: { tab } }));
   }
   els.tabs.addEventListener("click", (ev) => {
     const button = ev.target.closest("[data-tab]");
@@ -1210,6 +1213,7 @@
       state.saved = C.serialize(state.doc);
       updateState();
       toast(T("timeline.ui.saved"), "ok");
+      document.dispatchEvent(new CustomEvent("timeline:saved"));
       return true;
     }
     if (data && data.report) { state.report = data.report; renderIssues(); }
@@ -1222,6 +1226,7 @@
   window.TimelinePage = {
     isDirty,
     save,
+    setTab,
     hasContent: () => hasContent(state.doc),
     density: () => state.density,
   };

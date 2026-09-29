@@ -37,7 +37,7 @@ from runtime_contract import runtime_version  # noqa: E402
 # `launcher.py` est l'entrée de l'exécutable ; `runtime_probe.py` n'est importé
 # par personne dans l'app : c'est launcher --self-check qui le charge.
 ENTRY_POINTS = ("app.py", "launcher.py", "runtime_probe.py")
-DATA_DIRS = ("templates", "static", "locales", "skill_templates")
+DATA_DIRS = ("templates", "static", "locales", "skill_templates", "prompt_templates")
 IGNORED = shutil.ignore_patterns("__pycache__", "*.pyc")
 
 

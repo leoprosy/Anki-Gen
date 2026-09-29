@@ -48,7 +48,9 @@ class TestLocalModules(unittest.TestCase):
         # ils doivent partir quand même dans app.zip et dans l'exe.
         modules = set(local_modules())
         self.assertLessEqual({"timeline_dates.py", "timeline_schema.py", "timeline_store.py",
-                              "timeline_layout.py", "timeline_fonts.py", "timeline_render_svg.py"}, modules)
+                              "timeline_layout.py", "timeline_fonts.py", "timeline_render_svg.py",
+                              "timeline_prompt.py", "timeline_extract.py", "timeline_merge.py",
+                              "timeline_quotes.py"}, modules)
         # Le raster sert à la galerie ; les routes ne l'importent qu'avec les exports.
         self.assertNotIn("timeline_render_raster.py", modules)
 
@@ -110,6 +112,12 @@ class TestBuildPayload(unittest.TestCase):
         for directory in DATA_DIRS:
             self.assertTrue((self.dest / directory).is_dir(), directory)
         self.assertEqual(list(self.dest.rglob("__pycache__")), [])
+
+    def test_ships_the_timeline_prompt_templates(self):
+        # Aucun import n'atteint ces gabarits : seul DATA_DIRS les fait partir.
+        for lang in ("en", "fr"):
+            template = self.dest / "prompt_templates" / lang / "timeline_extract.md"
+            self.assertTrue(template.is_file(), template)
 
     def test_rebuild_starts_from_a_clean_folder(self):
         (self.dest / "stale.py").write_text("", encoding="utf-8")

@@ -11,6 +11,7 @@ import io
 import json
 import re
 import zipfile
+from dataclasses import replace
 from pathlib import Path
 from urllib.parse import quote
 
@@ -252,6 +253,7 @@ def work(project_id):
         progress=progress(project),
         missing_alt=missing_alt_count(project),
         warnings=project.get("warnings", []),
+        timeline_i18n=catalog_for_js(current_lang(), prefix="timeline.ui."),
     )
 
 
@@ -625,18 +627,92 @@ def _date_labels(doc, lang):
 
 def _timeline_view(record):
     """Ce que la page reçoit : l'enregistrement, sans le texte source (jusqu'à 200 000 caractères)."""
+    import timeline_prompt
+    source, extraction = record["source"], record["extraction"]
+    text = record.get("source_text") or ""
+    chunks = []
+    if extraction["strategy"] == "per_chunk":
+        # La section Sources : un paragraphe par ligne, avec son état.
+        for chunk_id, start, end in source.get("spans") or []:
+            heading = timeline_prompt.chunk_heading(text, source["spans"], chunk_id)
+            entry = extraction["per_chunk"].get(str(chunk_id)) or {}
+            chunks.append({"id": chunk_id, "heading": heading, "title": heading.split(" › ")[-1],
+                           "status": entry.get("status") or "pending", "chars": end - start,
+                           "mentions": timeline_prompt.date_mentions(text[start:end])})
+    project_id = source.get("project_id")
     return {
         "id": record["id"],
         "title": (record.get("data") or {}).get("title") or record.get("title") or "",
         "lang": (record.get("data") or {}).get("lang") or record.get("lang") or current_lang(),
-        "source": record["source"],
-        "has_source_text": bool(record.get("source_text")),
+        "source": source,
+        "has_source_text": bool(text),
+        "source_chars": len(text),
+        # §11 : un projet supprimé laisse ses frises intactes ; l'interface le signale.
+        "project_exists": bool(project_id) and project_path(project_id).exists(),
         "data": record.get("data"),
         "last_raw": (record.get("raw_responses") or [None])[-1],
         "render_options": record.get("render_options") or {},
+        "extraction": {key: extraction[key] for key in ("mode", "strategy", "skill")},
+        "chunks": chunks,
+        "merge": extraction["merge"].get("report"),
         "created_at": record.get("created_at"),
         "updated_at": record.get("updated_at"),
     }
+
+
+def _with_quotes(report, record):
+    """Statuts des citations d'un document valide, vérifiées contre l'instantané du texte source."""
+    import timeline_quotes
+    return timeline_quotes.annotate(report, record.get("source_text"))
+
+
+def _remerge(record, lang, *, force):
+    """
+    Refait la frise depuis les réponses des paragraphes (paragraphe par paragraphe).
+
+    Si le document a été retouché depuis la dernière fusion, rien n'est écrasé
+    sans `force` : l'interface demande d'abord confirmation.
+    """
+    import timeline_extract
+    merge = record["extraction"]["merge"]
+    current = record.get("data")
+    edited = bool(current) and (merge.get("hash") is None
+                                or timeline_extract.document_hash(current) != merge["hash"])
+    if edited and not force:
+        return {"merged": False, "edited": True, "report": None}
+    report, merge_report = timeline_extract.merge_record(record, lang=lang)
+    merge["report"] = merge_report
+    if report is None:              # aucun paragraphe utile : la frise reste vide
+        record["data"], merge["hash"] = None, None
+        return {"merged": True, "edited": False, "report": None}
+    if report["ok"]:
+        record["data"] = report["normalized"]
+        merge["hash"] = timeline_extract.document_hash(record["data"])
+    return {"merged": report["ok"], "edited": False, "report": report}
+
+
+def _merge_payload(record, result):
+    report = result.get("report")
+    return {
+        "merged": result["merged"],
+        "edited": result["edited"],
+        "data": record.get("data"),
+        "merge": record["extraction"]["merge"].get("report"),
+        "document_report": _with_messages(_with_quotes(report, record)) if report else None,
+        "chunks": _timeline_view(record)["chunks"],
+        "updated_at": record.get("updated_at"),
+    }
+
+
+def _chunk_source(record, chunk_arg):
+    """(identifiant, texte du paragraphe) d'un chunk de la frise ; ValueError s'il n'en fait pas partie."""
+    import timeline_prompt
+    try:
+        chunk_id = int(chunk_arg)
+        return chunk_id, timeline_prompt.chunk_text(record.get("source_text") or "",
+                                                    record["source"].get("spans"), chunk_id)
+    except (TypeError, ValueError, KeyError):
+        raise ValueError(chunk_arg) from None
 
 
 @app.route("/timeline/<tid>")
@@ -664,6 +740,8 @@ def timeline_new():
     payload = request.get_json(silent=True) or {}
     lang = current_lang()
     try:
+        if isinstance(payload.get("scope"), dict):
+            return _timeline_from_scope(payload, lang)
         if isinstance(payload.get("json"), str):
             raw = payload["json"]
             report = timeline_schema.validate_raw(raw, default_lang=lang)
@@ -694,6 +772,40 @@ def timeline_new():
     return jsonify(ok=True, id=tid, url=url_for("timeline_page", tid=tid))
 
 
+def _timeline_from_scope(payload, lang):
+    """
+    Frise d'une portée de la vue de travail (`{scope: {kind, project_id, deck_path,
+    chunk_ids}, title?, lang?, mode?, strategy?}`) : le texte source est figé tout de suite.
+    """
+    import timeline_prompt
+    import timeline_store
+    scope = payload["scope"]
+    project_id = scope.get("project_id")
+    project = load_project(project_id) if isinstance(project_id, str) else None
+    if not project:
+        return _timeline_error("api.project_not_found", 404)
+    try:
+        chunks = timeline_prompt.scope_chunks(project, scope)
+    except (TypeError, ValueError):
+        return _timeline_error("timeline.api.scope_empty", 400)
+    text, spans = timeline_prompt.build_source(chunks, project.get("deck_prefix"))
+    if not text:
+        return _timeline_error("timeline.api.scope_empty", 400)
+    title = (payload.get("title") or "").strip() if isinstance(payload.get("title"), str) else ""
+    title = title or timeline_prompt.scope_title(project, scope) or tr("timeline.ui.untitled")
+    strategy = payload.get("strategy")
+    if strategy not in timeline_store.EXTRACTION_STRATEGIES:
+        strategy = timeline_prompt.default_strategy(len(text))
+    mode = payload.get("mode") if payload.get("mode") in timeline_store.EXTRACTION_MODES else "strict"
+    tid, _ = timeline_store.create_timeline(
+        title=title[:120],
+        lang=payload.get("lang") if payload.get("lang") in ("en", "fr") else timeline_prompt.guess_lang(text, lang),
+        source={"kind": scope["kind"], "project_id": project_id, "deck_path": scope.get("deck_path"),
+                "chunk_ids": [span[0] for span in spans], "spans": spans},
+        source_text=text, extraction={"mode": mode, "strategy": strategy})
+    return jsonify(ok=True, id=tid, url=url_for("timeline_page", tid=tid))
+
+
 @app.route("/timeline/<tid>/delete", methods=["POST"])
 def timeline_delete(tid):
     import timeline_store
@@ -720,14 +832,28 @@ def api_timeline(tid):
     view = _timeline_view(record)
     if request.method == "GET":
         report = timeline_schema.validate(record["data"], default_lang=view["lang"]) if record["data"] else None
-        return jsonify(ok=True, timeline=view, report=_with_messages(report) if report else None)
+        return jsonify(ok=True, timeline=view,
+                       report=_with_messages(_with_quotes(report, record)) if report else None)
 
     payload = request.get_json(silent=True) or {}
-    report = _validated(payload, view["lang"])
-    if isinstance(payload.get("raw"), str):
-        timeline_store.push_raw_response(record, payload["raw"])
+    extraction = payload.get("extraction")
+    if isinstance(extraction, dict):
+        if extraction.get("mode") in timeline_store.EXTRACTION_MODES:
+            record["extraction"]["mode"] = extraction["mode"]
+        if isinstance(extraction.get("skill"), bool):
+            record["extraction"]["skill"] = extraction["skill"]
     if "options" in payload:
         record["render_options"] = _render_options(payload["options"])[1]
+    if isinstance(payload.get("raw"), str) and payload.get("chunk_id") is not None:
+        return _save_chunk_response(tid, record, payload, view["lang"])
+    if not isinstance(payload.get("raw"), str) and "data" not in payload:
+        # Réglages seuls (mode d'extraction, Skill, options de rendu).
+        record = timeline_store.save_timeline(tid, record)
+        return jsonify(ok=True, updated_at=record["updated_at"])
+
+    report = _with_quotes(_validated(payload, view["lang"]), record)
+    if isinstance(payload.get("raw"), str):
+        timeline_store.push_raw_response(record, payload["raw"])
     if report["ok"]:
         data = report["normalized"]
         record["data"] = data
@@ -737,6 +863,154 @@ def api_timeline(tid):
     status = 200 if report["ok"] else 422
     return jsonify(ok=report["ok"], report=_with_messages(report),
                    updated_at=record["updated_at"]), status
+
+
+def _save_chunk_response(tid, record, payload, lang):
+    """
+    Collage d'un paragraphe (paragraphe par paragraphe) : il est validé seul, gardé
+    brut, puis la frise est refaite par fusion. Un paragraphe sans date est un
+    état normal (`empty`), pas une erreur.
+    """
+    import timeline_extract
+    import timeline_store
+    try:
+        chunk_id, text = _chunk_source(record, payload["chunk_id"])
+    except ValueError:
+        return _timeline_error("timeline.api.chunk_unknown", 404)
+    raw = payload["raw"]
+    _, report = timeline_extract.ManualExtractor().parse_response(raw, lang=lang, source_text=text, chunk=True)
+    record["extraction"]["per_chunk"][str(chunk_id)] = {"status": report["status"], "raw": raw}
+    timeline_store.push_raw_response(record, raw)
+    result = {"merged": False, "edited": False, "report": None}
+    if report["status"] != "error":
+        result = _remerge(record, lang, force=bool(payload.get("replace_edits")))
+    record = timeline_store.save_timeline(tid, record)
+    ok = report["status"] != "error"
+    return jsonify(ok=ok, chunk={"id": chunk_id, "status": report["status"]},
+                   report=_with_messages(report), **_merge_payload(record, result)), 200 if ok else 422
+
+
+@app.route("/api/timeline/<tid>/merge", methods=["POST"])
+def api_timeline_merge(tid):
+    """
+    Refait la fusion des paragraphes : `{separate: clé}` annule la fusion d'un groupe
+    de doublons, `{join: clé}` la rétablit, `{force: true}` accepte d'écraser les
+    retouches faites depuis la dernière fusion.
+    """
+    import timeline_store
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    payload = request.get_json(silent=True) or {}
+    keep = record["extraction"]["merge"]["keep_separate"]
+    if isinstance(payload.get("separate"), str) and payload["separate"] not in keep:
+        keep.append(payload["separate"])
+    if isinstance(payload.get("join"), str) and payload["join"] in keep:
+        keep.remove(payload["join"])
+    result = _remerge(record, _timeline_view(record)["lang"], force=bool(payload.get("force")))
+    if result["edited"]:
+        return jsonify(ok=False, **_merge_payload(record, result)), 409
+    record = timeline_store.save_timeline(tid, record)
+    return jsonify(ok=True, **_merge_payload(record, result))
+
+
+@app.route("/api/timeline/<tid>/prompt")
+def api_timeline_prompt(tid):
+    """Prompt d'extraction : de toute la frise, ou d'un paragraphe (`?chunk_id=`), `?mode=`, `?skill=1`."""
+    import timeline_extract
+    import timeline_store
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    text = record.get("source_text") or ""
+    if not text:
+        return _timeline_error("timeline.api.no_source", 404)
+    view = _timeline_view(record)
+    extraction = record["extraction"]
+    mode = request.args.get("mode")
+    mode = mode if mode in timeline_store.EXTRACTION_MODES else extraction["mode"]
+    skill = request.args.get("skill") == "1" if "skill" in request.args else extraction["skill"]
+    chunk_arg = request.args.get("chunk_id")
+    tracks = ()
+    if chunk_arg:
+        try:
+            _, text = _chunk_source(record, chunk_arg)
+        except ValueError:
+            return _timeline_error("timeline.api.chunk_unknown", 404)
+        # Le modèle réutilise les pistes déjà présentes : la fusion reste lisible.
+        tracks = [{"id": t["id"], "label": t["label"]} for t in (record.get("data") or {}).get("tracks") or []]
+    built = timeline_extract.ManualExtractor().build_request(
+        text, view["lang"], mode, title=view["title"], skill=skill, chunk=bool(chunk_arg), tracks=tracks)
+    return jsonify(ok=True, prompt=built["prompt"], chars=built["chars"], tokens=built["tokens"],
+                   mode=mode, skill=skill)
+
+
+@app.route("/api/timeline/<tid>/correction-prompt")
+def api_timeline_correction_prompt(tid):
+    """Prompt de correction du dernier collage (de la frise, ou d'un paragraphe : `?chunk_id=`)."""
+    import timeline_extract
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    lang = _timeline_view(record)["lang"]
+    chunk_arg = request.args.get("chunk_id")
+    if chunk_arg:
+        try:
+            chunk_id, text = _chunk_source(record, chunk_arg)
+        except ValueError:
+            return _timeline_error("timeline.api.chunk_unknown", 404)
+        raw = (record["extraction"]["per_chunk"].get(str(chunk_id)) or {}).get("raw")
+    else:
+        text, raw = record.get("source_text"), (record.get("raw_responses") or [None])[-1]
+    if not raw:
+        return _timeline_error("timeline.api.nothing_to_fix", 404)
+    extractor = timeline_extract.ManualExtractor()
+    _, report = extractor.parse_response(raw, lang=lang, source_text=text, chunk=bool(chunk_arg))
+    built = extractor.correction_request(report, lang=lang, include_warnings=request.args.get("warnings") == "1")
+    if not built["prompt"]:
+        return _timeline_error("timeline.api.nothing_to_fix", 404)
+    return jsonify(ok=True, **built)
+
+
+@app.route("/api/timeline/scopes/<project_id>")
+def api_timeline_scopes(project_id):
+    """Portées proposées depuis la vue de travail pour le chunk courant : taille, tokens, stratégie."""
+    import timeline_prompt
+    project = load_project(project_id)
+    if not project or not project["prompts"]:
+        return _timeline_error("api.project_not_found", 404)
+    try:
+        chunk_id = int(request.args.get("chunk_id"))
+    except (TypeError, ValueError):
+        chunk_id = project["prompts"][0]["id"]
+    lang = current_lang()
+
+    def summary(scope):
+        try:
+            result = timeline_prompt.scope_summary(project, scope, lang)
+        except ValueError:
+            return None
+        return result if result["chars"] else None
+
+    chapters = []
+    for level in timeline_prompt.chapter_levels(project, chunk_id):
+        found = summary({"kind": "chapter", "deck_path": level["deck_path"]})
+        if found:
+            chapters.append(dict(found, label=level["label"], path=level["path"], depth=level["depth"]))
+    return jsonify(
+        ok=True, lang=lang, threshold=timeline_prompt.SINGLE_PROMPT_MAX_CHARS, chunk_id=chunk_id,
+        chunk=summary({"kind": "chunk", "chunk_ids": [chunk_id]}), chapters=chapters,
+        project=summary({"kind": "project"}),
+        timelines=[t for t in _timeline_summaries() if t["project_id"] == project_id],
+    )
+
+
+@app.route("/timeline/skill.md")
+def timeline_skill():
+    """Le Skill « Frise chronologique Ankigen », à copier dans un fichier SKILL.md."""
+    import timeline_prompt
+    lang = request.args.get("lang") if request.args.get("lang") in ("en", "fr") else current_lang()
+    return app.response_class(timeline_prompt.skill_text(lang), mimetype="text/markdown")
 
 
 @app.route("/api/timeline/validate", methods=["POST"])
@@ -766,15 +1040,19 @@ def api_timeline_render(tid):
     doc = report["normalized"] if report else record.get("data")
     if not doc:
         return _timeline_error("timeline.api.empty", 404)
+    import timeline_quotes
+    quotes, _ = timeline_quotes.check_document(doc, record.get("source_text"))
     options, _ = _render_options(payload.get("options"))
+    # L'aperçu montre les citations introuvables ; l'export ne le fera que sur option.
+    options = replace(options, unverified=tuple(sorted(i for i, s in quotes.items() if s == "not_found")))
     result = render(doc, options, id_prefix="tl-preview")
     warnings = [dict(w, message=tr(f"timeline.warn.{w['code']}", **w.get("params", {})))
                 for w in result.warnings]
     return jsonify(
         ok=True, svg=result.svg, width=result.width, height=result.height,
         warnings=warnings, stats=result.stats, notes=list(result.layout.notes),
-        dates=_date_labels(doc, doc["lang"]),
-        report=_with_messages(report) if report else None,
+        dates=_date_labels(doc, doc["lang"]), quotes=quotes,
+        report=_with_messages(_with_quotes(report, record)) if report else None,
     )
 
 

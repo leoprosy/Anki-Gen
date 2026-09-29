@@ -8,6 +8,7 @@ puis ouvre http://127.0.0.1:5000
 """
 
 import io
+import json
 import re
 import zipfile
 from pathlib import Path
@@ -179,7 +180,8 @@ def _with_export_headers(response, filename, data):
 # ──────────────────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return render_template("upload.html", projects=list_projects())
+    return render_template("upload.html", projects=list_projects(), timelines=_timeline_summaries(),
+                           timeline_i18n=catalog_for_js(current_lang(), prefix="timeline.ui."))
 
 
 @app.route("/upload", methods=["POST"])
@@ -527,6 +529,271 @@ def api_export_anki_media(project_id):
 def delete_project_route(project_id):
     delete_project(project_id)
     return redirect(url_for("index"))
+
+# ──────────────────────────────────────────────────────────────
+# Frises chronologiques
+# ──────────────────────────────────────────────────────────────
+# Les modules timeline_* sont importés DANS les routes : une frise cassée ne doit
+# jamais empêcher l'app de démarrer ni l'accueil de s'afficher.
+# (build_app_payload suit ces imports : ils partent quand même dans app.zip.)
+TIMELINE_THEMES = ("light", "dark", "print")
+
+
+def _timeline_summaries():
+    """Frises du tableau de bord ; une erreur ici laisse l'accueil s'afficher sans elles."""
+    try:
+        from timeline_store import list_timelines
+        return list_timelines()
+    except Exception:           # noqa: BLE001 — l'accueil passe avant la frise
+        app.logger.exception("liste des frises illisible")
+        return []
+
+
+def _timeline_error(key, status, **params):
+    return jsonify(ok=False, error=tr(key, **params)), status
+
+
+def _load_timeline_or_error(tid):
+    """(enregistrement, None) ou (None, réponse d'erreur JSON)."""
+    import timeline_store
+    try:
+        record = timeline_store.load_timeline(tid)
+    except timeline_store.TimelineIdError:
+        return None, _timeline_error("timeline.api.not_found", 404)
+    except timeline_store.TimelineStoreError:
+        app.logger.exception("frise illisible : %s", tid)
+        return None, _timeline_error("timeline.api.unreadable", 500)
+    if record is None:
+        return None, _timeline_error("timeline.api.not_found", 404)
+    return record, None
+
+
+def _render_options(raw):
+    """Options de rendu venues du navigateur : tout ce qui n'est pas reconnu est ignoré."""
+    from timeline_layout import WIDTH_MAX, WIDTH_MIN, LayoutOptions
+    raw = raw if isinstance(raw, dict) else {}
+    theme = raw.get("theme") if raw.get("theme") in TIMELINE_THEMES else "light"
+    density = raw.get("density") if raw.get("density") in ("comfortable", "compact") else "comfortable"
+    width_mode = "fixed" if raw.get("width_mode") == "fixed" else "auto"
+    try:
+        width_px = min(WIDTH_MAX, max(WIDTH_MIN, int(raw.get("width_px") or 1200)))
+    except (TypeError, ValueError):
+        width_px = 1200
+    stored = {"theme": theme, "density": density, "width_mode": width_mode, "width_px": width_px}
+    return LayoutOptions(theme=theme, density=density, width_mode=width_mode, width_px=width_px), stored
+
+
+def _validated(payload, default_lang):
+    """Rapport de validation d'un `{raw}` (texte collé) ou d'un `{data}` (objet édité)."""
+    import timeline_schema
+    if isinstance(payload.get("raw"), str):
+        return timeline_schema.validate_raw(payload["raw"], default_lang=default_lang)
+    if "data" in payload:
+        size = len(json.dumps(payload["data"], ensure_ascii=False).encode("utf-8"))
+        if size > timeline_schema.MAX_DOCUMENT_BYTES:
+            return timeline_schema.validate_raw("x" * (timeline_schema.MAX_DOCUMENT_BYTES + 1))
+        return timeline_schema.validate(payload["data"], default_lang=default_lang)
+    return timeline_schema.validate_raw("", default_lang=default_lang)
+
+
+def _with_messages(report):
+    import timeline_schema
+    return timeline_schema.with_messages(report, current_lang())
+
+
+def _date_labels(doc, lang):
+    """Date affichée de chaque élément, pour les lignes du rail et les infobulles."""
+    from timeline_dates import DateError, format_date, format_range, parse_date
+    out = {}
+    as_of = doc.get("as_of")
+    for kind in ("eras", "periods", "events"):
+        for element in doc.get(kind, []):
+            try:
+                approx = element.get("approx", False)
+                if kind == "events":
+                    date = parse_date(element["date"], element.get("precision"))
+                    out[element["id"]] = format_date(date, lang, approx=approx)
+                else:
+                    start = parse_date(element["start"], element.get("precision"))
+                    end = parse_date(element["end"], None if element["end"] == "present"
+                                     else element.get("precision"), allow_present=True, as_of=as_of)
+                    out[element["id"]] = format_range(start, end, lang, approx=approx)
+            except (DateError, KeyError, TypeError):
+                continue
+    return out
+
+
+def _timeline_view(record):
+    """Ce que la page reçoit : l'enregistrement, sans le texte source (jusqu'à 200 000 caractères)."""
+    return {
+        "id": record["id"],
+        "title": (record.get("data") or {}).get("title") or record.get("title") or "",
+        "lang": (record.get("data") or {}).get("lang") or record.get("lang") or current_lang(),
+        "source": record["source"],
+        "has_source_text": bool(record.get("source_text")),
+        "data": record.get("data"),
+        "last_raw": (record.get("raw_responses") or [None])[-1],
+        "render_options": record.get("render_options") or {},
+        "created_at": record.get("created_at"),
+        "updated_at": record.get("updated_at"),
+    }
+
+
+@app.route("/timeline/<tid>")
+def timeline_page(tid):
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return redirect(url_for("index"))
+    return render_template(
+        "timeline.html",
+        timeline=_timeline_view(record),
+        timeline_i18n=catalog_for_js(current_lang(), prefix="timeline."),
+    )
+
+
+@app.route("/timeline/new", methods=["POST"])
+def timeline_new():
+    """
+    Nouvelle frise, depuis un JSON (`{json, force?}`) ou un texte (`{text, title, lang}`).
+
+    Un JSON invalide est refusé avec son rapport ; `force` crée quand même une frise
+    vide qui garde le collage, pour le corriger dans l'onglet JSON.
+    """
+    import timeline_schema
+    import timeline_store
+    payload = request.get_json(silent=True) or {}
+    lang = current_lang()
+    try:
+        if isinstance(payload.get("json"), str):
+            raw = payload["json"]
+            report = timeline_schema.validate_raw(raw, default_lang=lang)
+            if report["ok"]:
+                data = report["normalized"]
+                tid, record = timeline_store.create_timeline(
+                    title=data["title"], lang=data["lang"], data=data, source={"kind": "import"})
+            elif payload.get("force"):
+                title = tr("timeline.ui.untitled")
+                record = timeline_store.new_record(title=title, lang=lang, source={"kind": "import"})
+                timeline_store.push_raw_response(record, raw)
+                tid = timeline_store.new_timeline_id(title)
+                record = timeline_store.save_timeline(tid, record)
+            else:
+                return jsonify(ok=False, report=_with_messages(report)), 422
+        elif isinstance(payload.get("text"), str):
+            title = (payload.get("title") or "").strip()
+            if not title:
+                return _timeline_error("timeline.api.title_required", 400)
+            text_lang = payload.get("lang") if payload.get("lang") in ("en", "fr") else lang
+            tid, record = timeline_store.create_timeline(
+                title=title[:120], lang=text_lang, source={"kind": "text"}, source_text=payload["text"])
+        else:
+            return _timeline_error("timeline.api.bad_request", 400)
+    except ValueError:
+        return _timeline_error("timeline.api.text_too_long", 400,
+                               max=timeline_store.MAX_SOURCE_CHARS)
+    return jsonify(ok=True, id=tid, url=url_for("timeline_page", tid=tid))
+
+
+@app.route("/timeline/<tid>/delete", methods=["POST"])
+def timeline_delete(tid):
+    import timeline_store
+    try:
+        timeline_store.delete_timeline(tid)
+    except timeline_store.TimelineIdError:
+        abort(404)
+    return redirect(url_for("index"))
+
+
+@app.route("/api/timelines")
+def api_timelines():
+    return jsonify(timelines=_timeline_summaries())
+
+
+@app.route("/api/timeline/<tid>", methods=["GET", "POST"])
+def api_timeline(tid):
+    """GET : la frise et le rapport de son document. POST : `{data}` ou `{raw}` → validation, enregistrement."""
+    import timeline_schema
+    import timeline_store
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    view = _timeline_view(record)
+    if request.method == "GET":
+        report = timeline_schema.validate(record["data"], default_lang=view["lang"]) if record["data"] else None
+        return jsonify(ok=True, timeline=view, report=_with_messages(report) if report else None)
+
+    payload = request.get_json(silent=True) or {}
+    report = _validated(payload, view["lang"])
+    if isinstance(payload.get("raw"), str):
+        timeline_store.push_raw_response(record, payload["raw"])
+    if "options" in payload:
+        record["render_options"] = _render_options(payload["options"])[1]
+    if report["ok"]:
+        data = report["normalized"]
+        record["data"] = data
+        record["title"] = data["title"]
+        record["lang"] = data["lang"]
+    record = timeline_store.save_timeline(tid, record)
+    status = 200 if report["ok"] else 422
+    return jsonify(ok=report["ok"], report=_with_messages(report),
+                   updated_at=record["updated_at"]), status
+
+
+@app.route("/api/timeline/validate", methods=["POST"])
+def api_timeline_validate():
+    payload = request.get_json(silent=True) or {}
+    lang = payload.get("lang") if payload.get("lang") in ("en", "fr") else current_lang()
+    return jsonify(_with_messages(_validated(payload, lang)))
+
+
+@app.route("/api/timeline/<tid>/render", methods=["POST"])
+def api_timeline_render(tid):
+    """
+    `{data?, options}` → `{svg, width, height, warnings, stats, notes, dates}`.
+
+    Alimente l'aperçu : on y envoie le document NON enregistré en cours d'édition ;
+    sans `data`, c'est le document enregistré qui est dessiné.
+    """
+    from timeline_render_svg import render
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    payload = request.get_json(silent=True) or {}
+    lang = _timeline_view(record)["lang"]
+    report = _validated(payload, lang) if "data" in payload else None
+    if report is not None and not report["ok"]:
+        return jsonify(ok=False, report=_with_messages(report)), 422
+    doc = report["normalized"] if report else record.get("data")
+    if not doc:
+        return _timeline_error("timeline.api.empty", 404)
+    options, _ = _render_options(payload.get("options"))
+    result = render(doc, options, id_prefix="tl-preview")
+    warnings = [dict(w, message=tr(f"timeline.warn.{w['code']}", **w.get("params", {})))
+                for w in result.warnings]
+    return jsonify(
+        ok=True, svg=result.svg, width=result.width, height=result.height,
+        warnings=warnings, stats=result.stats, notes=list(result.layout.notes),
+        dates=_date_labels(doc, doc["lang"]),
+        report=_with_messages(report) if report else None,
+    )
+
+
+@app.route("/api/timeline/date")
+def api_timeline_date():
+    """Aperçu en direct d'une date du tiroir d'édition : « 1971-08-15 » → « 15 août 1971 »."""
+    from timeline_dates import DateError, format_date, parse_date
+    value = (request.args.get("value") or "").strip()
+    precision = request.args.get("precision") or None
+    lang = request.args.get("lang") if request.args.get("lang") in ("en", "fr") else current_lang()
+    try:
+        date = parse_date(value, precision, allow_present=request.args.get("end") == "1",
+                          as_of=request.args.get("as_of") or None)
+    except DateError as error:
+        return jsonify(ok=False, message=tr(f"timeline.err.{error.code}", **error.params))
+    if date.present:
+        return jsonify(ok=True, text=tr("timeline.ui.present"))
+    return jsonify(ok=True, text=format_date(date, lang, approx=request.args.get("approx") == "1"))
+
 
 # ──────────────────────────────────────────────────────────────
 # Auto-update (repris de main)

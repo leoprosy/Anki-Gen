@@ -43,6 +43,15 @@ class TestLocalModules(unittest.TestCase):
     def test_ships_the_runtime_probe(self):
         self.assertIn("runtime_probe.py", local_modules())
 
+    def test_ships_the_timeline_modules_imported_by_routes(self):
+        # Importés dans les routes (une frise cassée ne bloque pas le démarrage) :
+        # ils doivent partir quand même dans app.zip et dans l'exe.
+        modules = set(local_modules())
+        self.assertLessEqual({"timeline_dates.py", "timeline_schema.py", "timeline_store.py",
+                              "timeline_layout.py", "timeline_fonts.py", "timeline_render_svg.py"}, modules)
+        # Le raster sert à la galerie ; les routes ne l'importent qu'avec les exports.
+        self.assertNotIn("timeline_render_raster.py", modules)
+
     def test_leaves_out_scripts_notes_and_tests(self):
         modules = set(local_modules())
         # new_version.py est une note markdown : elle ne doit jamais partir chez l'utilisateur.

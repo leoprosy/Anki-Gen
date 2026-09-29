@@ -1048,6 +1048,9 @@ def _attempt(doc, options, measure, forced_width, iteration):
         "notes": len(notes), "clusters": cluster_count, "breaks": len(scale.breaks),
         "width": width, "height": height, "iterations": iteration + 1,
         "period_rows": [state.period_rows for state in lane_states],
+        # Couleur et forme réelles de chaque piste : le rail de l'éditeur les reprend.
+        "tracks": [{"id": state.track["id"], "color": state.color, "shape": state.shape}
+                   for state in lane_states if state.track],
     }
     return (Layout(width=width, height=height, primitives=ordered,
                    notes=tuple({"number": n["number"], "ref": n["ref"], "text": note_rows[n["ref"]]}

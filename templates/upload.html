@@ -73,8 +73,99 @@
       <div class="empty-state">{{ t('upload.empty_state') }}</div>
       {% endif %}
     </section>
+
+    <section class="card tl-home" aria-labelledby="timelines-title">
+      <div class="tl-home__head">
+        <h3 id="timelines-title">{{ t('timeline.ui.timelines') }}</h3>
+        <button type="button" class="btn sm" id="tl-new-open">
+          <svg width="14" height="14" aria-hidden="true"><use href="#i-edit"></use></svg>
+          <span>{{ t('timeline.ui.new_timeline') }}</span>
+        </button>
+      </div>
+      <p class="muted">{{ t('timeline.ui.timelines_count', n=(timelines or [])|length) }}</p>
+
+      {% if timelines %}
+      <div class="project-list">
+        {% for tl in timelines %}
+        <div class="project-row">
+          <div class="project-row__main">
+            <h4>{{ tl.title or t('timeline.ui.untitled') }}</h4>
+            <div class="muted">
+              {{ t('timeline.ui.source_' ~ tl.source_kind) }}{% if tl.project_id %} · {{ tl.project_id }}{% endif %}
+              &middot; {{ t('timeline.ui.elements_count', events=tl.events, periods=tl.periods) }}
+              {% if tl.updated_at %}&middot; {{ t('timeline.ui.updated', date=tl.updated_at[:10]) }}{% endif %}
+            </div>
+          </div>
+          <div class="project-row__actions">
+            <a href="{{ url_for('timeline_page', tid=tl.id) }}" class="btn sm">{{ t('timeline.ui.open') }}</a>
+            <form action="{{ url_for('timeline_delete', tid=tl.id) }}" method="post"
+              onsubmit="return confirm(window.T('timeline.ui.delete_timeline_confirm'));">
+              <button type="submit" class="btn danger sm">{{ t('project.delete') }}</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state">{{ t('timeline.ui.timelines_empty') }}</div>
+      {% endif %}
+    </section>
   </div>
 </main>
+
+<dialog class="tl-modal" id="tl-new" aria-labelledby="tl-new-title">
+  <div class="tl-modal__inner">
+    <div class="tl-modal__head">
+      <h3 id="tl-new-title">{{ t('timeline.ui.new_timeline') }}</h3>
+      <button type="button" class="icon-btn" id="tl-new-close" aria-label="{{ t('timeline.ui.close') }}">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+    <div class="seg" role="tablist" id="tl-new-tabs">
+      <button type="button" role="tab" data-tab="text" class="active" aria-selected="true"
+        aria-controls="tl-new-text">{{ t('timeline.ui.tab_from_text') }}</button>
+      <button type="button" role="tab" data-tab="json" aria-selected="false" tabindex="-1"
+        aria-controls="tl-new-json">{{ t('timeline.ui.tab_import') }}</button>
+    </div>
+
+    <div class="tl-modal__panel" id="tl-new-text" role="tabpanel">
+      <label class="field">
+        <span>{{ t('timeline.ui.field_title') }}</span>
+        <input type="text" id="tl-new-title-input" maxlength="120" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>{{ t('timeline.ui.field_lang') }}</span>
+        <select id="tl-new-lang">
+          {% for language in languages %}
+          <option value="{{ language.code }}"{% if language.code == lang %} selected{% endif %}>{{ language.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="field">
+        <span>{{ t('timeline.ui.field_text') }}</span>
+        <textarea id="tl-new-text-input" maxlength="200000"></textarea>
+        <small class="muted">{{ t('timeline.ui.text_help') }}</small>
+      </label>
+    </div>
+
+    <div class="tl-modal__panel" id="tl-new-json" role="tabpanel" hidden>
+      <div class="drop-zone" id="tl-new-drop" tabindex="0" role="button" aria-label="{{ t('timeline.ui.import_drop') }}">
+        <span class="drop-zone__icon"><svg width="30" height="30" aria-hidden="true"><use href="#i-file"></use></svg></span>
+        <span class="drop-zone__prompt" id="tl-new-drop-label">{{ t('timeline.ui.import_drop') }}</span>
+        <input type="file" id="tl-new-file" accept=".json,application/json" class="drop-zone__input">
+      </div>
+      <textarea id="tl-new-json-input" class="mono" spellcheck="false"
+        aria-label="{{ t('timeline.ui.tab_import') }}" placeholder="{{ t('timeline.ui.json_placeholder') }}"></textarea>
+    </div>
+
+    <ul class="tl-modal__errors" id="tl-new-errors" aria-live="polite"></ul>
+    <div class="tl-modal__actions">
+      <button type="button" class="btn ghost" id="tl-new-cancel">{{ t('timeline.ui.cancel') }}</button>
+      <button type="button" class="btn" id="tl-new-force" hidden>{{ t('timeline.ui.create_anyway') }}</button>
+      <button type="button" class="btn primary" id="tl-new-create">{{ t('timeline.ui.create') }}</button>
+    </div>
+  </div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -120,4 +211,9 @@
     }
   })();
 </script>
+<script>
+  Object.assign(window.__I18N__, {{ (timeline_i18n or {}) | tojson }});
+  window.__TIMELINE_NEW_URL__ = {{ url_for('timeline_new') | tojson }};
+</script>
+<script src="{{ url_for('static', filename='timeline-home.js') }}"></script>
 {% endblock %}

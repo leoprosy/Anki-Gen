@@ -238,6 +238,17 @@
     return count;
   }
 
+  /**
+   * Paragraphe par paragraphe : le prochain paragraphe à traiter après `currentId`
+   * (en bouclant), à faire ou en erreur, de préférence un qui cite des dates.
+   */
+  function nextPendingChunk(chunks, currentId) {
+    const index = chunks.findIndex((c) => c.id === currentId);
+    const after = chunks.slice(index + 1).concat(chunks.slice(0, Math.max(0, index)));
+    const pending = after.filter((c) => c.status === "pending" || c.status === "error");
+    return pending.find((c) => c.mentions > 0) || pending[0] || null;
+  }
+
   return { ORDER, serialize, debounce, parsePointer, elementAt, pointerRange, lineColumnOffset,
-           dateKey, compareDates, uniqueId, slug, renameId, trackUsage };
+           dateKey, compareDates, uniqueId, slug, renameId, trackUsage, nextPendingChunk };
 });

@@ -142,3 +142,19 @@ test('renameId updates every reference', () => {
   assert.equal(doc.links[0].from, 'traite');
   assert.equal(core.trackUsage(doc, 'commerce'), 2);
 });
+
+test('nextPendingChunk prefers the next paragraph that cites dates, and wraps around', () => {
+  const chunks = [
+    { id: 1, status: 'ok', mentions: 3 },
+    { id: 2, status: 'pending', mentions: 0 },
+    { id: 3, status: 'pending', mentions: 4 },
+    { id: 4, status: 'error', mentions: 2 },
+  ];
+  assert.equal(core.nextPendingChunk(chunks, 1).id, 3);
+  assert.equal(core.nextPendingChunk(chunks, 3).id, 4);
+  // Après le dernier, on repart du début ; un paragraphe sans date reste un recours.
+  assert.equal(core.nextPendingChunk(chunks, 4).id, 3);
+  const onlyDateless = [{ id: 1, status: 'ok', mentions: 1 }, { id: 2, status: 'pending', mentions: 0 }];
+  assert.equal(core.nextPendingChunk(onlyDateless, 1).id, 2);
+  assert.equal(core.nextPendingChunk([{ id: 1, status: 'ok', mentions: 1 }], 1), null);
+});

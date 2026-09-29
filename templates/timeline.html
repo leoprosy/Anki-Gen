@@ -72,6 +72,10 @@
             aria-selected="true" aria-controls="tl-panel-preview">{{ t('timeline.ui.tab_preview') }}</button>
           <button type="button" role="tab" id="tl-tab-json" data-tab="json" aria-selected="false"
             aria-controls="tl-panel-json" tabindex="-1">{{ t('timeline.ui.tab_json') }}</button>
+          {% if timeline.has_source_text %}
+          <button type="button" role="tab" id="tl-tab-prompt" data-tab="prompt" aria-selected="false"
+            aria-controls="tl-panel-prompt" tabindex="-1">{{ t('timeline.ui.tab_prompt') }}</button>
+          {% endif %}
         </div>
         <div class="pane__tools tl-tools" id="tl-tools">
           <div class="seg" id="tl-theme" role="radiogroup" aria-label="{{ t('timeline.ui.theme') }}">
@@ -113,8 +117,14 @@
         </div>
         <div class="tl-empty" id="tl-empty" hidden>
           <h3>{{ t('timeline.ui.empty_title') }}</h3>
-          <p class="muted">{{ t('timeline.ui.empty_help') }}</p>
+          <p class="muted">{{ t('timeline.ui.empty_help_source' if timeline.has_source_text else 'timeline.ui.empty_help') }}</p>
           <div class="tl-empty__actions">
+            {% if timeline.has_source_text %}
+            <button type="button" class="btn" id="tl-empty-prompt">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+              <span>{{ t('timeline.ui.copy_prompt') }}</span>
+            </button>
+            {% endif %}
             <button type="button" class="btn" id="tl-empty-paste">
               <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
               <span>{{ t('timeline.ui.paste') }}</span>
@@ -130,10 +140,53 @@
           placeholder="{{ t('timeline.ui.json_placeholder') }}"></textarea>
         <div class="tl-json-bar">
           <button type="button" class="btn sm" id="tl-json-validate">{{ t('timeline.ui.json_validate') }}</button>
+          {% if timeline.has_source_text %}
+          <button type="button" class="btn sm ghost" id="tl-json-correction" hidden>{{ t('timeline.ui.correction_open') }}</button>
+          {% endif %}
           <span class="muted" id="tl-json-status" aria-live="polite"></span>
         </div>
         <ul class="tl-json-errors" id="tl-json-errors"></ul>
       </div>
+
+      {% if timeline.has_source_text %}
+      <div class="pane__body pane__body--flush tl-body" id="tl-panel-prompt" role="tabpanel" aria-labelledby="tl-tab-prompt" hidden>
+        <div class="tl-prompt-bar">
+          <div class="tl-chunk-nav" id="tl-chunk-nav" hidden>
+            <button type="button" class="icon-btn" data-chunk-step="-1" aria-label="{{ t('timeline.ui.chunk_prev') }}" title="{{ t('timeline.ui.chunk_prev') }}">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-prev"></use></svg>
+            </button>
+            <span class="tl-chunk-nav__label" id="tl-chunk-label" aria-live="polite"></span>
+            <button type="button" class="icon-btn" data-chunk-step="1" aria-label="{{ t('timeline.ui.chunk_next') }}" title="{{ t('timeline.ui.chunk_next') }}">
+              <svg width="16" height="16" aria-hidden="true"><use href="#i-next"></use></svg>
+            </button>
+          </div>
+          <div class="seg" id="tl-mode" role="radiogroup" aria-label="{{ t('timeline.ui.mode') }}">
+            <button type="button" role="radio" data-mode="strict" aria-checked="true" class="active"
+              title="{{ t('timeline.ui.mode_strict_help') }}">{{ t('timeline.ui.mode_strict') }}</button>
+            <button type="button" role="radio" data-mode="enriched" aria-checked="false"
+              title="{{ t('timeline.ui.mode_enriched_help') }}">{{ t('timeline.ui.mode_enriched') }}</button>
+          </div>
+          <label class="tl-check" title="{{ t('timeline.ui.skill_help') }}">
+            <input type="checkbox" id="tl-skill"> {{ t('timeline.ui.skill_installed') }}
+          </label>
+          <button type="button" class="btn sm ghost" id="tl-skill-copy">{{ t('timeline.ui.skill_copy') }}</button>
+          <span class="tl-prompt-size muted" id="tl-prompt-size"></span>
+        </div>
+        <div class="tl-correction" id="tl-correction" hidden>
+          <div class="tl-correction__text">
+            <strong>{{ t('timeline.ui.correction_title') }}</strong>
+            <span id="tl-correction-summary"></span>
+          </div>
+          <label class="tl-check">
+            <input type="checkbox" id="tl-correction-warnings"> {{ t('timeline.ui.correction_warnings') }}
+          </label>
+          <button type="button" class="btn sm ghost" id="tl-correction-back">{{ t('timeline.ui.correction_back') }}</button>
+        </div>
+        <ul class="tl-json-errors" id="tl-chunk-errors"></ul>
+        <p class="tl-prompt-note muted" id="tl-prompt-note" hidden></p>
+        <pre class="tl-prompt" id="tl-prompt" tabindex="0" aria-label="{{ t('timeline.ui.tab_prompt') }}"></pre>
+      </div>
+      {% endif %}
     </article>
   </section>
 
@@ -157,8 +210,26 @@
 
 <!-- ── Dock d'actions : visible à toutes les tailles ──────────── -->
 <footer class="dock" aria-label="{{ t('work.actions') }}">
+  {% if timeline.extraction.strategy == 'per_chunk' and timeline.chunks %}
   <div class="dock__group">
-    <button type="button" class="btn" id="tl-paste" title="{{ t('timeline.ui.paste_title') }}">
+    <button type="button" class="icon-btn" data-chunk-step="-1" title="{{ t('timeline.ui.chunk_prev') }} (Alt+←)" aria-label="{{ t('timeline.ui.chunk_prev') }}">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-prev"></use></svg>
+    </button>
+    <span class="counter" id="tl-dock-counter"></span>
+    <button type="button" class="icon-btn" data-chunk-step="1" title="{{ t('timeline.ui.chunk_next') }} (Alt+→)" aria-label="{{ t('timeline.ui.chunk_next') }}">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
+    </button>
+  </div>
+  <div class="dock__sep"></div>
+  {% endif %}
+  <div class="dock__group">
+    {% if timeline.has_source_text %}
+    <button type="button" class="btn" id="tl-copy-prompt" title="{{ t('timeline.ui.copy_prompt_title') }} (Ctrl+Maj+C)">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+      <span class="lbl" id="tl-copy-prompt-label">{{ t('timeline.ui.copy_prompt') }}</span>
+    </button>
+    {% endif %}
+    <button type="button" class="btn" id="tl-paste" title="{{ t('timeline.ui.paste_title') }} (Ctrl+Maj+V)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
       <span class="lbl">{{ t('timeline.ui.paste') }}</span>
     </button>
@@ -181,6 +252,10 @@
     render: {{ url_for('api_timeline_render', tid=timeline.id) | tojson }},
     validate: {{ url_for('api_timeline_validate') | tojson }},
     date: {{ url_for('api_timeline_date') | tojson }},
+    prompt: {{ url_for('api_timeline_prompt', tid=timeline.id) | tojson }},
+    correction: {{ url_for('api_timeline_correction_prompt', tid=timeline.id) | tojson }},
+    merge: {{ url_for('api_timeline_merge', tid=timeline.id) | tojson }},
+    skill: {{ url_for('timeline_skill') | tojson }},
   };
 </script>
 <script src="{{ url_for('static', filename='timeline-core.js') }}"></script>

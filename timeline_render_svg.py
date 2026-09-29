@@ -224,7 +224,7 @@ def unsupported_characters(doc, fonts):
     return seen
 
 
-def render(doc, options=None, *, fonts=None, embed_font=False, id_prefix="tl") -> Rendered:
+def render(doc, options=None, *, fonts=None, embed_font=False, id_prefix="tl", background=True) -> Rendered:
     """
     Chaîne complète : mise en page avec la vraie police, vérification des
     invariants, SVG. Une violation n'est jamais livrée en silence : elle est
@@ -256,6 +256,6 @@ def render(doc, options=None, *, fonts=None, embed_font=False, id_prefix="tl") -
     if missing:
         warnings.append({"code": "label_unsupported_chars", "params": {"chars": " ".join(missing)}})
     svg = render_svg(result, title=doc.get("title", ""), embed_font=embed_font, fonts=fonts,
-                     id_prefix=id_prefix)
+                     id_prefix=id_prefix, background=background)
     return Rendered(svg=svg, width=result.width, height=result.height, warnings=tuple(warnings),
                     stats=result.stats, layout=result)

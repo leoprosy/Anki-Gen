@@ -92,6 +92,15 @@ class TestScopes(unittest.TestCase):
         self.assertEqual(levels[0]["path"], "CH1: La mondialisation(1) › I - Les phases")
         self.assertEqual(tp.chapter_levels(project(), 99), [])
 
+    def test_scope_deck(self):
+        p = project()
+        self.assertEqual(tp.scope_deck(p, {"kind": "chunk", "chunk_ids": [2]}),
+                         "ESH::CH1: La mondialisation(1)::I - Les phases::A) Détail")
+        self.assertEqual(tp.scope_deck(p, {"kind": "chapter", "deck_path": "ESH::CH1: La mondialisation(1)::I - Les phases"}),
+                         "ESH::CH1: La mondialisation(1)::I - Les phases")
+        # Tout le cours : le cours lui-même, pas le préfixe partagé par plusieurs cours.
+        self.assertEqual(tp.scope_deck(p, {"kind": "project"}), "ESH::CH1: La mondialisation(1)")
+
     def test_scope_title(self):
         p = project()
         self.assertEqual(tp.scope_title(p, {"kind": "project"}), "La mondialisation")

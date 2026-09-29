@@ -176,6 +176,31 @@ def chapter_levels(project, chunk_id) -> list:
     return levels
 
 
+def scope_deck(project, scope) -> str:
+    """
+    Deck Anki de la portée, sous lequel iront les cartes de la frise : le chunk, le
+    chapitre, ou pour tout le cours le plus long préfixe commun aux decks du cours
+    (le cours lui-même plutôt que le préfixe partagé par plusieurs cours).
+    """
+    kind = scope.get("kind")
+    if kind == "chapter":
+        return "::".join(deck_segments(scope.get("deck_path")))
+    if kind == "chunk":
+        return "::".join(deck_segments(scope_chunks(project, scope)[0].get("deck")))
+    prefix_len = _prefix_length(project)
+    decks = [deck_segments(p.get("deck")) for p in project.get("prompts") or []]
+    decks = [segments for segments in decks if len(segments) > prefix_len] or [s for s in decks if s]
+    if not decks:
+        return ""
+    common = decks[0]
+    for segments in decks[1:]:
+        size = 0
+        while size < min(len(common), len(segments)) and common[size] == segments[size]:
+            size += 1
+        common = common[:size]
+    return "::".join(common)
+
+
 def scope_title(project, scope) -> str:
     """Titre proposé pour la frise d'une portée."""
     kind = scope.get("kind")

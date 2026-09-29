@@ -1056,6 +1056,140 @@ def api_timeline_render(tid):
     )
 
 
+# ── Exports (§9) ───────────────────────────────────────────────
+TIMELINE_EXPORT_FORMATS = ("png", "jpeg", "webp", "pdf", "svg", "json")
+
+
+def _export_options(source, record):
+    """Options d'export venues de la requête : toute valeur inconnue reprend son défaut."""
+    from timeline_layout import WIDTH_MAX, WIDTH_MIN
+    stored = record.get("render_options") or {}
+
+    def number(name, default, low, high, cast=float):
+        try:
+            return min(high, max(low, cast(source.get(name))))
+        except (TypeError, ValueError):
+            return default
+
+    def flag(name, default):
+        value = source.get(name)
+        return default if value is None else str(value).lower() in ("1", "true")
+
+    density = source.get("density")
+    return {
+        # L'export est en clair par défaut, quel que soit le thème de l'interface (§8.4).
+        "theme": source.get("theme") if source.get("theme") in TIMELINE_THEMES else "light",
+        "density": density if density in ("comfortable", "compact") else stored.get("density", "comfortable"),
+        "width_mode": "fixed" if source.get("width_mode") == "fixed" else "auto",
+        "width_px": number("width_px", 1200, WIDTH_MIN, WIDTH_MAX, int),
+        "scale": number("scale", 2.0, 1.0, 4.0),
+        "transparent": flag("transparent", False),
+        "quality": number("quality", 90, 1, 100, int),
+        "lossless": flag("lossless", False),
+        "embed_font": flag("embed_font", True),
+        "page": source.get("page") if source.get("page") in ("fit", "a4", "a3") else "fit",
+        "orientation": "portrait" if source.get("orientation") == "portrait" else "landscape",
+        "margin": number("margin", 10.0, 0.0, 30.0),
+        # Le marquage des citations introuvables est désactivé par défaut à l'export (§6.5).
+        "unverified": flag("unverified", False),
+    }
+
+
+def _export_render(record, doc, options, **svg_options):
+    """Mise en page (et SVG) d'un export, avec ses options de rendu."""
+    import timeline_quotes
+    from timeline_render_svg import render
+    layout_options, _ = _render_options(options)
+    if options["unverified"]:
+        quotes, _ = timeline_quotes.check_document(doc, record.get("source_text"))
+        layout_options = replace(layout_options, unverified=tuple(sorted(
+            i for i, status in quotes.items() if status == "not_found")))
+    else:
+        layout_options = replace(layout_options, show_unverified=False)
+    return render(doc, layout_options, **svg_options)
+
+
+def _export_warnings(warnings):
+    return [dict(w, message=tr(f"timeline.export.{w['code']}", **w.get("params", {}))) for w in warnings]
+
+
+@app.route("/export/timeline/<tid>.<fmt>")
+def export_timeline(tid, fmt):
+    """
+    Frise enregistrée → fichier. Comme l'export des cartes : téléchargement, copie dans
+    le dossier d'export (X-Export-Path), sauf pour le presse-papiers (`?to=clipboard`).
+    """
+    import timeline_render_raster
+    import timeline_store
+    if fmt not in TIMELINE_EXPORT_FORMATS:
+        abort(404)
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    doc = record.get("data")
+    if not doc:
+        return _timeline_error("timeline.api.empty", 404)
+    options = _export_options(request.args, record)
+    warnings = []
+    if fmt == "json":
+        data = (json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        mimetype, extension = "application/json", "json"
+    elif fmt == "svg":
+        rendered = _export_render(record, doc, options, embed_font=options["embed_font"])
+        data = ('<?xml version="1.0" encoding="UTF-8"?>\n' + rendered.svg + "\n").encode("utf-8")
+        mimetype, extension = "image/svg+xml", "svg"
+    else:
+        rendered = _export_render(record, doc, options)
+        exported = timeline_render_raster.export(
+            rendered.layout, fmt, scale=options["scale"], transparent=options["transparent"],
+            quality=options["quality"], lossless=options["lossless"], page=options["page"],
+            orientation=options["orientation"], margin_mm=options["margin"], title=doc.get("title", ""))
+        data, mimetype, extension = exported.data, exported.mimetype, exported.extension
+        warnings = _export_warnings(exported.warnings)
+    filename = f"{timeline_store.slugify_title(doc.get('title'))}.{extension}"
+    response = send_file(io.BytesIO(data), mimetype=mimetype, as_attachment=True, download_name=filename)
+    if warnings:
+        response.headers["X-Export-Warning"] = quote(" ".join(w["message"] for w in warnings))
+    if request.args.get("to") != "clipboard":
+        response = _with_export_headers(response, filename, data)
+    return response
+
+
+@app.route("/api/timeline/<tid>/export-preview", methods=["POST"])
+def api_timeline_export_preview(tid):
+    """Ce que la modale d'export annonce : miniature, dimensions finales, poids estimé, avertissements."""
+    import timeline_render_raster
+    import timeline_store
+    from timeline_render_svg import render_svg
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    doc = record.get("data")
+    if not doc:
+        return _timeline_error("timeline.api.empty", 404)
+    payload = request.get_json(silent=True) or {}
+    fmt = payload.get("fmt") if payload.get("fmt") in TIMELINE_EXPORT_FORMATS else "png"
+    options = _export_options(payload.get("options") if isinstance(payload.get("options"), dict) else {}, record)
+    rendered = _export_render(record, doc, options, id_prefix="tl-thumb")
+    layout = rendered.layout
+    if fmt in timeline_render_raster.FORMATS:
+        output = timeline_render_raster.estimate(
+            layout, fmt, scale=options["scale"], lossless=options["lossless"], page=options["page"],
+            orientation=options["orientation"], margin_mm=options["margin"])
+        extension = timeline_render_raster.EXTENSIONS[fmt]
+    elif fmt == "svg":
+        size = len(render_svg(layout, title=doc.get("title", ""), embed_font=options["embed_font"]).encode("utf-8"))
+        output = {"width": round(layout.width), "height": round(layout.height), "bytes": size, "warnings": []}
+        extension = "svg"
+    else:
+        size = len(json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8"))
+        output = {"bytes": size, "warnings": []}
+        extension = "json"
+    warnings = _export_warnings(output.pop("warnings"))
+    return jsonify(ok=True, svg=rendered.svg, width=layout.width, height=layout.height, output=output,
+                   warnings=warnings, filename=f"{timeline_store.slugify_title(doc.get('title'))}.{extension}")
+
+
 @app.route("/api/timeline/date")
 def api_timeline_date():
     """Aperçu en direct d'une date du tiroir d'édition : « 1971-08-15 » → « 15 août 1971 »."""

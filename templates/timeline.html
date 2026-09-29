@@ -234,6 +234,12 @@
       <span class="lbl">{{ t('timeline.ui.paste') }}</span>
     </button>
   </div>
+  <div class="dock__group">
+    <button type="button" class="btn" id="tl-export-open" title="{{ t('timeline.ui.export_title') }}">
+      <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
+      <span class="lbl">{{ t('timeline.ui.export') }}</span>
+    </button>
+  </div>
   <div class="dock__group dock__group--main">
     <button type="button" class="btn primary btn-save-next" id="tl-save" title="{{ t('timeline.ui.save') }} (Ctrl+Entrée)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
@@ -241,6 +247,119 @@
     </button>
   </div>
 </footer>
+
+<!-- ── Export (§9) ─────────────────────────────────────────────── -->
+<dialog class="tl-modal tl-export" id="tl-export" aria-labelledby="tl-export-title">
+  <div class="tl-modal__inner">
+    <div class="tl-modal__head">
+      <h3 id="tl-export-title">{{ t('timeline.ui.export_title') }}</h3>
+      <button type="button" class="icon-btn" id="tl-export-close" aria-label="{{ t('timeline.ui.close') }}">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+
+    <div class="tl-export__thumb" id="tl-export-thumb" aria-hidden="true"></div>
+    <p class="tl-export__dims" id="tl-export-dims" aria-live="polite"></p>
+    <ul class="tl-export__warnings" id="tl-export-warnings" aria-live="polite"></ul>
+
+    <div class="tl-export__options" id="tl-export-options">
+      <div class="tl-export__row">
+        <span class="tl-export__label" id="tl-export-format-label">{{ t('timeline.ui.export_format') }}</span>
+        <div class="seg" id="tl-export-format" role="radiogroup" aria-labelledby="tl-export-format-label">
+          {% for fmt, label in (('png', 'PNG'), ('jpeg', 'JPEG'), ('webp', 'WebP'), ('pdf', 'PDF'), ('svg', 'SVG'), ('json', 'JSON')) %}
+          <button type="button" role="radio" data-value="{{ fmt }}" aria-checked="false">{{ label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="tl-export__row" data-for="png jpeg webp pdf svg">
+        <span class="tl-export__label" id="tl-export-theme-label">{{ t('timeline.ui.theme') }}</span>
+        <div class="seg" id="tl-export-theme" role="radiogroup" aria-labelledby="tl-export-theme-label">
+          <button type="button" role="radio" data-value="light" aria-checked="false">{{ t('timeline.ui.theme_light') }}</button>
+          <button type="button" role="radio" data-value="dark" aria-checked="false">{{ t('timeline.ui.theme_dark') }}</button>
+          <button type="button" role="radio" data-value="print" aria-checked="false">{{ t('timeline.ui.theme_print') }}</button>
+        </div>
+      </div>
+      <div class="tl-export__row" data-for="png jpeg webp pdf svg">
+        <span class="tl-export__label" id="tl-export-density-label">{{ t('timeline.ui.density') }}</span>
+        <div class="seg" id="tl-export-density" role="radiogroup" aria-labelledby="tl-export-density-label">
+          <button type="button" role="radio" data-value="comfortable" aria-checked="false">{{ t('timeline.ui.density_comfortable') }}</button>
+          <button type="button" role="radio" data-value="compact" aria-checked="false">{{ t('timeline.ui.density_compact') }}</button>
+        </div>
+      </div>
+      <div class="tl-export__row" data-for="png jpeg webp pdf svg">
+        <span class="tl-export__label" id="tl-export-width-label">{{ t('timeline.ui.export_width') }}</span>
+        <div class="tl-export__inline">
+          <div class="seg" id="tl-export-width-mode" role="radiogroup" aria-labelledby="tl-export-width-label">
+            <button type="button" role="radio" data-value="auto" aria-checked="false">{{ t('timeline.ui.export_width_auto') }}</button>
+            <button type="button" role="radio" data-value="fixed" aria-checked="false">{{ t('timeline.ui.export_width_fixed') }}</button>
+          </div>
+          <label class="tl-export__number"><input type="number" id="tl-export-width" min="900" max="12000" step="100"
+            aria-label="{{ t('timeline.ui.export_width') }}"> px</label>
+        </div>
+      </div>
+      <div class="tl-export__row" data-for="png jpeg webp">
+        <span class="tl-export__label" id="tl-export-scale-label">{{ t('timeline.ui.export_scale') }}</span>
+        <div class="seg" id="tl-export-scale" role="radiogroup" aria-labelledby="tl-export-scale-label">
+          {% for n in (1, 2, 3, 4) %}
+          <button type="button" role="radio" data-value="{{ n }}" aria-checked="false">{{ n }}×</button>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="tl-export__row" data-for="jpeg webp">
+        <label class="tl-export__label" for="tl-export-quality">{{ t('timeline.ui.export_quality') }}</label>
+        <div class="tl-export__inline">
+          <input type="range" id="tl-export-quality" min="50" max="100" step="1">
+          <output class="tl-export__value" id="tl-export-quality-value" for="tl-export-quality"></output>
+        </div>
+      </div>
+      <label class="tl-check" data-for="png"><input type="checkbox" id="tl-export-transparent"> {{ t('timeline.ui.export_transparent') }}</label>
+      <label class="tl-check" data-for="webp"><input type="checkbox" id="tl-export-lossless"> {{ t('timeline.ui.export_lossless') }}</label>
+      <div class="tl-export__row" data-for="pdf">
+        <span class="tl-export__label" id="tl-export-page-label">{{ t('timeline.ui.export_page') }}</span>
+        <div class="seg" id="tl-export-page" role="radiogroup" aria-labelledby="tl-export-page-label">
+          <button type="button" role="radio" data-value="fit" aria-checked="false">{{ t('timeline.ui.export_page_fit') }}</button>
+          <button type="button" role="radio" data-value="a4" aria-checked="false">A4</button>
+          <button type="button" role="radio" data-value="a3" aria-checked="false">A3</button>
+        </div>
+      </div>
+      <div class="tl-export__row" data-for="pdf">
+        <span class="tl-export__label" id="tl-export-orientation-label">{{ t('timeline.ui.export_orientation') }}</span>
+        <div class="tl-export__inline">
+          <div class="seg" id="tl-export-orientation" role="radiogroup" aria-labelledby="tl-export-orientation-label">
+            <button type="button" role="radio" data-value="landscape" aria-checked="false">{{ t('timeline.ui.export_landscape') }}</button>
+            <button type="button" role="radio" data-value="portrait" aria-checked="false">{{ t('timeline.ui.export_portrait') }}</button>
+          </div>
+          <label class="tl-export__number">{{ t('timeline.ui.export_margin') }}
+            <input type="number" id="tl-export-margin" min="0" max="30" step="1"> mm</label>
+        </div>
+      </div>
+      <label class="tl-check" data-for="svg"><input type="checkbox" id="tl-export-embed"> {{ t('timeline.ui.export_embed_font') }}</label>
+      <p class="tl-export__help" data-for="svg">{{ t('timeline.ui.export_embed_help') }}</p>
+      <p class="tl-export__help" data-for="pdf">{{ t('timeline.ui.export_pdf_help') }}</p>
+      <p class="tl-export__help" data-for="json">{{ t('timeline.ui.export_json_help') }}</p>
+      {% if timeline.has_source_text %}
+      <label class="tl-check" data-for="png jpeg webp pdf svg"><input type="checkbox" id="tl-export-unverified"> {{ t('timeline.ui.export_unverified') }}</label>
+      {% endif %}
+    </div>
+
+    <div class="tl-export__unsaved" id="tl-export-unsaved" hidden>
+      <span>{{ t('timeline.ui.export_unsaved') }}</span>
+      <button type="button" class="btn sm" id="tl-export-save">{{ t('timeline.ui.export_save_first') }}</button>
+    </div>
+    <div class="tl-modal__actions">
+      <span class="tl-export__status muted" id="tl-export-status" aria-live="polite"></span>
+      <button type="button" class="btn ghost" id="tl-export-cancel">{{ t('timeline.ui.cancel') }}</button>
+      <button type="button" class="btn" id="tl-export-copy" hidden>
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+        <span>{{ t('timeline.ui.export_copy') }}</span>
+      </button>
+      <button type="button" class="btn primary" id="tl-export-go">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
+        <span>{{ t('timeline.ui.export_go') }}</span>
+      </button>
+    </div>
+  </div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
@@ -256,8 +375,12 @@
     correction: {{ url_for('api_timeline_correction_prompt', tid=timeline.id) | tojson }},
     merge: {{ url_for('api_timeline_merge', tid=timeline.id) | tojson }},
     skill: {{ url_for('timeline_skill') | tojson }},
+    exportPreview: {{ url_for('api_timeline_export_preview', tid=timeline.id) | tojson }},
+    // « FORMAT » est remplacé par l'extension choisie.
+    export: {{ url_for('export_timeline', tid=timeline.id, fmt='FORMAT') | tojson }},
   };
 </script>
 <script src="{{ url_for('static', filename='timeline-core.js') }}"></script>
 <script src="{{ url_for('static', filename='timeline.js') }}"></script>
+<script src="{{ url_for('static', filename='timeline-export.js') }}"></script>
 {% endblock %}

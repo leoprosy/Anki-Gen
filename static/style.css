@@ -2061,6 +2061,76 @@ body.tl-drawer-open .tl-work {
 .tl-scope-existing { font-size: 13px; }
 .tl-scope-existing[hidden] { display: none; }
 
+/* ── Modale d'export ─────────────────────────────────────────── */
+.tl-export { width: min(640px, 94vw); }
+.tl-export [hidden] { display: none; }
+.tl-export__thumb {
+  height: 170px;
+  padding: 10px;
+  border-radius: var(--r-lg);
+  background: var(--surface-alt);
+  overflow: hidden;
+  transition: opacity 0.15s ease;
+}
+.tl-export__thumb.is-busy { opacity: 0.55; }
+/* La miniature tient dans la boîte, quelle que soit la forme de la frise. */
+.tl-export__thumb svg { display: block; width: 100%; height: 100%; border-radius: var(--r-sm); }
+.tl-export__dims { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.tl-export__warnings { list-style: none; font-size: 13px; }
+.tl-export__warnings:not(:empty) { padding: 8px 12px; border-radius: var(--r-md); background: var(--warning-soft); color: var(--warning); }
+.tl-export__warnings li + li { margin-top: 4px; }
+.tl-export__options { display: flex; flex-direction: column; gap: 10px; }
+.tl-export__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.tl-export__label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.tl-export__inline { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.tl-export__number { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.tl-export__number input {
+  width: 84px;
+  min-height: 32px;
+  padding: 4px 8px;
+  background: var(--surface-alt);
+  border: 1.5px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.tl-export__number input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-subtle); }
+.tl-export__number input:disabled { opacity: 0.5; }
+.tl-export__inline input[type="range"] { width: 160px; accent-color: var(--accent); }
+.tl-export__value { min-width: 28px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tl-export .seg button:disabled { opacity: 0.45; cursor: not-allowed; }
+.tl-export__help { font-size: 12px; color: var(--text-secondary); }
+.tl-export__unsaved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-md);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 13px;
+}
+/* Les actions restent visibles quand la modale défile (fenêtre de 800 × 600). */
+.tl-export .tl-modal__actions {
+  position: sticky;
+  bottom: calc(-1 * var(--space-lg));
+  margin: 0 calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg));
+  padding: 12px var(--space-lg) var(--space-lg);
+  background: var(--surface);
+  box-shadow: 0 -0.5px 0 var(--hairline);
+  align-items: center;
+}
+@media (max-height: 700px) {
+  .tl-export__thumb { height: 110px; }
+}
+.tl-export__status { flex: 1; min-width: 0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl-export__status.is-ok { color: var(--success); }
+.tl-export__status.is-error { color: var(--error); white-space: normal; }
+
 @media (max-width: 1180px) {
   body.tl-drawer-open .tl-work { grid-template-columns: minmax(0, 1fr); }
   .tl-drawer {

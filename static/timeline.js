@@ -1203,19 +1203,28 @@
     if (state.jsonDirty && !(await validateJson())) {
       setTab("json");
       toast(T("timeline.ui.save_failed"), "err", 4000);
-      return;
+      return false;
     }
     const { status, data } = await postJson(URLS.api, { data: state.doc, options: { density: state.density } });
     if (status === 200 && data && data.ok) {
       state.saved = C.serialize(state.doc);
       updateState();
       toast(T("timeline.ui.saved"), "ok");
-      return;
+      return true;
     }
     if (data && data.report) { state.report = data.report; renderIssues(); }
     toast(T("timeline.ui.save_failed"), "err", 4000);
+    return false;
   }
   $("tl-save").addEventListener("click", save);
+
+  // Ce que les autres scripts de la page (export) ont besoin de savoir ou de faire.
+  window.TimelinePage = {
+    isDirty,
+    save,
+    hasContent: () => hasContent(state.doc),
+    density: () => state.density,
+  };
 
   document.addEventListener("keydown", (ev) => {
     const mod = ev.ctrlKey || ev.metaKey;

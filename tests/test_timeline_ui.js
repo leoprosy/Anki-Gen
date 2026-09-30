@@ -49,6 +49,39 @@ test('debounce can be cancelled or flushed', () => {
   assert.deepEqual(calls, ['c']);
 });
 
+test('singleFlight runs at once, then merges the calls made while running', async () => {
+  const releases = [];
+  let calls = 0;
+  const run = core.singleFlight(() => {
+    calls += 1;
+    return new Promise((resolve) => releases.push(resolve));
+  });
+  const first = run();
+  assert.equal(calls, 1);                 // aucun délai pour une modification isolée
+  run(); run(); run();                     // trois modifications pendant le rendu
+  assert.equal(calls, 1);
+  releases.shift()();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls, 2);                 // regroupées en un seul rendu suivant
+  releases.shift()();
+  await first;
+  assert.equal(calls, 2);
+  run();
+  assert.equal(calls, 3);                 // de nouveau libre
+  releases.shift()();
+});
+
+test('singleFlight survives a failing call', async () => {
+  let calls = 0;
+  const run = core.singleFlight(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('network');
+  });
+  await run();
+  await run();
+  assert.equal(calls, 2);
+});
+
 test('serialize writes keys in the canonical order of the schema', () => {
   const doc = {
     events: [{ label: 'Traité', date: '1860', id: 'e1', importance: 2, track: 't' }],

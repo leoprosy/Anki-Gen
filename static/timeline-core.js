@@ -56,6 +56,29 @@
     return debounced;
   }
 
+  /**
+   * Un seul appel asynchrone en vol : le premier part aussitôt, et tous ceux qui
+   * arrivent pendant qu'il tourne se regroupent en un seul appel, lancé dès qu'il
+   * finit. Une modification isolée se redessine sans attendre ; pendant la frappe,
+   * le rendu suit au rythme du serveur, sans file d'attente.
+   */
+  function singleFlight(fn) {
+    let running = false;
+    let again = false;
+    return async function run() {
+      if (running) { again = true; return; }
+      running = true;
+      try {
+        do {
+          again = false;
+          try { await fn(); } catch (_) { /* l'appelant signale ses propres erreurs */ }
+        } while (again);
+      } finally {
+        running = false;
+      }
+    };
+  }
+
   /** "/events/3/date" → ["events", "3", "date"] (RFC 6901 : ~1 → /, ~0 → ~). */
   function parsePointer(pointer) {
     if (!pointer) return [];
@@ -249,6 +272,6 @@
     return pending.find((c) => c.mentions > 0) || pending[0] || null;
   }
 
-  return { ORDER, serialize, debounce, parsePointer, elementAt, pointerRange, lineColumnOffset,
+  return { ORDER, serialize, debounce, singleFlight, parsePointer, elementAt, pointerRange, lineColumnOffset,
            dateKey, compareDates, uniqueId, slug, renameId, trackUsage, nextPendingChunk };
 });

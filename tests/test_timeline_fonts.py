@@ -74,6 +74,25 @@ class TestMeasure(unittest.TestCase):
     def test_empty_text(self):
         self.assertEqual(self.fonts.measure("", 12, 400), 0.0)
 
+    def test_cached_width_is_exactly_the_computed_one(self):
+        fonts = tf.FontSet()
+        for text in SAMPLES:
+            computed = sum(fonts._advance(ch, 400) for ch in text) * 13
+            self.assertEqual(fonts.measure(text, 13, 400), computed)   # calcul
+            self.assertEqual(fonts.measure(text, 13, 400), computed)   # cache
+        self.assertNotEqual(fonts.measure(SAMPLES[0], 13, 600), fonts.measure(SAMPLES[0], 13, 400))
+
+    def test_width_cache_stays_bounded(self):
+        fonts = tf.FontSet()
+        previous = tf.WIDTH_CACHE_MAX
+        tf.WIDTH_CACHE_MAX = 3
+        try:
+            for i in range(10):
+                fonts.measure(f"libellé {i}", 12, 400)
+                self.assertLessEqual(len(fonts._widths[400]), 3)
+        finally:
+            tf.WIDTH_CACHE_MAX = previous
+
     def test_fast_enough_for_the_layout(self):
         start = time.perf_counter()
         for i in range(1200):

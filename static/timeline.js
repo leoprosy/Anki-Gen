@@ -163,7 +163,9 @@
     renderIssues();
   }
 
-  const scheduleRender = C.debounce(renderPreview, 250);
+  // Pas d'anti-rebond : une modification se redessine dès que le serveur est libre
+  // (budget de 300 ms entre l'édition et le nouveau dessin).
+  const scheduleRender = C.singleFlight(renderPreview);
 
   // ── Zoom et déplacement ──────────────────────────────────────
   /**
@@ -842,17 +844,17 @@
     if (!button) return;
     state.theme = button.dataset.theme;
     segChoice($("tl-theme"), "theme", state.theme);
-    renderPreview();
+    scheduleRender();
   });
   $("tl-density").addEventListener("click", (ev) => {
     const button = ev.target.closest("[data-density]");
     if (!button) return;
     state.density = button.dataset.density;
     segChoice($("tl-density"), "density", state.density);
-    renderPreview();
+    scheduleRender();
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (state.theme === "auto") renderPreview();
+    if (state.theme === "auto") scheduleRender();
   });
 
   // ── Onglet JSON ──────────────────────────────────────────────
@@ -1298,7 +1300,7 @@
     // Frise tout juste créée depuis un cours ou un texte : on commence par le prompt.
     renderPromptChrome();
     setTab("prompt");
-    renderPreview();
+    scheduleRender();
   } else if (!DATA.data && DATA.last_raw) {
     // Import forcé ou collage invalide : on montre tout de suite ce qui ne va pas.
     if (hasSource) state.correction = { chunk: null };
@@ -1312,6 +1314,6 @@
     });
   } else {
     renderPromptChrome();
-    renderPreview();
+    scheduleRender();
   }
 })();

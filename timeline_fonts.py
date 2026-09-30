@@ -32,6 +32,9 @@ FONT_FILES = {400: "Inter-Regular.ttf", 600: "Inter-SemiBold.ttf"}
 FAMILY = "Ankigen Inter"
 REF_SIZE = 1000
 MISSING_ADVANCE_EM = 1.0
+# La mise en page mesure les mêmes libellés des dizaines de fois (variantes de
+# coupure, candidats de placement) : leurs largeurs sont gardées, dans une limite.
+WIDTH_CACHE_MAX = 50_000
 
 
 def weight_key(weight) -> int:
@@ -140,6 +143,7 @@ class FontSet:
         self.font_dir = Path(font_dir)
         self._fonts = {}
         self._advances = {400: {}, 600: {}}
+        self._widths = {400: {}, 600: {}}
         self._coverage = None
 
     def font(self, weight):
@@ -188,7 +192,14 @@ class FontSet:
     def measure(self, text, size, weight) -> float:
         """Largeur en px : la fonction que la mise en page reçoit par injection."""
         key = weight_key(weight)
-        return sum(self._advance(ch, key) for ch in text) * size
+        cache = self._widths[key]
+        width = cache.get(text)
+        if width is None:
+            width = sum(self._advance(ch, key) for ch in text)
+            if len(cache) >= WIDTH_CACHE_MAX:
+                cache.clear()
+            cache[text] = width
+        return width * size
 
 
 _DEFAULT = None

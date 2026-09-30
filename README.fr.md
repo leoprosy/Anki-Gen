@@ -104,6 +104,36 @@ oublié, et l'onglet **Cartes** montre le rendu final avant l'import.
 
 ---
 
+## Frises chronologiques
+
+![Une frise dessinée par Ankigen : trois pistes, des périodes, des ères et des évènements datés de 1846 à 2008](docs/images/timeline.png)
+
+Un cours est plein de dates, et une pile de cartes cache comment elles s'articulent. Depuis l'écran
+de travail, le bouton **Frise** transforme un paragraphe, un chapitre ou le cours entier en frise
+chronologique : pistes, périodes, ères et évènements sur un seul dessin.
+
+- **Claude extrait, Ankigen dessine.** Le prompt copié demande un document JSON
+  (`ankigen.timeline/1`, [schéma JSON](static/schemas/timeline-v1.json)) et rien d'autre. Ankigen
+  calcule lui-même la mise en page, si bien qu'aucune étiquette ne se chevauche : ce qui ne tient
+  pas passe en notes numérotées sous la frise.
+- **Vérifiée contre le cours.** Chaque date arrive avec la phrase dont elle est tirée, et Ankigen
+  cherche cette phrase dans le cours. Les dates introuvables sont signalées ; celles que le modèle
+  ajoute de lui-même (mode enrichi) sont marquées comme telles et restent hors des cartes.
+- **Chapitres longs, paragraphe par paragraphe.** Au-delà d'environ 25 000 caractères, Ankigen
+  propose un prompt par paragraphe et fusionne les réponses : les pistes de même nom sont
+  rapprochées, et un évènement trouvé deux fois n'en fait plus qu'un, séparable à nouveau.
+- **Exports.** PNG, JPEG, WebP, PDF (A4, A3 ou page ajustée, à 300 dpi), SVG avec la police
+  incorporée, JSON, ou copie dans le presse-papiers.
+- **Cartes.** La frise écrit ses propres cartes, sans Claude : « En quelle année… ? », bornes des
+  périodes, remise en ordre, avant et après, et images de la frise où un évènement est masqué. Elles
+  s'exportent comme les cartes du cours, et un réimport met les notes à jour au lieu de les
+  dupliquer.
+
+La page **Mode d'emploi** de l'application détaille le format, les limites (calendrier grégorien tel
+qu'écrit, sans conversion depuis le julien) et un Skill Claude facultatif pour les frises.
+
+---
+
 ## Lancer depuis les sources
 
 ```bash
@@ -165,10 +195,14 @@ l'exécutable de la release précédente ([`scripts/check_runtime_compat.py`](sc
 ## Où sont stockées les données ?
 
 - **Depuis les sources** (`python app.py`) : dans le dossier du projet — `projects/`, `uploads/`,
-  `media/`, `exports/`.
+  `media/`, `exports/`, `timelines/`.
 - **Dans l'application packagée** : dans `%APPDATA%\AnkiGen\` (`settings.json`, `projects/`,
-  `uploads/`, `media/`, `exports/`). C'est indispensable : un exécutable PyInstaller *onefile* est
-  déballé dans un dossier temporaire, et tout ce qui y serait écrit disparaîtrait à la fermeture.
+  `uploads/`, `media/`, `exports/`, `timelines/`). C'est indispensable : un exécutable PyInstaller
+  *onefile* est déballé dans un dossier temporaire, et tout ce qui y serait écrit disparaîtrait à la
+  fermeture.
+
+Chaque frise est un fichier JSON dans `timelines/`. Les images de ses cartes sont rendues à la
+demande dans `media/_timelines/<frise>/` et supprimées avec la frise.
 
 ---
 
@@ -176,11 +210,15 @@ l'exécutable de la release précédente ([`scripts/check_runtime_compat.py`](sc
 
 ```bash
 .venv/Scripts/python.exe -m unittest discover -s tests
+node --test "tests/*.js"
 ```
 
 Les fixtures `.docx` (images avec/sans alt, image seule dans un paragraphe, image répétée, fusions
 horizontales et verticales, tableau imbriqué, image en cellule) sont générées à la volée par
-`tests/make_fixtures.py` — rien de binaire n'est versionné.
+`tests/make_fixtures.py` — rien de binaire n'est versionné. Les fixtures de frise sont des documents
+JSON dans `tests/fixtures_timeline/` ; `scripts/timeline_gallery.py` les rend toutes, dans chaque
+thème, dans `exports/gallery/` pour la revue visuelle. Les tests JavaScript (éditeur de frise,
+updater) ne demandent que Node 22 ou plus récent, qui développe lui-même le motif entre guillemets.
 
 ---
 
@@ -196,6 +234,10 @@ les idées de flux de travail vont dans les
 
 Ankigen est un logiciel libre, publié sous **GNU General Public License v3.0 ou ultérieure**.
 Voir [LICENSE](LICENSE). Copyright (C) 2026 leoprosy.
+
+Les frises sont dessinées avec la police [Inter](https://github.com/rsms/inter) (v4.1),
+Copyright (c) 2016 The Inter Project Authors, fournie dans `static/fonts/` sous la
+[SIL Open Font License 1.1](static/fonts/OFL.txt).
 
 Les frises sont dessinées avec la police [Inter](https://github.com/rsms/inter) (v4.1),
 Copyright (c) 2016 The Inter Project Authors, livrée dans `static/fonts/` sous

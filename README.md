@@ -91,6 +91,36 @@ before you import anything.
 
 ---
 
+## Timelines
+
+![A timeline drawn by Ankigen: three tracks, periods, eras and dated events from 1846 to 2008](docs/images/timeline.png)
+
+A course is full of dates, and a pile of cards hides how they relate. From the work view, the
+**Timeline** button turns a paragraph, a chapter or the whole course into a chronological timeline:
+tracks, periods, eras and events on a single drawing.
+
+- **Claude extracts, Ankigen draws.** The copied prompt asks for one JSON document
+  (`ankigen.timeline/1`, [JSON Schema](static/schemas/timeline-v1.json)) and nothing else. Ankigen
+  computes the layout itself, so labels never overlap: what does not fit moves to numbered notes
+  under the timeline.
+- **Checked against the course.** Every date comes with the sentence it was taken from, and
+  Ankigen looks for that sentence in the course. Dates it cannot find are flagged; dates the model
+  added from its own knowledge (enriched mode) are marked as such and kept out of the cards.
+- **Long chapters, paragraph by paragraph.** Past about 25,000 characters, Ankigen suggests one
+  prompt per paragraph and merges the answers: tracks with the same name are matched, and an event
+  found twice becomes one, which you can split again.
+- **Exports.** PNG, JPEG, WebP, PDF (A4, A3 or fitted to the content, at 300 dpi), SVG with the
+  typeface embedded, JSON, or a copy to the clipboard.
+- **Cards.** The timeline writes its own cards, without Claude — "In which year…?", period bounds,
+  putting events in order, before and after, and pictures of the timeline with one event hidden.
+  They export like the course's cards, and re-importing updates the notes instead of duplicating
+  them.
+
+The **How to use** page in the app details the format, the limits (Gregorian calendar as written,
+no Julian conversion) and an optional Claude Skill for timelines.
+
+---
+
 ## Run from source
 
 ```bash
@@ -152,10 +182,13 @@ Before each release, CI runs the new code on the previous release's executable
 ## Where the data lives
 
 - **From source** (`python app.py`): in the project folder — `projects/`, `uploads/`, `media/`,
-  `exports/`.
+  `exports/`, `timelines/`.
 - **In the packaged app**: in `%APPDATA%\AnkiGen\` (`settings.json`, `projects/`, `uploads/`,
-  `media/`, `exports/`). This matters — a PyInstaller *onefile* executable is unpacked into a
-  temporary folder, and anything written there disappears when the app closes.
+  `media/`, `exports/`, `timelines/`). This matters — a PyInstaller *onefile* executable is unpacked
+  into a temporary folder, and anything written there disappears when the app closes.
+
+Each timeline is one JSON file in `timelines/`. The pictures of its cards are rendered on demand
+into `media/_timelines/<timeline>/` and deleted with the timeline.
 
 ---
 
@@ -163,11 +196,15 @@ Before each release, CI runs the new code on the previous release's executable
 
 ```bash
 .venv/Scripts/python.exe -m unittest discover -s tests
+node --test "tests/*.js"
 ```
 
 The `.docx` fixtures (images with and without alt text, a lone image in a paragraph, a repeated
 image, horizontal and vertical merges, a nested table, an image inside a cell) are generated on the
-fly by `tests/make_fixtures.py` — no binary file is versioned.
+fly by `tests/make_fixtures.py` — no binary file is versioned. The timeline fixtures are JSON
+documents in `tests/fixtures_timeline/`; `scripts/timeline_gallery.py` renders them all, in every
+theme, into `exports/gallery/` for visual review. The JavaScript tests (timeline editor, updater)
+need nothing but Node 22 or later, which expands the quoted pattern itself.
 
 ---
 

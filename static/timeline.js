@@ -427,9 +427,9 @@
         + `<button type="button" class="tl-row" data-kind="tracks" data-index="${index}">${swatch(track.id)}`
         + `<span class="tl-row__label">${escapeHtml(track.label)}</span>`
         + `<span class="tl-row__badges"><span class="badge">${C.trackUsage(doc, track.id)}</span></span></button>`
-        + `<button type="button" class="icon-btn tl-move" data-move="-1" data-index="${index}" aria-label="${escapeHtml(T("timeline.ui.move_up"))} : ${escapeHtml(track.label)}"${index === 0 ? " disabled" : ""}>`
+        + `<button type="button" class="icon-btn tl-move" data-move="-1" data-index="${index}" aria-label="${escapeHtml(T("timeline.ui.move_up", { label: track.label }))}"${index === 0 ? " disabled" : ""}>`
         + `<svg width="14" height="14" aria-hidden="true"><use href="#i-up"></use></svg></button>`
-        + `<button type="button" class="icon-btn tl-move" data-move="1" data-index="${index}" aria-label="${escapeHtml(T("timeline.ui.move_down"))} : ${escapeHtml(track.label)}"${index === tracks.length - 1 ? " disabled" : ""}>`
+        + `<button type="button" class="icon-btn tl-move" data-move="1" data-index="${index}" aria-label="${escapeHtml(T("timeline.ui.move_down", { label: track.label }))}"${index === tracks.length - 1 ? " disabled" : ""}>`
         + `<svg width="14" height="14" aria-hidden="true"><use href="#i-down"></use></svg></button>`
         + "</div></li>";
     }).join("");
@@ -539,7 +539,7 @@
     state.editing = { kind, index };
     const item = index === null ? defaults(kind) : clone(state.doc[kind][index]);
     const isNew = index === null;
-    els.drawerTitle.textContent = `${T(KIND_TITLE[kind])} — ${isNew ? T("timeline.ui.new") : (item.label || item.id)}`;
+    els.drawerTitle.textContent = isNew ? T(`timeline.ui.new_${kind}`) : `${T(KIND_TITLE[kind])} — ${item.label || item.id}`;
     const parts = [field("id", T("timeline.ui.field_id"), input("id", item.id, ' autocomplete="off" spellcheck="false"'),
                          T("timeline.ui.id_help"))];
     parts.push(field("label", T("timeline.ui.field_label"), input("label", item.label, ' maxlength="80"')));
@@ -602,10 +602,23 @@
   }
 
   function closeDrawer() {
+    const editing = state.editing;
     els.drawer.hidden = true;
     document.body.classList.remove("tl-drawer-open");
     state.editing = null;
     renderEditor();
+    // Le rail est redessiné (ici puis après la modification) : le focus clavier revient à
+    // la ligne de l'élément, ou à sa section pour un élément nouveau, une fois tout redessiné.
+    if (editing) setTimeout(() => returnFocus(editing), 0);
+  }
+
+  function returnFocus(editing) {
+    if (document.activeElement && document.activeElement !== document.body
+        && !els.drawer.contains(document.activeElement)) return;
+    const row = editing.index === null ? null
+      : els.editor.querySelector(`.tl-row[data-kind="${editing.kind}"][data-index="${editing.index}"]`);
+    const target = row || els.editor.querySelector(`[data-section="${editing.kind}"] > summary`);
+    if (target) target.focus();
   }
 
   /** Erreurs du dernier rapport qui concernent l'élément ouvert. */

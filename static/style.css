@@ -1545,9 +1545,13 @@ body.tl-drawer-open .tl-work {
   grid-template-columns: var(--rail-w) minmax(0, 1fr) min(380px, 34vw);
 }
 
+/* Les petits boutons et les contrôles segmentés (32 et 28 px ailleurs) gardent la cible
+   minimale de design.md dans la page frise et ses fenêtres. */
+.tl-work .btn.sm, .tl-modal .btn.sm, .tl-work .seg button, .tl-modal .seg button { min-height: var(--tap); }
+
 /* ── Rail : l'éditeur structuré ─────────────────────────────── */
 .tl-rail .rail__head { position: relative; }
-.tl-add > summary { min-height: 32px; padding: 6px 11px; font-size: 13px; }
+.tl-add > summary { padding: 6px 11px; font-size: 13px; }
 .tl-add__panel { width: 220px; }
 .tl-editor {
   flex: 1;
@@ -1563,6 +1567,7 @@ body.tl-drawer-open .tl-work {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: var(--tap);
   padding: 10px 8px 6px;
   font-size: 11px;
   font-weight: 600;
@@ -1584,7 +1589,7 @@ body.tl-drawer-open .tl-work {
   justify-content: flex-start;
   gap: 8px;
   width: 100%;
-  min-height: 36px;
+  min-height: var(--tap);
   padding: 6px 10px;
   background: transparent;
   border-radius: var(--r-md);
@@ -1618,7 +1623,7 @@ body.tl-drawer-open .tl-work {
 }
 .tl-track { display: flex; align-items: center; gap: 2px; }
 .tl-track .tl-row { flex: 1; min-width: 0; }
-.tl-move { width: 32px; height: 32px; min-height: 32px; flex: none; }
+.tl-move { width: var(--tap); height: var(--tap); min-height: var(--tap); flex: none; }
 .tl-swatch {
   width: 10px;
   height: 10px;
@@ -1636,7 +1641,7 @@ body.tl-drawer-open .tl-work {
 .tl-tools { flex-wrap: wrap; justify-content: flex-end; }
 .tl-tools[hidden] { display: none; }
 .tl-zoom { display: inline-flex; align-items: center; gap: 2px; }
-.tl-zoom .icon-btn { width: 34px; height: 34px; min-height: 34px; }
+.tl-zoom .icon-btn { width: var(--tap); height: var(--tap); min-height: var(--tap); }
 .tl-zoom__value {
   min-width: 48px;
   text-align: center;
@@ -1861,7 +1866,7 @@ body.tl-drawer-open .tl-work {
 .tl-radio span {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
+  min-height: var(--tap);
   padding: 6px 12px;
   border-radius: var(--r-md);
   background: var(--surface-alt);
@@ -1874,7 +1879,7 @@ body.tl-drawer-open .tl-work {
 .tl-color { display: flex; align-items: center; gap: 12px; }
 .tl-color input[type="color"] {
   width: 48px;
-  height: 36px;
+  height: var(--tap);
   padding: 0;
   border: none;
   border-radius: var(--r-sm);
@@ -1946,11 +1951,10 @@ body.tl-drawer-open .tl-work {
 #tl-panel-prompt { padding: 0 var(--space-md) var(--space-md); gap: 10px; }
 #tl-panel-prompt[hidden] { display: none; }
 .tl-prompt-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
-.tl-prompt-bar .tl-check { min-height: 32px; }
 .tl-prompt-size { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
 .tl-chunk-nav { display: inline-flex; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
 .tl-chunk-nav[hidden] { display: none; }
-.tl-chunk-nav .icon-btn { width: 34px; height: 34px; min-height: 34px; flex: none; }
+.tl-chunk-nav .icon-btn { width: var(--tap); height: var(--tap); min-height: var(--tap); flex: none; }
 .tl-chunk-nav__label {
   min-width: 0;
   max-width: 42ch;
@@ -1974,7 +1978,6 @@ body.tl-drawer-open .tl-work {
 .tl-correction[hidden] { display: none; }
 .tl-correction__text { flex: 1 1 240px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
 .tl-correction__text strong { color: var(--error); font-weight: 600; }
-.tl-correction .tl-check { min-height: 32px; }
 .tl-prompt-note { flex: none; font-size: 12px; }
 .tl-prompt-note[hidden] { display: none; }
 .tl-prompt {
@@ -2020,7 +2023,7 @@ body.tl-drawer-open .tl-work {
 .tl-merge__what { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .tl-merge__what strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tl-merge__what small { color: var(--text-tertiary); }
-.tl-merge__item .btn { flex: none; min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.tl-merge__item .btn { flex: none; min-height: var(--tap); padding: 4px 10px; font-size: 12px; }
 
 /* ── Vue de travail : choix de la portée ─────────────────────── */
 .tl-scopes { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: none; }
@@ -2044,7 +2047,7 @@ body.tl-drawer-open .tl-work {
 .tl-scope__text small { font-size: 12px; font-variant-numeric: tabular-nums; }
 .tl-scope__text select {
   width: 100%;
-  min-height: 36px;
+  min-height: var(--tap);
   padding: 6px 10px;
   background: var(--surface);
   border: 1.5px solid transparent;
@@ -2081,13 +2084,12 @@ body.tl-drawer-open .tl-work {
   border: none;
 }
 .tl-card-types legend { margin-bottom: 2px; font-size: 12px; font-weight: 500; color: var(--text-secondary); }
-.tl-card-types .tl-check { min-height: 32px; }
 .tl-card-types__count { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 .tl-cards-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 12px; }
 .tl-cards-deck { flex: 1 1 260px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .tl-cards-deck span { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
 .tl-cards-deck input {
-  min-height: 36px;
+  min-height: var(--tap);
   padding: 6px 10px;
   background: var(--surface-alt);
   border: 1.5px solid transparent;
@@ -2104,7 +2106,7 @@ body.tl-drawer-open .tl-work {
 .tl-card.is-off { opacity: 0.45; }
 .tl-card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .tl-card__head .card-label { margin-bottom: 0; }
-.tl-card__toggle { min-height: 28px; font-size: 12px; }
+.tl-card__toggle { font-size: 12px; }
 .tl-card .card-body img { display: block; margin-bottom: 6px; }
 /* Vue de travail : « Inclure les cartes des frises liées » dans le menu d'export. */
 .export-option { display: flex; align-items: center; gap: 8px; padding: 4px 10px 8px; font-size: 12px; }
@@ -2135,7 +2137,7 @@ body.tl-drawer-open .tl-work {
 .tl-export__number { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
 .tl-export__number input {
   width: 84px;
-  min-height: 32px;
+  min-height: var(--tap);
   padding: 4px 8px;
   background: var(--surface-alt);
   border: 1.5px solid transparent;

@@ -115,7 +115,7 @@
       </details>
 
       <div class="pane__body tl-body" id="tl-panel-preview" role="tabpanel" aria-labelledby="tl-tab-preview">
-        <div class="tl-viewport" id="tl-viewport" tabindex="0" aria-label="{{ t('timeline.ui.tab_preview') }}">
+        <div class="tl-viewport" id="tl-viewport" tabindex="0" role="region" aria-label="{{ t('timeline.ui.tab_preview') }}">
           <div class="tl-canvas" id="tl-canvas"></div>
         </div>
         <div class="tl-empty" id="tl-empty" hidden>
@@ -259,12 +259,12 @@
   {% endif %}
   <div class="dock__group">
     {% if timeline.has_source_text %}
-    <button type="button" class="btn" id="tl-copy-prompt" title="{{ t('timeline.ui.copy_prompt_title') }} (Ctrl+Maj+C)">
+    <button type="button" class="btn" id="tl-copy-prompt" title="{{ t('timeline.ui.copy_prompt_title') }} (Ctrl+{{ t('keys.shift') }}+C)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
       <span class="lbl" id="tl-copy-prompt-label">{{ t('timeline.ui.copy_prompt') }}</span>
     </button>
     {% endif %}
-    <button type="button" class="btn" id="tl-paste" title="{{ t('timeline.ui.paste_title') }} (Ctrl+Maj+V)">
+    <button type="button" class="btn" id="tl-paste" title="{{ t('timeline.ui.paste_title') }} (Ctrl+{{ t('keys.shift') }}+V)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-paste"></use></svg>
       <span class="lbl">{{ t('timeline.ui.paste') }}</span>
     </button>
@@ -280,7 +280,7 @@
     </button>
   </div>
   <div class="dock__group dock__group--main">
-    <button type="button" class="btn primary btn-save-next" id="tl-save" title="{{ t('timeline.ui.save') }} (Ctrl+Entrée)">
+    <button type="button" class="btn primary btn-save-next" id="tl-save" title="{{ t('timeline.ui.save') }} (Ctrl+{{ t('keys.enter') }})">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-save"></use></svg>
       <span class="lbl">{{ t('timeline.ui.save') }}</span>
     </button>

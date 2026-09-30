@@ -62,22 +62,85 @@
     </ol>
     <p class="help-note"><svg width="18" height="18" aria-hidden="true"><use href="#i-check"></use></svg><span>{{ t('help.anki_header') }}</span></p>
   </section>
+
+  <section class="card help-section" id="timelines" aria-labelledby="timelines-title">
+    <div class="help-section-head">
+      <h3 id="timelines-title">{{ t('help.timelines_title') }}</h3>
+      <span class="help-caption">{{ t('help.timelines_caption') }}</span>
+    </div>
+    <p>{{ t('help.timelines_intro') }}</p>
+    <ol class="help-import-steps">
+      {% for step in ['scope', 'prompt', 'paste', 'edit', 'export'] %}
+      <li>{{ t('help.timelines_step_' ~ step) }}</li>
+      {% endfor %}
+    </ol>
+
+    <h4 class="help-subtitle">{{ t('help.timelines_long_title') }}</h4>
+    <p>{{ t('help.timelines_long') }}</p>
+
+    <h4 class="help-subtitle">{{ t('help.timelines_quotes_title') }}</h4>
+    <p>{{ t('help.timelines_quotes') }}</p>
+
+    <h4 class="help-subtitle">{{ t('help.timelines_format_title') }}</h4>
+    <p>{{ t('help.timelines_format') }}</p>
+    <p>
+      <a class="btn sm" href="{{ url_for('static', filename='schemas/timeline-v1.json') }}" download="timeline-v1.json">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
+        <span>{{ t('help.timelines_schema') }}</span>
+      </a>
+    </p>
+    {% if timeline_skill %}
+    <p>{{ t('help.timelines_skill') }}</p>
+    <div class="help-template">
+      <details class="help-template-details">
+        <summary>
+          <svg width="18" height="18" aria-hidden="true"><use href="#i-file"></use></svg>
+          <span class="help-template-label"><strong>{{ t('help.timelines_skill_title') }}</strong><span>ankigen-timeline/SKILL.md</span></span>
+          <svg class="help-chevron" width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
+        </summary>
+        <div class="help-template-body">
+          <p>{{ t('help.timelines_skill_help') }}</p>
+          <pre id="timeline-skill-template" class="prompt-text" tabindex="0" role="region" aria-label="{{ t('help.timelines_skill_title') }}">{{ timeline_skill }}</pre>
+        </div>
+      </details>
+      <button type="button" class="btn sm help-copy" data-copy="timeline-skill-template">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>
+        <span aria-live="polite">{{ t('help.copy') }}</span>
+      </button>
+    </div>
+    {% endif %}
+
+    <h4 class="help-subtitle">{{ t('help.timelines_cards_title') }}</h4>
+    <p>{{ t('help.timelines_cards') }}</p>
+    <p>{{ t('help.timelines_reimport') }}</p>
+
+    <h4 class="help-subtitle">{{ t('help.timelines_limits_title') }}</h4>
+    <ul class="help-list">
+      {% for limit in ['calendar', 'sizes', 'pdf', 'fonts'] %}
+      <li>{{ t('help.timelines_limit_' ~ limit) }}</li>
+      {% endfor %}
+    </ul>
+  </section>
 </main>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  document.getElementById('copy-skill-btn').addEventListener('click', async () => {
-    const btn = document.querySelector('#copy-skill-btn span');
-    try {
-      await navigator.clipboard.writeText(document.getElementById('skill-template').textContent);
-      btn.textContent = window.T('js.copied');
-      setTimeout(() => { btn.textContent = window.T('js.copy'); }, 1400);
-    } catch (e) {
-      btn.textContent = window.T('js.copy_failed');
-      document.querySelector('.help-template-details').open = true;
-      document.getElementById('skill-template').focus();
-    }
-  });
+  // Boutons « Copier » des modèles de Skill (cartes et frise).
+  for (const button of document.querySelectorAll('[data-copy], #copy-skill-btn')) {
+    button.addEventListener('click', async () => {
+      const label = button.querySelector('span');
+      const source = document.getElementById(button.dataset.copy || 'skill-template');
+      try {
+        await navigator.clipboard.writeText(source.textContent);
+        label.textContent = window.T('js.copied');
+        setTimeout(() => { label.textContent = window.T('js.copy'); }, 1400);
+      } catch (e) {
+        label.textContent = window.T('js.copy_failed');
+        source.closest('details').open = true;
+        source.focus();
+      }
+    });
+  }
 </script>
 {% endblock %}

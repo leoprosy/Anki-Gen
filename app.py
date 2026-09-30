@@ -274,10 +274,21 @@ def load_skill_template(lang):
     return ""
 
 
+def _timeline_skill_text(lang):
+    """Le Skill frise de l'aide ; une frise cassée ne doit pas empêcher l'aide de s'afficher."""
+    try:
+        import timeline_prompt
+        return timeline_prompt.skill_text(lang)
+    except Exception:           # noqa: BLE001 — l'aide passe avant la frise
+        app.logger.exception("Skill frise illisible")
+        return ""
+
+
 @app.route("/help")
 def help_page():
     return render_template("help.html",
-                           skill_template=load_skill_template(current_lang()))
+                           skill_template=load_skill_template(current_lang()),
+                           timeline_skill=_timeline_skill_text(current_lang()))
 
 
 @app.route("/api/settings", methods=["GET", "POST"])

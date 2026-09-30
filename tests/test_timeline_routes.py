@@ -18,6 +18,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from markupsafe import escape  # l'échappement de Jinja
+
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
@@ -242,6 +244,21 @@ class TestDeletion(RoutesTestCase):
     def test_delete_refuses_a_malicious_id(self):
         self.assertEqual(self.client.post("/timeline/..%5Csettings/delete").status_code, 404)
         self.assertTrue((self.tmp / "settings.json").exists())
+
+
+class TestHelpPage(RoutesTestCase):
+    def test_timeline_section_in_each_language(self):
+        import timeline_prompt
+        for lang, title in (("fr", "Frises chronologiques"), ("en", "Timelines")):
+            with self.subTest(lang=lang):
+                settings.save_settings({"language": lang, "analytics_decided": True})
+                page = self.client.get("/help").get_data(as_text=True)
+                self.assertIn('id="timelines"', page)
+                self.assertIn(title, page)
+                self.assertIn("schemas/timeline-v1.json", page)
+                # Le Skill affiché est celui que sert /timeline/skill.md, dans la langue de l'interface.
+                self.assertIn(str(escape(timeline_prompt.skill_text(lang).splitlines()[2])), page)
+                self.assertNotIn("help.timelines_", page)          # aucune clé brute
 
 
 if __name__ == "__main__":

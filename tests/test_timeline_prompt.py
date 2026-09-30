@@ -254,9 +254,16 @@ class TestExtractionPrompt(unittest.TestCase):
         for lang in i18n.LANGUAGES:
             text = tp.skill_text(lang)
             self.assertTrue(text.startswith("---\nname: ankigen-timeline\n"), lang)
-            self.assertIn("<<<SOURCE", text)
+            self.assertIn("SOURCE", text)
             self.assertNotIn("{{", text)
             self.assertIn('"origin": "model"', text)
+
+    def test_skill_description_has_no_xml_tags(self):
+        # Claude refuse d'importer un Skill dont la description contient « < » ou « > ».
+        for lang in i18n.LANGUAGES:
+            frontmatter = tp.skill_text(lang).split("\n---\n", 1)[0]
+            self.assertNotRegex(frontmatter, r"[<>]", lang)
+            self.assertLessEqual(len(frontmatter), 1024 + 64, lang)
 
 
 class TestCorrectionPrompt(unittest.TestCase):

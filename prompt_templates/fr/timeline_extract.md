@@ -162,7 +162,7 @@ name: ankigen-timeline
 description: Extraire la chronologie d'un texte de cours en JSON ankigen.timeline/1,
   pour l'application Ankigen, qui dessine la frise. Utiliser ce skill dès que
   l'utilisateur demande une frise chronologique Ankigen, ou envoie un texte
-  délimité par <<<SOURCE et SOURCE>>> en mentionnant la frise.
+  encadré par les marqueurs SOURCE en mentionnant la frise.
 ---
 
 # Frise chronologique Ankigen

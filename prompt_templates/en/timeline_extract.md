@@ -161,8 +161,8 @@ Language of the text: "{{lang}}".
 name: ankigen-timeline
 description: Extract the chronology of a course text as ankigen.timeline/1 JSON,
   for the Ankigen app, which draws the timeline. Use this skill whenever the user
-  asks for an Ankigen timeline, or sends a text delimited by <<<SOURCE and
-  SOURCE>>> and mentions the timeline.
+  asks for an Ankigen timeline, or sends a text enclosed in SOURCE markers and
+  mentions the timeline.
 ---
 
 # Ankigen timeline

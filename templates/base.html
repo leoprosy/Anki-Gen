@@ -104,18 +104,16 @@
   <div class="shell {% block shell_class %}{% endblock %}">
 
     <header class="topbar">
-      <a class="brand" href="{{ url_for('index') }}" aria-label="{{ t('nav.home') }}">
-        <svg width="22" height="22" aria-hidden="true"><use href="#i-logo"></use></svg>
+      <a class="brand" href="{{ url_for('index') }}" aria-label="{{ t('nav.home') }}" title="{{ t('nav.home') }}">
+        <svg width="20" height="20" aria-hidden="true"><use href="#i-logo"></use></svg>
         <span class="brand__name">{{ t('app.name') }}</span>
       </a>
       {% block topbar %}<div class="topbar__spacer"></div>{% endblock %}
       <nav class="topbar__nav">
-        <a class="btn ghost sm" href="{{ url_for('help_page') }}" title="{{ t('nav.help') }}">
-          <span class="lbl">{{ t('nav.help') }}</span>
-        </a>
-        <a class="btn ghost sm" href="{{ url_for('settings_page') }}" title="{{ t('nav.settings') }}">
-          <span class="lbl">{{ t('nav.settings') }}</span>
-        </a>
+        <a class="nav-link" href="{{ url_for('help_page') }}"
+          {% if request.endpoint == 'help_page' %}aria-current="page"{% endif %}>{{ t('nav.help') }}</a>
+        <a class="nav-link" href="{{ url_for('settings_page') }}"
+          {% if request.endpoint == 'settings_page' %}aria-current="page"{% endif %}>{{ t('nav.settings') }}</a>
       </nav>
     </header>
 

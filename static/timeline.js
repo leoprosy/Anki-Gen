@@ -354,7 +354,19 @@
       + (count ? body : `<p class="tl-section__empty">${escapeHtml(T("timeline.ui.empty_section"))}</p>`)
       + "</details>";
   }
-  const sectionOpen = {};
+  const sectionOpen = { course: false };
+
+  function updateCourseLinks(course, document = state.doc) {
+    DATA.course = course;
+    DATA.data = clone(document);
+  }
+
+  function courseParagraphLink(id) {
+    const paragraph = DATA.course && DATA.course.paragraphs.find((p) => p.id === id);
+    return paragraph ? '<a class="tl-course-link" href="' + escapeHtml(paragraph.url)
+      + '" aria-label="' + escapeHtml(T("timeline.ui.course_paragraph", { id: id })) + '">'
+      + escapeHtml(T("timeline.ui.course")) + ' <span aria-hidden="true">↗</span></a>' : "";
+  }
 
   // Paragraphe par paragraphe : la section Sources, avec l'état de chaque paragraphe
   // et le rapport de fusion.
@@ -372,7 +384,7 @@
         + `<span class="tl-row__label">${escapeHtml(chunk.title || `#${chunk.id}`)}</span>`
         + `<span class="tl-row__badges"><span class="badge${chunk.mentions ? "" : " tl-badge--muted"}"`
         + ` title="${escapeHtml(T("timeline.ui.mentions_title"))}">${escapeHtml(T("timeline.ui.mentions", { n: chunk.mentions }))}</span></span>`
-        + "</button></li>";
+        + "</button>" + courseParagraphLink(chunk.id) + "</li>";
     }).join("");
     return section("sources", T("timeline.ui.section_sources"),
       mergeSummary() + `<ul class="tl-list">${rows}</ul>` + mergeDetails(), `${done}/${state.chunks.length}`);
@@ -422,6 +434,15 @@
     const tracks = doc.tracks || [];
     const parts = [];
     if (perChunk()) parts.push(sourcesSection());
+    else if (DATA.course && DATA.course.paragraphs.length) {
+      const rows = DATA.course.paragraphs.map((p) =>
+        '<li class="tl-item"><a class="tl-row tl-course-paragraph" href="' + escapeHtml(p.url)
+        + '" title="' + escapeHtml(p.label) + '"><span class="mono">#' + p.id
+        + '</span><span class="tl-row__label">' + escapeHtml(p.label.split("::").pop())
+        + '</span><span aria-hidden="true">↗</span></a></li>').join("");
+      parts.push(section("course", T("timeline.ui.course_paragraphs"), '<ul class="tl-list">' + rows + '</ul>',
+                         DATA.course.paragraphs.length));
+    }
 
     // Pistes : renommer, couleur, ordre (flèches, accessibles au clavier).
     const trackRows = tracks.map((track, index) => {
@@ -493,7 +514,7 @@
       mergeAction(split.dataset.separate ? { separate: split.dataset.separate } : { join: split.dataset.join });
       return;
     }
-    const button = ev.target.closest(".tl-row");
+    const button = ev.target.closest(".tl-row[data-kind]");
     if (button) {
       setRail(false);           // en fenêtre étroite, le rail en tiroir laisse place à l'édition
       openDrawer(button.dataset.kind, Number(button.dataset.index));
@@ -549,6 +570,12 @@
     els.drawerTitle.textContent = isNew ? T(`timeline.ui.new_${kind}`) : `${T(KIND_TITLE[kind])} — ${item.label || item.id}`;
     const parts = [field("id", T("timeline.ui.field_id"), input("id", item.id, ' autocomplete="off" spellcheck="false"'),
                          T("timeline.ui.id_help"))];
+    const original = (DATA.data && DATA.data[kind] || []).find((e) => e.id === item.id);
+    const sourceUrl = DATA.course && DATA.course.element_links[item.id];
+    if (sourceUrl && original && original.source_quote === item.source_quote) {
+      parts.unshift('<a class="tl-course-read" href="' + escapeHtml(sourceUrl) + '">'
+        + escapeHtml(T("timeline.ui.course_read")) + ' <span aria-hidden="true">↗</span></a>');
+    }
     parts.push(field("label", T("timeline.ui.field_label"), input("label", item.label, ' maxlength="80"')));
     if (kind === "tracks") {
       const auto = !item.color;
@@ -1109,6 +1136,7 @@
       state.jsonDirty = false;
       els.json.value = C.serialize(state.doc);
     }
+    if ("course" in data) updateCourseLinks(data.course, data.data);
     renderEditor();
     updateState();
     renderPromptChrome();
@@ -1163,6 +1191,7 @@
     if (!data || !data.report) { toast(T("timeline.ui.network_error"), "err"); return; }
     if (data.ok) {
       state.doc = clone(data.report.normalized);
+      updateCourseLinks(data.course);
       state.saved = C.serialize(state.doc);
       state.jsonDirty = false;
       els.json.value = C.serialize(state.doc);
@@ -1231,6 +1260,8 @@
     const { status, data } = await postJson(URLS.api, { data: state.doc, options: { density: state.density } });
     if (status === 200 && data && data.ok) {
       state.saved = C.serialize(state.doc);
+      updateCourseLinks(data.course);
+      renderEditor();
       updateState();
       toast(T("timeline.ui.saved"), "ok");
       document.dispatchEvent(new CustomEvent("timeline:saved"));

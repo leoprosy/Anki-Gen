@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ project_id }} — {{ t('app.name') }}{% endblock %}
 {% block shell_class %}shell--fixed{% endblock %}
+{% block body_class %}course-workspace{% endblock %}
 
 {% block topbar %}
 <button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="{{ t('work.chunk_list') }}" aria-expanded="false"
@@ -20,10 +21,7 @@
 </div>
 
 <div class="topbar__actions">
-  <button type="button" class="btn ghost" id="tl-scope-open" title="{{ t('timeline.ui.scope_open_title') }}">
-    <svg width="16" height="16" aria-hidden="true"><use href="#i-timeline"></use></svg>
-    <span class="lbl">{{ t('timeline.ui.scope_open') }}</span>
-  </button>
+  {% include "_course_navigation.html" %}
 
   <details class="menu" id="export-menu">
     <summary title="{{ t('work.export') }}">
@@ -296,6 +294,7 @@
 <script>
   const PROMPTS = {{ prompts | tojson }};
   window.__PROJECT_ID__ = {{ project_id | tojson }};
+  window.__CURRENT_CHUNK__ = {{ current_chunk | tojson }};
   window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
   window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";

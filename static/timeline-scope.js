@@ -104,12 +104,14 @@
     els.existing.hidden = !existing.length;
     els.existing.innerHTML = existing.length
       ? `<span class="muted">${escapeHtml(T("timeline.ui.scope_existing"))}</span> `
-        + existing.map((t) => `<a href="/timeline/${encodeURIComponent(t.id)}">${escapeHtml(t.title)}</a>`).join(", ")
+        + existing.map((t) => `<a href="/timeline/${encodeURIComponent(t.id)}?chunk_id=${encodeURIComponent(currentChunkId())}">${escapeHtml(t.title)}</a>`).join(", ")
       : "";
     update();
   }
 
   async function open() {
+    const menu = els.open.closest("details");
+    if (menu) menu.open = false;
     data = null;
     strategyTouched = false;
     titleTouched = false;
@@ -146,7 +148,13 @@
         body: JSON.stringify({ scope, title: els.name.value, lang: els.lang.value, mode, strategy }),
       });
       const body = await response.json();
-      if (body.ok) { window.location.href = body.url; return; }
+      if (body.ok) {
+        const url = new URL(body.url, window.location.origin);
+        const chunk = currentChunkId();
+        if (chunk !== "") url.searchParams.set("chunk_id", chunk);
+        window.location.href = url.href;
+        return;
+      }
       els.errors.innerHTML = `<li>${escapeHtml(body.error || T("timeline.ui.network_error"))}</li>`;
     } catch (e) {
       els.errors.innerHTML = `<li>${escapeHtml(T("timeline.ui.network_error"))}</li>`;

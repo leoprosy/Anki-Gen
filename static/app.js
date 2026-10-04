@@ -47,7 +47,8 @@
   const mqTabs = window.matchMedia("(max-width: 900px)");
 
   const firstPending = prompts.findIndex((p) => p.status !== "done");
-  let currentIdx = firstPending >= 0 ? firstPending : 0;
+  const requestedChunk = prompts.findIndex((p) => p.id === window.__CURRENT_CHUNK__);
+  let currentIdx = requestedChunk >= 0 ? requestedChunk : firstPending >= 0 ? firstPending : 0;
   let answerMode = "edit";       // edit | cards
   let dirty = false;             // réponse modifiée non enregistrée
 
@@ -129,6 +130,14 @@
   // ── Rendu du chunk courant ─────────────────────────────────
   function render() {
     const p = prompts[currentIdx];
+    const pageUrl = new URL(window.location.href);
+    pageUrl.searchParams.set("chunk_id", p.id);
+    window.history.replaceState(null, "", pageUrl);
+    for (const link of document.querySelectorAll("[data-course-timeline], [data-course-home]")) {
+      const url = new URL(link.href);
+      url.searchParams.set("chunk_id", p.id);
+      link.href = url.href;
+    }
     els.curId.textContent = `#${p.id}`;
     els.curDeck.textContent = p.deck;
     els.curDeck.title = p.deck;

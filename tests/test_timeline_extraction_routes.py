@@ -13,6 +13,7 @@ un dossier jetable.
 import json
 import sys
 import unittest
+from urllib.parse import parse_qs, urlsplit
 from pathlib import Path
 from unittest import mock
 
@@ -107,6 +108,89 @@ class TestScopes(ExtractionTestCase):
         self.assertIn('id="tl-scope"', html)
         self.assertIn("timeline-scope.js", html)
         self.assertIn("Paragraphe par paragraphe", html)
+
+
+class TestCourseNavigation(ExtractionTestCase):
+    def test_course_lists_only_its_linked_timelines(self):
+        tid = self.created({"kind": "project"}, title="Frise de ce cours")
+        standalone = self.created_id()
+        html = self.client.get(f"/work/{PROJECT_ID}").get_data(as_text=True)
+        self.assertIn('aria-label="Vues du cours"', html)
+        self.assertIn(f'href="/timeline/{tid}"', html)
+        self.assertNotIn(f'href="/timeline/{standalone}"', html)
+        self.assertIn('id="tl-scope-open"', html)
+
+    def test_course_deep_link_keeps_zero_and_ignores_unknown_paragraphs(self):
+        for value, expected in (("0", "0"), ("2", "2"), ("999", "null"), ("../2", "null")):
+            html = self.client.get(f"/work/{PROJECT_ID}", query_string={"chunk_id": value}).get_data(as_text=True)
+            self.assertIn(f"window.__CURRENT_CHUNK__ = {expected};", html)
+
+    def test_single_extraction_exposes_source_paragraphs_and_exact_quote_links(self):
+        tid = self.created({"kind": "chapter", "deck_path": f"{PREFIX}::I - Première mondialisation"})
+        self.client.post(f"/api/timeline/{tid}", json={"raw": doc([COBDEN, MELINE])})
+        course = self.client.get(f"/api/timeline/{tid}").get_json()["timeline"]["course"]
+        self.assertEqual(course["id"], PROJECT_ID)
+        self.assertEqual([p["id"] for p in course["paragraphs"]], [1, 2])
+        self.assertEqual(parse_qs(urlsplit(course["url"]).query)["chunk_id"], ["1"])
+        self.assertEqual(parse_qs(urlsplit(course["element_links"]["meline"]).query)["chunk_id"], ["2"])
+        self.assertNotIn("prompt", course["paragraphs"][0])
+
+    def test_timeline_returns_to_the_paragraph_that_was_open_in_the_course(self):
+        tid = self.created({"kind": "chunk", "chunk_ids": [1]})
+        html = self.client.get(f"/timeline/{tid}?chunk_id=3").get_data(as_text=True)
+        self.assertIn("chunk_id=3", html)
+        self.assertIn('aria-label="Vues du cours"', html)
+        self.assertIn("Cours source", html)
+        html = self.client.get(f"/timeline/{tid}?chunk_id=999").get_data(as_text=True)
+        self.assertNotIn("chunk_id=999", html)
+        self.assertIn("chunk_id=1", html)
+
+    def test_paste_and_quote_edits_refresh_links_without_reloading(self):
+        tid = self.created({"kind": "project"})
+        body = self.client.post(f"/api/timeline/{tid}", json={"raw": doc([COBDEN])}).get_json()
+        self.assertIn("cobden", body["course"]["element_links"])
+        edited = body["report"]["normalized"]
+        edited["events"][0]["source_quote"] = MELINE["source_quote"]
+        body = self.client.post(f"/api/timeline/{tid}", json={"data": edited}).get_json()
+        self.assertEqual(parse_qs(urlsplit(body["course"]["element_links"]["cobden"]).query)["chunk_id"], ["2"])
+        edited["events"][0]["source_quote"] = "Citation introuvable"
+        body = self.client.post(f"/api/timeline/{tid}", json={"data": edited}).get_json()
+        self.assertNotIn("cobden", body["course"]["element_links"])
+
+    def test_per_chunk_paste_and_merge_refresh_source_links(self):
+        tid = self.per_chunk()
+        body = self.client.post(f"/api/timeline/{tid}", json={"raw": doc([MELINE]), "chunk_id": 2}).get_json()
+        self.assertEqual(parse_qs(urlsplit(body["course"]["element_links"]["c2_meline"]).query)["chunk_id"], ["2"])
+        body = self.client.post(f"/api/timeline/{tid}/merge", json={}).get_json()
+        self.assertIn("c2_meline", body["course"]["element_links"])
+
+    def test_deleted_source_paragraphs_have_no_dead_links(self):
+        tid = self.created({"kind": "chapter", "deck_path": f"{PREFIX}::I - Première mondialisation"})
+        project = project_store.load_project(PROJECT_ID)
+        project["prompts"] = [p for p in project["prompts"] if p["id"] != 1]
+        project_store.save_project(PROJECT_ID, project)
+        course = self.client.get(f"/api/timeline/{tid}").get_json()["timeline"]["course"]
+        self.assertEqual([p["id"] for p in course["paragraphs"]], [2])
+        self.assertEqual(parse_qs(urlsplit(course["url"]).query)["chunk_id"], ["2"])
+
+    def test_ambiguous_quotes_do_not_claim_one_source_paragraph(self):
+        project = project_store.load_project(PROJECT_ID)
+        project["prompts"][2]["prompt"] = project["prompts"][1]["prompt"]
+        project_store.save_project(PROJECT_ID, project)
+        tid = self.created({"kind": "project"})
+        self.client.post(f"/api/timeline/{tid}", json={"raw": doc([COBDEN])})
+        course = self.client.get(f"/api/timeline/{tid}").get_json()["timeline"]["course"]
+        self.assertNotIn("cobden", course["element_links"])
+
+    def test_import_and_deleted_course_remain_standalone(self):
+        standalone = self.created_id()
+        self.assertIsNone(self.client.get(f"/api/timeline/{standalone}").get_json()["timeline"]["course"])
+        tid = self.created({"kind": "project"})
+        project_store.delete_project(PROJECT_ID)
+        self.assertIsNone(self.client.get(f"/api/timeline/{tid}").get_json()["timeline"]["course"])
+        html = self.client.get(f"/timeline/{tid}").get_data(as_text=True)
+        self.assertNotIn('aria-label="Vues du cours"', html)
+        self.assertEqual(self.client.get(f"/timeline/{tid}").status_code, 200)
 
 
 class TestCreationFromScope(ExtractionTestCase):

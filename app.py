@@ -247,6 +247,7 @@ def work(project_id):
     project = load_project(project_id)
     if not project:
         return redirect(url_for("index"))
+    course_timelines = [t for t in _timeline_summaries() if t.get("project_id") == project_id]
     return render_template(
         "work.html",
         project_id=project_id,
@@ -255,7 +256,10 @@ def work(project_id):
         missing_alt=missing_alt_count(project),
         warnings=project.get("warnings", []),
         timeline_i18n=catalog_for_js(current_lang(), prefix="timeline.ui."),
-        linked_timelines=sum(1 for t in _timeline_summaries() if t.get("project_id") == project_id),
+        linked_timelines=len(course_timelines),
+        course_timelines=course_timelines, course_id=project_id,
+        course_url=url_for("work", project_id=project_id), course_page="course",
+        current_chunk=_course_chunk(project, request.args.get("chunk_id")),
     )
 
 
@@ -659,7 +663,52 @@ def _date_labels(doc, lang):
     return out
 
 
-def _timeline_view(record):
+def _course_chunk(project, candidate):
+    """Un lien profond doit désigner un paragraphe du cours actuel, y compris le n° 0."""
+    try:
+        chunk_id = int(candidate)
+    except (ValueError, TypeError):
+        return None
+    return chunk_id if any(p["id"] == chunk_id for p in project.get("prompts", [])) else None
+
+
+def _timeline_course(record, candidate=None):
+    """Liens vers le cours actuel, sans exposer son texte ni modifier l'instantané de la frise."""
+    import timeline_quotes
+    project_id = record["source"].get("project_id")
+    if not project_id:
+        return None
+    try:
+        project = load_project(project_id)
+    except (OSError, ValueError):
+        return None
+    if not project:
+        return None
+    wanted = set(record["source"].get("chunk_ids") or [])
+    paragraphs = [p for p in project.get("prompts", []) if p["id"] in wanted]
+    chunk_id = _course_chunk(project, candidate)
+    if chunk_id is None and paragraphs:
+        chunk_id = paragraphs[0]["id"]
+
+    def chunk_url(value):
+        return url_for("work", project_id=project_id, chunk_id=value)
+
+    links = [{"id": p["id"], "label": p.get("deck") or f"#{p['id']}", "url": chunk_url(p["id"])}
+             for p in paragraphs]
+    texts = [(p["id"], timeline_quotes.normalize(p.get("prompt") or "")) for p in paragraphs]
+    source_links = {}
+    data = record.get("data") or {}
+    for kind in ("eras", "periods", "events"):
+        for item in data.get(kind) or []:
+            quote_text = timeline_quotes.normalize(item.get("source_quote") or "")
+            matches = [i for i, text in texts if quote_text and quote_text in text]
+            if len(matches) == 1:
+                source_links[item["id"]] = chunk_url(matches[0])
+    return {"id": project_id, "url": chunk_url(chunk_id), "chunk_id": chunk_id, "paragraphs": links,
+            "element_links": source_links}
+
+
+def _timeline_view(record, course_chunk=None):
     """Ce que la page reçoit : l'enregistrement, sans le texte source (jusqu'à 200 000 caractères)."""
     import timeline_prompt
     source, extraction = record["source"], record["extraction"]
@@ -679,6 +728,7 @@ def _timeline_view(record):
         "title": (record.get("data") or {}).get("title") or record.get("title") or "",
         "lang": (record.get("data") or {}).get("lang") or record.get("lang") or current_lang(),
         "source": source,
+        "course": _timeline_course(record, course_chunk),
         "has_source_text": bool(text),
         "source_chars": len(text),
         # §11 : un projet supprimé laisse ses frises intactes ; l'interface le signale.
@@ -727,13 +777,15 @@ def _remerge(record, lang, *, force):
 
 def _merge_payload(record, result):
     report = result.get("report")
+    view = _timeline_view(record)
     return {
         "merged": result["merged"],
         "edited": result["edited"],
         "data": record.get("data"),
         "merge": record["extraction"]["merge"].get("report"),
         "document_report": _with_messages(_with_quotes(report, record)) if report else None,
-        "chunks": _timeline_view(record)["chunks"],
+        "chunks": view["chunks"],
+        "course": view["course"],
         "updated_at": record.get("updated_at"),
     }
 
@@ -754,10 +806,15 @@ def timeline_page(tid):
     record, error = _load_timeline_or_error(tid)
     if error:
         return redirect(url_for("index"))
+    view = _timeline_view(record, request.args.get("chunk_id"))
+    course = view["course"]
     return render_template(
         "timeline.html",
-        timeline=_timeline_view(record),
+        timeline=view,
         timeline_i18n=catalog_for_js(current_lang(), prefix="timeline."),
+        course_id=course["id"] if course else None,
+        course_url=course["url"] if course else None, course_page="timeline",
+        course_timelines=[t for t in _timeline_summaries() if course and t.get("project_id") == course["id"]],
     )
 
 
@@ -897,6 +954,7 @@ def api_timeline(tid):
     record = timeline_store.save_timeline(tid, record)
     status = 200 if report["ok"] else 422
     return jsonify(ok=report["ok"], report=_with_messages(report),
+                   course=_timeline_course(record),
                    updated_at=record["updated_at"]), status
 
 

@@ -109,8 +109,11 @@ oublié, et l'onglet **Cartes** montre le rendu final avant l'import.
 ![Une frise dessinée par Ankigen : trois pistes, des périodes, des ères et des évènements datés de 1846 à 2008](docs/images/timeline.png)
 
 Un cours est plein de dates, et une pile de cartes cache comment elles s'articulent. Depuis l'écran
-de travail, le bouton **Frise** transforme un paragraphe, un chapitre ou le cours entier en frise
-chronologique : pistes, périodes, ères et évènements sur un seul dessin.
+de travail, le menu **Frises** retrouve les frises rattachées au cours et permet de transformer
+un paragraphe, un chapitre ou le cours entier en frise chronologique : pistes, périodes, ères
+et évènements sur un seul dessin. La navigation **Cours / Frises** conserve le paragraphe ouvert.
+Depuis la frise, les liens source retrouvent les paragraphes du cours et, lorsqu'une citation
+l'identifie sans ambiguïté, le passage associé à un événement.
 
 - **Claude extrait, Ankigen dessine.** Le prompt copié demande un document JSON
   (`ankigen.timeline/1`, [schéma JSON](static/schemas/timeline-v1.json)) et rien d'autre. Ankigen

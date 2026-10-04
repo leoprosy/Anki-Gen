@@ -96,8 +96,10 @@ before you import anything.
 ![A timeline drawn by Ankigen: three tracks, periods, eras and dated events from 1846 to 2008](docs/images/timeline.png)
 
 A course is full of dates, and a pile of cards hides how they relate. From the work view, the
-**Timeline** button turns a paragraph, a chapter or the whole course into a chronological timeline:
-tracks, periods, eras and events on a single drawing.
+**Timelines** menu opens the course's existing timelines or turns a paragraph, a chapter or the
+whole course into a chronological timeline: tracks, periods, eras and events on a single drawing.
+The shared **Course / Timelines** navigation preserves the current paragraph. Source links lead
+back to course paragraphs and, when a quotation identifies it unambiguously, an event's source.
 
 - **Claude extracts, Ankigen draws.** The copied prompt asks for one JSON document
   (`ankigen.timeline/1`, [JSON Schema](static/schemas/timeline-v1.json)) and nothing else. Ankigen

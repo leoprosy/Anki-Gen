@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ project_id }} — {{ t('app.name') }}{% endblock %}
 {% block shell_class %}shell--fixed{% endblock %}
+{% block body_class %}course-workspace{% endblock %}
 
 {% block topbar %}
 <button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="{{ t('work.chunk_list') }}" aria-expanded="false"
@@ -21,6 +22,8 @@
 </div>
 
 <div class="topbar__actions">
+  {% include "_course_navigation.html" %}
+
   <details class="menu" id="export-menu">
     <summary title="{{ t('work.export') }}">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-download"></use></svg>
@@ -29,6 +32,12 @@
     <div class="menu__panel">
       <div class="menu__title">{{ t('work.export') }}</div>
       <div class="export-report" id="export-report">{{ t('work.export_computing') }}</div>
+      {% if linked_timelines %}
+      <label class="export-option">
+        <input type="checkbox" id="export-timelines">
+        <span>{{ t('timeline.ui.export_include_timelines', n=linked_timelines) }}</span>
+      </label>
+      {% endif %}
       <button type="button" class="export-item" id="export-tsv-btn"
         data-export-url="{{ url_for('export_tsv', project_id=project_id) }}">
         <strong>{{ t('work.export_tsv') }}</strong>
@@ -51,6 +60,9 @@
 {% endblock %}
 
 {% block shell_body %}
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-timeline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><circle cx="7" cy="12" r="2"></circle><circle cx="15" cy="12" r="2"></circle><line x1="7" y1="5" x2="7" y2="10"></line><line x1="15" y1="14" x2="15" y2="19"></line></symbol>
+</svg>
 <main class="work">
   <!-- ── Rail des chunks (tiroir sous 1180px) ─────────────────── -->
   <aside class="rail" id="rail" aria-label="{{ t('work.chunk_list') }}">
@@ -192,18 +204,106 @@
     </button>
   </div>
 </footer>
+
+<!-- ── Frise : choix de la portée (§2.1) ──────────────────────── -->
+<dialog class="tl-modal" id="tl-scope" aria-labelledby="tl-scope-title">
+  <div class="tl-modal__inner">
+    <div class="tl-modal__head">
+      <h3 id="tl-scope-title">{{ t('timeline.ui.scope_title') }}</h3>
+      <button type="button" class="icon-btn" id="tl-scope-close" aria-label="{{ t('timeline.ui.close') }}">
+        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
+      </button>
+    </div>
+
+    <fieldset class="tl-scopes" id="tl-scope-choices">
+      <legend class="tl-scopes__legend">{{ t('timeline.ui.scope_legend') }}</legend>
+      <label class="tl-scope">
+        <input type="radio" name="tl-scope" value="chunk">
+        <span class="tl-scope__text">
+          <strong>{{ t('timeline.ui.scope_chunk') }}</strong>
+          <small class="muted" data-scope-size="chunk"></small>
+        </span>
+      </label>
+      <label class="tl-scope" id="tl-scope-chapter-row">
+        <input type="radio" name="tl-scope" value="chapter">
+        <span class="tl-scope__text">
+          <strong>{{ t('timeline.ui.scope_chapter') }}</strong>
+          <select id="tl-scope-level" aria-label="{{ t('timeline.ui.scope_level') }}"></select>
+          <small class="muted" data-scope-size="chapter"></small>
+        </span>
+      </label>
+      <label class="tl-scope">
+        <input type="radio" name="tl-scope" value="project">
+        <span class="tl-scope__text">
+          <strong>{{ t('timeline.ui.scope_project') }}</strong>
+          <small class="muted" data-scope-size="project"></small>
+        </span>
+      </label>
+    </fieldset>
+
+    <div class="tl-scope-options">
+      <div class="tl-scope-option">
+        <span class="tl-scope-option__label" id="tl-scope-strategy-label">{{ t('timeline.ui.strategy') }}</span>
+        <div class="seg" id="tl-scope-strategy" role="radiogroup" aria-labelledby="tl-scope-strategy-label">
+          <button type="button" role="radio" data-strategy="single" aria-checked="true" class="active">{{ t('timeline.ui.strategy_single') }}</button>
+          <button type="button" role="radio" data-strategy="per_chunk" aria-checked="false">{{ t('timeline.ui.strategy_per_chunk') }}</button>
+        </div>
+      </div>
+      <p class="tl-scope-hint" id="tl-scope-hint" aria-live="polite"></p>
+      <div class="tl-scope-option">
+        <span class="tl-scope-option__label" id="tl-scope-mode-label">{{ t('timeline.ui.mode') }}</span>
+        <div class="seg" id="tl-scope-mode" role="radiogroup" aria-labelledby="tl-scope-mode-label">
+          <button type="button" role="radio" data-mode="strict" aria-checked="true" class="active"
+            title="{{ t('timeline.ui.mode_strict_help') }}">{{ t('timeline.ui.mode_strict') }}</button>
+          <button type="button" role="radio" data-mode="enriched" aria-checked="false"
+            title="{{ t('timeline.ui.mode_enriched_help') }}">{{ t('timeline.ui.mode_enriched') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tl-scope-fields">
+      <label class="field">
+        <span>{{ t('timeline.ui.field_title') }}</span>
+        <input type="text" id="tl-scope-name" maxlength="120" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>{{ t('timeline.ui.field_lang') }}</span>
+        <select id="tl-scope-lang">
+          {% for language in languages %}
+          <option value="{{ language.code }}"{% if language.code == lang %} selected{% endif %}>{{ language.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="tl-scope-existing" id="tl-scope-existing" hidden></div>
+    <ul class="tl-modal__errors" id="tl-scope-errors" aria-live="polite"></ul>
+    <div class="tl-modal__actions">
+      <button type="button" class="btn ghost" id="tl-scope-cancel">{{ t('timeline.ui.cancel') }}</button>
+      <button type="button" class="btn primary" id="tl-scope-create">{{ t('timeline.ui.scope_create') }}</button>
+    </div>
+  </div>
+</dialog>
 {% endblock %}
 
 {% block scripts %}
 <script>
   const PROMPTS = {{ prompts | tojson }};
   window.__PROJECT_ID__ = {{ project_id | tojson }};
+  window.__CURRENT_CHUNK__ = {{ current_chunk | tojson }};
   window.__MISSING_ALT__ = {{ missing_alt | tojson }};
   window.__API_SAVE_URL__ = "{{ url_for('api_save', project_id=project_id) }}";
   window.__API_ASSET_URL__ = "{{ url_for('api_asset', project_id=project_id, asset_id='__ASSET__') }}";
   window.__API_PREVIEW_URL__ = "{{ url_for('api_preview', project_id=project_id) }}";
   window.__API_REPORT_URL__ = "{{ url_for('api_export_report', project_id=project_id) }}";
   window.__API_ANKI_MEDIA_URL__ = "{{ url_for('api_export_anki_media', project_id=project_id) }}";
+  Object.assign(window.__I18N__, {{ (timeline_i18n or {}) | tojson }});
+  window.__TIMELINE_SCOPE__ = {
+    projectId: {{ project_id | tojson }},
+    scopes: {{ url_for('api_timeline_scopes', project_id=project_id) | tojson }},
+    create: {{ url_for('timeline_new') | tojson }},
+  };
 </script>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='timeline-scope.js') }}"></script>
 {% endblock %}

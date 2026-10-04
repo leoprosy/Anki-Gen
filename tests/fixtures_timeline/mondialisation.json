@@ -1,0 +1,291 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "La dynamique de la mondialisation économique",
+  "subtitle": "Du libre-échange britannique à l'OMC",
+  "lang": "fr",
+  "tracks": [
+    {
+      "id": "commerce",
+      "label": "Commerce"
+    },
+    {
+      "id": "monnaie",
+      "label": "Monnaie et finance",
+      "color": "#0072B2"
+    },
+    {
+      "id": "institutions",
+      "label": "Institutions"
+    }
+  ],
+  "eras": [
+    {
+      "id": "premiere_mondialisation",
+      "label": "Première mondialisation",
+      "start": "1870",
+      "end": "1914",
+      "approx": true
+    },
+    {
+      "id": "desintegration",
+      "label": "Désintégration de l'économie mondiale",
+      "start": "1914",
+      "end": "1945"
+    },
+    {
+      "id": "reintegration",
+      "label": "Réintégration sous l'égide du GATT",
+      "start": "1945",
+      "end": "1990",
+      "approx": true
+    },
+    {
+      "id": "hypermondialisation",
+      "label": "Hypermondialisation",
+      "start": "1990",
+      "end": "2008",
+      "approx": true
+    }
+  ],
+  "periods": [
+    {
+      "id": "longue_depression",
+      "track": "commerce",
+      "start": "1873",
+      "end": "1896",
+      "label": "Longue dépression",
+      "importance": 2
+    },
+    {
+      "id": "retour_protectionnisme",
+      "track": "commerce",
+      "start": "1879",
+      "end": "1914",
+      "label": "Retour du protectionnisme en Europe",
+      "importance": 2,
+      "approx": true
+    },
+    {
+      "id": "etalon_or",
+      "track": "monnaie",
+      "start": "1873",
+      "end": "1914",
+      "label": "Étalon-or classique",
+      "importance": 3,
+      "approx": true
+    },
+    {
+      "id": "grande_depression",
+      "track": "commerce",
+      "start": "1929",
+      "end": "1939",
+      "label": "Grande Dépression",
+      "importance": 3
+    },
+    {
+      "id": "bretton_woods",
+      "track": "monnaie",
+      "start": "1944-07",
+      "end": "1971-08-15",
+      "label": "Système de Bretton Woods",
+      "importance": 3,
+      "description": "Changes fixes mais ajustables, dollar convertible en or.",
+      "source_quote": "le système de Bretton Woods, qui prend fin en 1971"
+    },
+    {
+      "id": "uruguay_round",
+      "track": "institutions",
+      "start": "1986-09",
+      "end": "1994-04",
+      "label": "Cycle de l'Uruguay",
+      "importance": 2
+    }
+  ],
+  "events": [
+    {
+      "id": "corn_laws",
+      "track": "commerce",
+      "date": "1846",
+      "label": "Abrogation des Corn Laws",
+      "importance": 2
+    },
+    {
+      "id": "cobden_chevalier",
+      "track": "commerce",
+      "date": "1860-01-23",
+      "label": "Traité Cobden-Chevalier",
+      "importance": 3,
+      "description": "Traité de libre-échange franco-britannique, modèle de la clause de la nation la plus favorisée.",
+      "date_text": "en 1860",
+      "source_quote": "le traité Cobden-Chevalier de 1860",
+      "tags": [
+        "libre-échange"
+      ],
+      "origin": "text"
+    },
+    {
+      "id": "suez",
+      "track": "commerce",
+      "date": "1869-11-17",
+      "label": "Ouverture du canal de Suez",
+      "importance": 2
+    },
+    {
+      "id": "tarif_bismarck",
+      "track": "commerce",
+      "date": "1879",
+      "label": "Tarif douanier de Bismarck",
+      "importance": 2
+    },
+    {
+      "id": "tarif_meline",
+      "track": "commerce",
+      "date": "1892-01-11",
+      "label": "Tarif Méline",
+      "importance": 2
+    },
+    {
+      "id": "panama",
+      "track": "commerce",
+      "date": "1914-08-15",
+      "label": "Ouverture du canal de Panama",
+      "importance": 1
+    },
+    {
+      "id": "genes",
+      "track": "monnaie",
+      "date": "1922",
+      "label": "Conférence de Gênes",
+      "importance": 1
+    },
+    {
+      "id": "krach",
+      "track": "monnaie",
+      "date": "1929-10-24",
+      "label": "Krach de Wall Street",
+      "importance": 2
+    },
+    {
+      "id": "smoot_hawley",
+      "track": "commerce",
+      "date": "1930-06-17",
+      "label": "Tarif Smoot-Hawley",
+      "importance": 2
+    },
+    {
+      "id": "sterling_or",
+      "track": "monnaie",
+      "date": "1931-09-21",
+      "label": "Suspension de la convertibilité-or de la livre",
+      "importance": 2
+    },
+    {
+      "id": "ottawa",
+      "track": "commerce",
+      "date": "1932",
+      "label": "Accords d'Ottawa",
+      "importance": 1
+    },
+    {
+      "id": "plan_marshall",
+      "track": "institutions",
+      "date": "1947-06-05",
+      "label": "Annonce du plan Marshall",
+      "importance": 2
+    },
+    {
+      "id": "gatt",
+      "track": "institutions",
+      "date": "1947-10-30",
+      "label": "Signature du GATT",
+      "importance": 3,
+      "source_quote": "le GATT, signé en 1947"
+    },
+    {
+      "id": "oece",
+      "track": "institutions",
+      "date": "1948-04-16",
+      "label": "Création de l'OECE",
+      "importance": 1
+    },
+    {
+      "id": "ideal_x",
+      "track": "commerce",
+      "date": "1956-04-26",
+      "label": "Premier porte-conteneurs",
+      "importance": 1
+    },
+    {
+      "id": "traite_rome",
+      "track": "institutions",
+      "date": "1957-03-25",
+      "label": "Traité de Rome",
+      "importance": 2
+    },
+    {
+      "id": "nixon",
+      "track": "monnaie",
+      "date": "1971-08-15",
+      "label": "Fin de la convertibilité du dollar en or",
+      "importance": 3,
+      "source_quote": "la suspension de la convertibilité-or du dollar en août 1971"
+    },
+    {
+      "id": "jamaique",
+      "track": "monnaie",
+      "date": "1976-01",
+      "label": "Accords de la Jamaïque",
+      "importance": 2
+    },
+    {
+      "id": "plaza",
+      "track": "monnaie",
+      "date": "1985-09-22",
+      "label": "Accords du Plaza",
+      "importance": 1
+    },
+    {
+      "id": "alena",
+      "track": "institutions",
+      "date": "1994-01-01",
+      "label": "Entrée en vigueur de l'ALENA",
+      "importance": 2
+    },
+    {
+      "id": "omc",
+      "track": "institutions",
+      "date": "1995-01-01",
+      "label": "Création de l'OMC",
+      "importance": 3
+    },
+    {
+      "id": "baht",
+      "track": "monnaie",
+      "date": "1997-07-02",
+      "label": "Dévaluation du baht thaïlandais",
+      "importance": 2
+    },
+    {
+      "id": "euro",
+      "track": "monnaie",
+      "date": "1999-01-01",
+      "label": "Lancement de l'euro",
+      "importance": 2
+    },
+    {
+      "id": "chine_omc",
+      "track": "institutions",
+      "date": "2001-12-11",
+      "label": "Adhésion de la Chine à l'OMC",
+      "importance": 2
+    },
+    {
+      "id": "lehman",
+      "track": "monnaie",
+      "date": "2008-09-15",
+      "label": "Faillite de Lehman Brothers",
+      "importance": 2
+    }
+  ],
+  "links": []
+}

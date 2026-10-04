@@ -1,0 +1,168 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Repères de l'Antiquité",
+  "lang": "fr",
+  "tracks": [
+    {
+      "id": "orient",
+      "label": "Proche-Orient"
+    },
+    {
+      "id": "grece",
+      "label": "Grèce"
+    },
+    {
+      "id": "rome",
+      "label": "Rome"
+    }
+  ],
+  "eras": [
+    {
+      "id": "archaique",
+      "label": "Époque archaïque",
+      "start": "-800",
+      "end": "-480",
+      "approx": true
+    },
+    {
+      "id": "classique",
+      "label": "Époque classique",
+      "start": "-480",
+      "end": "-323"
+    },
+    {
+      "id": "hellenistique",
+      "label": "Époque hellénistique",
+      "start": "-323",
+      "end": "-31"
+    }
+  ],
+  "periods": [
+    {
+      "id": "royaute",
+      "track": "rome",
+      "start": "-753",
+      "end": "-509",
+      "label": "Royauté romaine",
+      "importance": 2,
+      "approx": true
+    },
+    {
+      "id": "republique",
+      "track": "rome",
+      "start": "-509",
+      "end": "-27",
+      "label": "République romaine",
+      "importance": 3
+    },
+    {
+      "id": "peloponnese",
+      "track": "grece",
+      "start": "-431",
+      "end": "-404",
+      "label": "Guerre du Péloponnèse",
+      "importance": 2
+    },
+    {
+      "id": "principat",
+      "track": "rome",
+      "start": "-27",
+      "end": "14",
+      "label": "Principat d'Auguste",
+      "importance": 3
+    },
+    {
+      "id": "crise_iii",
+      "track": "rome",
+      "start": "235",
+      "end": "284",
+      "label": "Crise du IIIe siècle",
+      "importance": 2
+    }
+  ],
+  "events": [
+    {
+      "id": "cuneiforme",
+      "track": "orient",
+      "date": "-4000",
+      "label": "Apparition de l'écriture cunéiforme",
+      "importance": 3,
+      "precision": "millennium",
+      "approx": true
+    },
+    {
+      "id": "hammurabi",
+      "track": "orient",
+      "date": "-1750",
+      "label": "Code de Hammurabi",
+      "importance": 2,
+      "approx": true
+    },
+    {
+      "id": "iliade",
+      "track": "grece",
+      "date": "-800",
+      "label": "Rédaction de l'Iliade",
+      "importance": 2,
+      "precision": "century",
+      "approx": true
+    },
+    {
+      "id": "fondation_rome",
+      "track": "rome",
+      "date": "-753-04-21",
+      "label": "Fondation légendaire de Rome",
+      "importance": 2
+    },
+    {
+      "id": "solon",
+      "track": "grece",
+      "date": "-594",
+      "label": "Réformes de Solon",
+      "importance": 1
+    },
+    {
+      "id": "marathon",
+      "track": "grece",
+      "date": "-490",
+      "label": "Bataille de Marathon",
+      "importance": 2
+    },
+    {
+      "id": "alexandre",
+      "track": "grece",
+      "date": "-323-06",
+      "label": "Mort d'Alexandre le Grand",
+      "importance": 3
+    },
+    {
+      "id": "cesar",
+      "track": "rome",
+      "date": "-44-03-15",
+      "label": "Assassinat de César",
+      "importance": 2
+    },
+    {
+      "id": "apogee",
+      "track": "rome",
+      "date": "101",
+      "label": "Apogée de l'Empire romain",
+      "importance": 1,
+      "precision": "century"
+    },
+    {
+      "id": "caracalla",
+      "track": "rome",
+      "date": "212",
+      "label": "Édit de Caracalla",
+      "importance": 1
+    },
+    {
+      "id": "chute_rome",
+      "track": "rome",
+      "date": "476",
+      "label": "Chute de l'Empire romain d'Occident",
+      "importance": 2
+    }
+  ]
+}

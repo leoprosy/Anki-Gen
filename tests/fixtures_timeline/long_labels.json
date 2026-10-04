@@ -1,0 +1,48 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Libellés longs : accents, <balises> & \"guillemets\" à échapper dans le SVG",
+  "lang": "fr",
+  "tracks": [
+    {
+      "id": "a",
+      "label": "Piste au libellé long & <spécial>"
+    },
+    {
+      "id": "b",
+      "label": "Seconde piste"
+    }
+  ],
+  "periods": [
+    {
+      "id": "p_longue",
+      "track": "b",
+      "start": "1945",
+      "end": "1973",
+      "label": "Wirtschaftswunder : croissance ouest-allemande d'après-guerre, dite « miracle »",
+      "importance": 2
+    }
+  ],
+  "events": [
+    {
+      "id": "e1",
+      "track": "a",
+      "date": "1776-07-04",
+      "label": "Déclaration d'indépendance des États-Unis d'Amérique, rédigée par Jefferson",
+      "importance": 3
+    },
+    {
+      "id": "e2",
+      "track": "a",
+      "date": "1789",
+      "label": "Loi « <b>test</b> » & \"guillemets\" : l'échappement XML doit tenir en 80 signes",
+      "importance": 2
+    },
+    {
+      "id": "e3",
+      "track": "b",
+      "date": "1795",
+      "label": "Œuvre complète — éditions établies à partir des manuscrits autographes & <notes>",
+      "importance": 2
+    }
+  ]
+}

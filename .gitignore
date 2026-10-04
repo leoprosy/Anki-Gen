@@ -14,6 +14,7 @@ prompts.json
 *.spec
 !flask-server.spec
 /projects
+/timelines
 version.json
 /media
 /exports

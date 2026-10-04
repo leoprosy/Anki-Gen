@@ -1,0 +1,11 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Frise fautive",
+  "events": [
+    {
+      "id": "e1",
+      "date": "vers 1450",
+      "label": "Évènement"
+    }
+  ]
+}

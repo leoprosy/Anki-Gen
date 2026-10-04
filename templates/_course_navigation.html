@@ -1,0 +1,32 @@
+{# Même navigation pour les deux vues d'un cours. #}
+{% if course_id %}
+<nav class="course-nav" aria-label="{{ t('timeline.ui.course_views') }}">
+  <a class="course-nav__tab" href="{{ course_url }}" data-course-home{% if course_page == 'course' %} aria-current="page"{% endif %}>{{ t('timeline.ui.course') }}</a>
+  <details class="menu course-nav__menu" id="course-timelines">
+    <summary class="course-nav__tab"{% if course_page == 'timeline' %} aria-current="page"{% endif %}>
+      <span>{{ t('timeline.ui.course_timelines') }}</span>
+      {% if course_timelines %}<span class="course-nav__count">{{ course_timelines|length }}</span>{% endif %}
+      <span class="course-nav__chevron" aria-hidden="true">⌄</span>
+    </summary>
+    <div class="menu__panel course-nav__panel">
+      <p class="course-nav__heading">{{ t('timeline.ui.course_timelines_title') }}</p>
+      <p class="course-nav__name" title="{{ course_id }}">{{ course_id }}</p>
+      <ul class="course-nav__list">
+      {% for item in course_timelines %}
+        <li><a class="course-nav__item" href="{{ url_for('timeline_page', tid=item.id, chunk_id=timeline.course.chunk_id if course_page == 'timeline' else none) }}" data-course-timeline{% if course_page == 'timeline' and item.id == timeline.id %} aria-current="page"{% endif %}>
+          <strong>{{ item.title }}</strong>
+          <small>{{ t('timeline.ui.course_scope_' ~ item.source_kind) }} · {{ t('timeline.ui.course_elements', events=item.events, periods=item.periods) if item.events or item.periods else t('timeline.ui.course_not_generated') }}</small>
+        </a></li>
+      {% else %}
+        <li class="course-nav__empty">{{ t('timeline.ui.course_no_timelines') }}</li>
+      {% endfor %}
+      </ul>
+      {% if course_page == 'course' %}
+      <button type="button" class="course-nav__create" id="tl-scope-open" aria-haspopup="dialog">{{ t('timeline.ui.course_create') }}</button>
+      {% else %}
+      <a class="course-nav__create" href="{{ course_url }}">{{ t('timeline.ui.course_return') }}</a>
+      {% endif %}
+    </div>
+  </details>
+</nav>
+{% endif %}

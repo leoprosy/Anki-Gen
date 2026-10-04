@@ -1,0 +1,11 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "events": [
+    {
+      "id": "e1",
+      "date": "1971",
+      "label": "Évènement"
+    }
+  ]
+}

@@ -48,10 +48,48 @@ def _server_stack():
         render_template_string("{{ 1 + 1 }}")
 
 
+def _timeline_raster():
+    """
+    timeline_render_raster.py : Inter par FreeType (moteur de mise en page basique,
+    celui des mesures), texte accentué aux trois ancres, réduction LANCZOS,
+    composition alpha, puis PNG, JPEG, WebP (avec et sans perte) et PDF.
+    """
+    from pathlib import Path
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    fonts = Path(__file__).resolve().parent / "static" / "fonts"
+    basic = ImageFont.Layout.BASIC
+    regular = ImageFont.truetype(str(fonts / "Inter-Regular.ttf"), 39, layout_engine=basic)
+    semibold = ImageFont.truetype(str(fonts / "Inter-SemiBold.ttf"), 39, layout_engine=basic)
+    width = regular.getlength("Traité Cobden-Chevalier — août 1971")
+    if not 400 < width < 800:
+        raise ValueError(f"largeur de texte inattendue : {width}")
+    image = Image.new("RGBA", (900, 120), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle([10, 60, 600, 90], radius=15, fill=(0, 114, 178, 255))
+    for anchor, font in (("ls", regular), ("ms", semibold), ("rs", regular)):
+        draw.text((450, 50), "Élément «œuvre» — XVIe s.", font=font, fill=(29, 29, 31, 255), anchor=anchor)
+    if image.getbbox() is None:
+        raise ValueError("rien n'a été dessiné")
+    layer = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    ImageDraw.Draw(layer).ellipse([700, 70, 720, 90], fill=(213, 94, 0, 115))
+    small = Image.alpha_composite(image, layer).resize((300, 40), Image.LANCZOS)
+    small.save(io.BytesIO(), format="PNG", optimize=True)
+    small.convert("RGB").save(io.BytesIO(), format="JPEG", quality=90, subsampling=0)
+    small.save(io.BytesIO(), format="WEBP", quality=90)
+    small.save(io.BytesIO(), format="WEBP", lossless=True)
+    buffer = io.BytesIO()
+    small.convert("RGB").save(buffer, format="PDF", resolution=300.0, title="Frise", author="Ankigen")
+    if not buffer.getvalue().startswith(b"%PDF"):
+        raise ValueError("PDF invalide")
+
+
 PROBES = {
     "pillow_roundtrip": _pillow_roundtrip,
     "docx_and_lxml": _docx_and_lxml,
     "server_stack": _server_stack,
+    "timeline_raster": _timeline_raster,
 }
 
 

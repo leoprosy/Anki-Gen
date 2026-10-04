@@ -1,0 +1,17 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Frise fautive",
+  "events": [
+    {
+      "id": "e1",
+      "date": "1971",
+      "label": "Évènement"
+    }
+  ],
+  "tracks": [
+    {
+      "id": "t",
+      "label": "Piste"
+    }
+  ]
+}

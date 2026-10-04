@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  {% block head %}{% endblock %}
 </head>
 
 <body class="{% block body_class %}{% endblock %}">
@@ -176,6 +177,39 @@
         setTimeout(() => el.remove(), 220);
       }, ms || 2200);
     };
+
+    // ── Groupes radio faits de boutons (role="radiogroup") ──────
+    // Motif ARIA : un seul arrêt Tab par groupe, sur le choix courant, et les
+    // flèches changent de choix. Le clic reste la seule voie de sélection : les
+    // pages gardent leurs gestionnaires, et aria-checked se reflète ici.
+    (function () {
+      const radios = (group) => [...group.querySelectorAll('[role="radio"]')]
+        .filter((radio) => !radio.disabled && radio.offsetParent !== null);
+      function sync(group) {
+        const all = [...group.querySelectorAll('[role="radio"]')];
+        const current = all.find((radio) => radio.getAttribute('aria-checked') === 'true')
+          || radios(group)[0] || all[0];
+        for (const radio of all) radio.tabIndex = radio === current ? 0 : -1;
+      }
+      document.querySelectorAll('[role="radiogroup"]').forEach(sync);
+      new MutationObserver((records) => {
+        const groups = new Set(records.map((r) => r.target.closest('[role="radiogroup"]')).filter(Boolean));
+        groups.forEach(sync);
+      }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['aria-checked'] });
+      document.addEventListener('keydown', (ev) => {
+        const radio = ev.target.closest && ev.target.closest('[role="radio"]');
+        const group = radio && radio.closest('[role="radiogroup"]');
+        if (!group || ev.altKey || ev.ctrlKey || ev.metaKey) return;
+        const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[ev.key];
+        if (!step) return;
+        const list = radios(group);
+        if (list.length < 2) return;
+        ev.preventDefault();
+        const next = list[(list.indexOf(radio) + step + list.length) % list.length];
+        next.focus();
+        next.click();
+      });
+    })();
 
     // ── Vérification silencieuse des mises à jour ───────────────
     const updBanner = document.getElementById('update-banner');

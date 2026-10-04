@@ -1,0 +1,59 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Évènements simultanés",
+  "lang": "fr",
+  "tracks": [
+    {
+      "id": "europe",
+      "label": "Europe"
+    },
+    {
+      "id": "empires",
+      "label": "Empires coloniaux"
+    }
+  ],
+  "events": [
+    {
+      "id": "capitulation",
+      "track": "europe",
+      "date": "1945-05-08",
+      "label": "Capitulation allemande",
+      "importance": 3
+    },
+    {
+      "id": "setif",
+      "track": "empires",
+      "date": "1945-05-08",
+      "label": "Massacres de Sétif et Guelma",
+      "importance": 2
+    },
+    {
+      "id": "fin_guerre_europe",
+      "track": "europe",
+      "date": "1945",
+      "label": "Fin de la Seconde Guerre mondiale en Europe",
+      "importance": 2
+    },
+    {
+      "id": "cee",
+      "track": "europe",
+      "date": "1957-03-25",
+      "label": "Traité instituant la CEE",
+      "importance": 2
+    },
+    {
+      "id": "euratom",
+      "track": "europe",
+      "date": "1957-03-25",
+      "label": "Traité Euratom",
+      "importance": 2
+    },
+    {
+      "id": "ghana",
+      "track": "empires",
+      "date": "1957-03-06",
+      "label": "Indépendance du Ghana",
+      "importance": 2
+    }
+  ]
+}

@@ -35,10 +35,12 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 PROJECTS_DIR = DATA_DIR / "projects"
 MEDIA_DIR = DATA_DIR / "media"
 EXPORT_DIR = DATA_DIR / "exports"
+# Jamais sous projects/ : list_projects() y prend tous les *.json pour des projets.
+TIMELINES_DIR = DATA_DIR / "timelines"
 
 
 def ensure_dirs() -> None:
-    for d in (UPLOAD_DIR, PROJECTS_DIR, MEDIA_DIR, EXPORT_DIR):
+    for d in (UPLOAD_DIR, PROJECTS_DIR, MEDIA_DIR, EXPORT_DIR, TIMELINES_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 
@@ -49,6 +51,14 @@ def migrate_legacy_data() -> list:
     Conservé pour ne pas casser l'appel dans app.py.
     """
     return []
+
+
+def timeline_media_dir(timeline_id: str) -> Path:
+    """
+    Images des cartes d'une frise (non créé ici : elles se rendent à la demande).
+    Un dossier par frise, supprimé avec elle ; supprimer le projet d'origine n'y touche pas.
+    """
+    return MEDIA_DIR / "_timelines" / timeline_id
 
 
 def project_media_dir(project_id: str) -> Path:

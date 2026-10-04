@@ -1,0 +1,225 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Douze pays, deux étapes de l'intégration européenne",
+  "lang": "fr",
+  "tracks": [
+    {
+      "id": "france",
+      "label": "France"
+    },
+    {
+      "id": "allemagne",
+      "label": "Allemagne"
+    },
+    {
+      "id": "italie",
+      "label": "Italie"
+    },
+    {
+      "id": "espagne",
+      "label": "Espagne"
+    },
+    {
+      "id": "portugal",
+      "label": "Portugal"
+    },
+    {
+      "id": "grece",
+      "label": "Grèce"
+    },
+    {
+      "id": "irlande",
+      "label": "Irlande"
+    },
+    {
+      "id": "autriche",
+      "label": "Autriche"
+    },
+    {
+      "id": "finlande",
+      "label": "Finlande"
+    },
+    {
+      "id": "slovenie",
+      "label": "Slovénie"
+    },
+    {
+      "id": "croatie",
+      "label": "Croatie"
+    },
+    {
+      "id": "royaume_uni",
+      "label": "Royaume-Uni"
+    }
+  ],
+  "events": [
+    {
+      "id": "france_adhesion",
+      "track": "france",
+      "date": "1958-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "france_euro",
+      "track": "france",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "allemagne_adhesion",
+      "track": "allemagne",
+      "date": "1958-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "allemagne_euro",
+      "track": "allemagne",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "italie_adhesion",
+      "track": "italie",
+      "date": "1958-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "italie_euro",
+      "track": "italie",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "espagne_adhesion",
+      "track": "espagne",
+      "date": "1986-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "espagne_euro",
+      "track": "espagne",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "portugal_adhesion",
+      "track": "portugal",
+      "date": "1986-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "portugal_euro",
+      "track": "portugal",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "grece_adhesion",
+      "track": "grece",
+      "date": "1981-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "grece_euro",
+      "track": "grece",
+      "date": "2001-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "irlande_adhesion",
+      "track": "irlande",
+      "date": "1973-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "irlande_euro",
+      "track": "irlande",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "autriche_adhesion",
+      "track": "autriche",
+      "date": "1995-01-01",
+      "label": "Entrée dans l'UE",
+      "importance": 2
+    },
+    {
+      "id": "autriche_euro",
+      "track": "autriche",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "finlande_adhesion",
+      "track": "finlande",
+      "date": "1995-01-01",
+      "label": "Entrée dans l'UE",
+      "importance": 2
+    },
+    {
+      "id": "finlande_euro",
+      "track": "finlande",
+      "date": "1999-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "slovenie_adhesion",
+      "track": "slovenie",
+      "date": "2004-05-01",
+      "label": "Entrée dans l'UE",
+      "importance": 2
+    },
+    {
+      "id": "slovenie_euro",
+      "track": "slovenie",
+      "date": "2007-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "croatie_adhesion",
+      "track": "croatie",
+      "date": "2013-07-01",
+      "label": "Entrée dans l'UE",
+      "importance": 2
+    },
+    {
+      "id": "croatie_euro",
+      "track": "croatie",
+      "date": "2023-01-01",
+      "label": "Passage à l'euro",
+      "importance": 2
+    },
+    {
+      "id": "royaume_uni_adhesion",
+      "track": "royaume_uni",
+      "date": "1973-01-01",
+      "label": "Entrée dans la CEE",
+      "importance": 2
+    },
+    {
+      "id": "royaume_uni_sortie",
+      "track": "royaume_uni",
+      "date": "2020-01-31",
+      "label": "Sortie de l'Union européenne",
+      "importance": 3
+    }
+  ]
+}

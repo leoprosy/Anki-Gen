@@ -1,0 +1,39 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Institutions en place",
+  "lang": "fr",
+  "as_of": "2026-09-28",
+  "tracks": [
+    {
+      "id": "institutions",
+      "label": "Institutions"
+    }
+  ],
+  "periods": [
+    {
+      "id": "omc",
+      "track": "institutions",
+      "start": "1995-01-01",
+      "end": "present",
+      "label": "Organisation mondiale du commerce",
+      "importance": 3
+    },
+    {
+      "id": "zone_euro",
+      "track": "institutions",
+      "start": "1999-01-01",
+      "end": "present",
+      "label": "Zone euro",
+      "importance": 2
+    }
+  ],
+  "events": [
+    {
+      "id": "chine_omc",
+      "track": "institutions",
+      "date": "2001-12-11",
+      "label": "Adhésion de la Chine à l'OMC",
+      "importance": 2
+    }
+  ]
+}

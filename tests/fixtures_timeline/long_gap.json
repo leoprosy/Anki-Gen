@@ -1,0 +1,74 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Un long vide",
+  "lang": "fr",
+  "tracks": [
+    {
+      "id": "histoire",
+      "label": "Histoire"
+    }
+  ],
+  "periods": [
+    {
+      "id": "revolution",
+      "track": "histoire",
+      "start": "1789",
+      "end": "1799",
+      "label": "Révolution française",
+      "importance": 3
+    },
+    {
+      "id": "empire",
+      "track": "histoire",
+      "start": "1804-05-18",
+      "end": "1815-06-22",
+      "label": "Premier Empire",
+      "importance": 2
+    }
+  ],
+  "events": [
+    {
+      "id": "sumer",
+      "track": "histoire",
+      "date": "-3000",
+      "label": "Essor des cités-États sumériennes",
+      "importance": 2,
+      "approx": true
+    },
+    {
+      "id": "bastille",
+      "track": "histoire",
+      "date": "1789-07-14",
+      "label": "Prise de la Bastille",
+      "importance": 3
+    },
+    {
+      "id": "royaute",
+      "track": "histoire",
+      "date": "1792-09-21",
+      "label": "Abolition de la royauté",
+      "importance": 2
+    },
+    {
+      "id": "brumaire",
+      "track": "histoire",
+      "date": "1799-11-09",
+      "label": "Coup d'État du 18 Brumaire",
+      "importance": 2
+    },
+    {
+      "id": "sacre",
+      "track": "histoire",
+      "date": "1804-12-02",
+      "label": "Sacre de Napoléon",
+      "importance": 2
+    },
+    {
+      "id": "waterloo",
+      "track": "histoire",
+      "date": "1815-06-18",
+      "label": "Bataille de Waterloo",
+      "importance": 2
+    }
+  ]
+}

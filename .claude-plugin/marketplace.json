@@ -1,0 +1,18 @@
+{
+  "name": "ankigen-plugins",
+  "owner": {
+    "name": "leoprosy"
+  },
+  "metadata": {
+    "description": "Claude Code plugins published from the Ankigen repository."
+  },
+  "plugins": [
+    {
+      "name": "motion-design-studio",
+      "source": "./plugins/motion-design-studio",
+      "description": "Conçoit, développe, critique et exporte des motion designs professionnels en code (HTML/CSS/SVG + seek(t), HyperFrames ou Remotion), avec rendu déterministe frame par frame vers MP4.",
+      "version": "1.0.0",
+      "category": "design"
+    }
+  ]
+}

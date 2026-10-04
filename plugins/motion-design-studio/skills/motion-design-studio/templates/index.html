@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Motion Studio</title>
+<style>
+  /* Brand tokens: replace with the real brand system (brand/palette.md). */
+  :root {
+    --bg: #0e0f12;
+    --fg: #f4f2ee;
+    --muted: #8a8f98;
+    --accent: #4f7cff;
+    --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  /* No CSS transitions or animations anywhere: seek(t) owns every frame. */
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  html, body { height: 100%; background: #000; overflow: hidden; }
+  body { font-family: var(--font); color: var(--fg); }
+
+  #stage {
+    position: absolute; left: 0; top: 0;
+    background: var(--bg);
+    overflow: hidden;
+    transform-origin: 0 0;
+  }
+  /* No will-change: promoted layers can leave 1px raster seams in captures. */
+  .layer { position: absolute; left: 50%; top: 50%; }
+
+  #shape {
+    background: var(--accent);
+    display: flex; align-items: center; overflow: hidden;
+  }
+  #query { white-space: nowrap; color: var(--fg); font-weight: 500; }
+  #caret { display: inline-block; background: var(--fg); vertical-align: middle; }
+  #title { font-weight: 700; letter-spacing: -0.03em; white-space: nowrap; text-align: center; }
+
+  /* Preview player: hidden in render mode. */
+  #player {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    display: flex; gap: 12px; align-items: center;
+    padding: 10px 16px; background: rgba(0,0,0,.85); color: #ddd;
+    font: 13px/1 ui-monospace, monospace;
+  }
+  #player button { background: #222; color: #ddd; border: 1px solid #444; padding: 6px 10px; cursor: pointer; font: inherit; }
+  #player input[type=range] { flex: 1; }
+  .render #player { display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="layer" id="shape"><span id="query">find the right card<span id="caret"></span></span></div>
+  <div class="layer" id="title">Motion Studio</div>
+</div>
+
+<div id="player">
+  <button id="play">Play</button>
+  <button id="replay">Replay</button>
+  <input id="scrub" type="range" min="0" step="0.001" value="0">
+  <span id="clock">0.000 s</span>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * Composition contract — read by render.py.
+ * width/height: master size. `cuts`: hard-cut timestamps, so motion
+ * blur never blends sub-frames across a cut.
+ * ------------------------------------------------------------------ */
+window.__MOTION__ = {
+  duration: 6,
+  width: 1920,
+  height: 1080,
+  fps: 60,
+  cuts: []
+};
+
+/* ---------------- Timing helpers (pure functions of t) ------------- */
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+const progress = (t, start, end) => clamp01((t - start) / (end - start));
+const lerp = (a, b, p) => a + (b - a) * p;
+const smoothstep = (p) => p * p * (3 - 2 * p);
+const easeInOut = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+const easeOut = (p) => 1 - Math.pow(1 - p, 3);
+
+/* Closed-form damped spring from 0 to 1. zeta >= 0.72 keeps overshoot low. */
+function spring(t, { freq = 2.2, zeta = 0.78 } = {}) {
+  if (t <= 0) return 0;
+  const w0 = 2 * Math.PI * freq;
+  if (zeta >= 1) return 1 - (1 + w0 * t) * Math.exp(-w0 * t);
+  const wd = w0 * Math.sqrt(1 - zeta * zeta);
+  return 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + (zeta * w0 / wd) * Math.sin(wd * t));
+}
+const springAt = (t, start, opts) => spring(t - start, opts);
+
+/* Seeded PRNG: use instead of Math.random(). */
+function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let r = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------------- Layout ----------------------------------------- *
+ * In render mode the stage fills the viewport, so the same timeline
+ * adapts to 16:9, 1:1 and 9:16 (render.py --size). Sizes use `u`, the
+ * short side divided by 1080, so the draft at 960×540 is a true scale.
+ * ------------------------------------------------------------------ */
+const RENDER = new URLSearchParams(location.search).has('render');
+if (RENDER) document.documentElement.classList.add('render');
+
+const stage = document.getElementById('stage');
+const el = (id) => document.getElementById(id);
+let W, H, u;
+
+function layout() {
+  const M = window.__MOTION__;
+  if (RENDER) {
+    W = innerWidth; H = innerHeight;
+    stage.style.transform = '';
+  } else {
+    W = M.width; H = M.height;
+    const k = Math.min(innerWidth / W, (innerHeight - 48) / H);
+    stage.style.transform = `translate(${(innerWidth - W * k) / 2}px, ${(innerHeight - 48 - H * k) / 2}px) scale(${k})`;
+  }
+  stage.style.width = W + 'px';
+  stage.style.height = H + 'px';
+  u = Math.min(W, H) / 1080;
+}
+
+function place(node, { x = 0, y = 0, s = 1, o = 1 }) {
+  node.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px) scale(${s})`;
+  node.style.opacity = o;
+}
+
+/* ---------------- The movie ---------------------------------------- *
+ * Demo only: replace with the storyboard. Every property is derived
+ * from t; nothing is accumulated between frames.
+ *
+ * STATE 0 dot → STATE 1 search bar → STATE 2 typed query → STATE 3 title
+ * ------------------------------------------------------------------ */
+function render(t) {
+  const shape = el('shape'), query = el('query'), caret = el('caret'), title = el('title');
+
+  // 0.0–0.9  dot appears
+  const appear = springAt(t, 0.2, { freq: 1.8, zeta: 0.8 });
+  // 0.9–1.9  dot stretches into a search bar
+  const grow = springAt(t, 0.9, { freq: 1.4, zeta: 0.85 });
+  // 3.6–4.4  bar collapses back into a dot, 4.2+ title reveal
+  const collapse = easeInOut(progress(t, 3.6, 4.4));
+  const reveal = springAt(t, 4.2, { freq: 1.6, zeta: 0.82 });
+
+  const dot = 36 * u;
+  const barW = Math.min(W * 0.78, 1100 * u), barH = 96 * u;
+  const open = grow * (1 - collapse);
+  // Whole pixels for box sizes keep edges crisp in captures.
+  const w = Math.round(lerp(dot, barW, open));
+  const h = Math.round(lerp(dot, barH, open));
+
+  shape.style.width = w + 'px';
+  shape.style.height = h + 'px';
+  shape.style.borderRadius = h / 2 + 'px';
+  shape.style.padding = `0 ${36 * u * clamp01(open)}px`;
+  place(shape, { y: lerp(0, -150 * u, reveal), s: appear, o: 1 });
+
+  // 1.9–3.4 typed query (character count is a pure function of t)
+  const text = 'find the right card';
+  const n = Math.floor(text.length * progress(t, 1.9, 3.3));
+  query.firstChild.nodeValue = text.slice(0, n);
+  query.style.fontSize = 40 * u + 'px';
+  query.style.opacity = clamp01(progress(t, 1.6, 1.9) - collapse * 2);
+  caret.style.width = 3 * u + 'px';
+  caret.style.height = 44 * u + 'px';
+  caret.style.marginLeft = 4 * u + 'px';
+  caret.style.opacity = Math.floor(t * 2.5) % 2 === 0 ? 1 : 0;   // blink derived from t
+
+  title.style.fontSize = 120 * u + 'px';
+  place(title, { y: lerp(60 * u, 40 * u, reveal), o: clamp01(reveal) });
+}
+
+/* ---------------- Public contract ---------------------------------- */
+window.seek = function (t) {
+  const d = window.__MOTION__.duration;
+  t = Math.max(0, Math.min(d, t));
+  layout();
+  render(t);
+  if (!RENDER) {
+    el('scrub').value = t;
+    el('clock').textContent = t.toFixed(3) + ' s';
+  }
+};
+
+/* ---------------- Preview player (rAF only drives playback) -------- */
+if (!RENDER) {
+  const M = window.__MOTION__;
+  const scrub = el('scrub'), btn = el('play');
+  scrub.max = M.duration;
+  let playing = false, t = 0, last = 0;
+
+  const setPlaying = (v) => { playing = v; btn.textContent = v ? 'Pause' : 'Play'; if (v) { last = 0; requestAnimationFrame(tick); } };
+  function tick(now) {
+    if (!playing) return;
+    if (last) t += (now - last) / 1000;
+    last = now;
+    if (t >= M.duration) { t = M.duration; setPlaying(false); }
+    seek(t);
+    if (playing) requestAnimationFrame(tick);
+  }
+  const go = (v) => { t = Math.max(0, Math.min(M.duration, v)); seek(t); };
+
+  btn.onclick = () => { if (t >= M.duration) t = 0; setPlaying(!playing); };
+  el('replay').onclick = () => { go(0); setPlaying(true); };
+  scrub.oninput = () => { setPlaying(false); go(+scrub.value); };
+  addEventListener('resize', () => seek(t));
+  addEventListener('keydown', (e) => {
+    const f = 1 / M.fps;
+    if (e.code === 'Space') { e.preventDefault(); btn.onclick(); }
+    else if (e.code === 'ArrowLeft') { setPlaying(false); go(t - (e.shiftKey ? 1 : f)); }
+    else if (e.code === 'ArrowRight') { setPlaying(false); go(t + (e.shiftKey ? 1 : f)); }
+    else if (e.code === 'KeyR') { go(0); setPlaying(true); }
+  });
+}
+
+document.fonts.ready.then(() => seek(0));
+</script>
+</body>
+</html>

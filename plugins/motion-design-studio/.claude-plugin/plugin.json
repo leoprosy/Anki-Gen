@@ -1,0 +1,10 @@
+{
+  "name": "motion-design-studio",
+  "version": "1.0.0",
+  "description": "Setup, conçoit, développe, critique et exporte des motion designs professionnels directement en code, avec un rendu déterministe frame-perfect vers MP4.",
+  "author": {
+    "name": "leoprosy"
+  },
+  "license": "GPL-3.0",
+  "keywords": ["motion-design", "animation", "video", "playwright", "ffmpeg", "hyperframes", "remotion"]
+}

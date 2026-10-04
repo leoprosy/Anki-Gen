@@ -9,6 +9,7 @@
 </button>
 
 <div class="topbar__context">
+  <span class="crumb-sep" aria-hidden="true">/</span>
   <span class="project-name" title="{{ project_id }}">{{ project_id }}</span>
   <div class="topbar__spacer"></div>
   <div class="progress" title="{{ t('work.progress_title') }}">
@@ -46,11 +47,6 @@
       <div class="export-status muted" id="export-status"></div>
     </div>
   </details>
-
-  <a class="btn ghost" href="{{ url_for('index') }}" title="{{ t('nav.home') }}">
-    <svg width="16" height="16" aria-hidden="true"><use href="#i-home"></use></svg>
-    <span class="lbl">{{ t('nav.home') }}</span>
-  </a>
 </div>
 {% endblock %}
 

@@ -202,40 +202,72 @@ code {
 }
 
 /* ── Barre supérieure ───────────────────────────────────────── */
+/* Même hauteur sur toutes les pages ; un seul style de lien, discret,
+   la page courante légèrement marquée. */
 .topbar {
   flex: none;
   z-index: 70;
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: 10px var(--space-md);
+  gap: 12px;
+  height: 52px;
+  padding: 0 20px;
   background: var(--bg-blur);
   backdrop-filter: var(--blur-bg);
   -webkit-backdrop-filter: var(--blur-bg);
-  box-shadow: 0 0.5px 0 var(--hairline);
+  box-shadow: 0 1px 0 var(--hairline);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  font-size: 16px;
+  gap: 8px;
+  margin-left: -6px;
+  padding: 4px 8px 4px 6px;
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: -0.01em;
-  padding: 4px 6px;
-  border-radius: var(--r-md);
+  letter-spacing: -0.015em;
+  border-radius: 8px;
   flex: none;
+  transition: background 0.15s ease;
 }
 .brand svg { color: var(--accent); }
-.brand:hover { background: var(--surface-alt); }
+.brand:hover { background: var(--hairline); }
 .brand__name { white-space: nowrap; }
 
+.topbar__nav { display: flex; align-items: center; gap: 2px; flex: none; }
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.nav-link:hover { color: var(--text-primary); background: var(--hairline); }
+.nav-link[aria-current="page"] { color: var(--text-primary); background: var(--hairline); }
+
+/* Fil d'Ariane de la page de travail : « Ankigen / cours ». */
+.crumb-sep { flex: none; margin: 0 -2px; font-size: 16px; color: var(--text-tertiary); }
+
 .topbar__spacer { flex: 1 1 auto; min-width: 0; }
-.rail-toggle { display: none; }   /* visible seulement quand le rail est un tiroir */
+.rail-toggle { display: none; order: -1; }   /* visible seulement quand le rail est un tiroir ; avant le logo pour ne pas couper le fil d'Ariane */
 .topbar__actions {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
   flex: none;
+}
+/* Fin trait vertical entre les actions du cours et la navigation. */
+.topbar__actions + .topbar__nav::before {
+  content: "";
+  width: 1px;
+  height: 20px;
+  margin-right: 10px;
+  background: var(--hairline);
 }
 
 /* Contexte du projet, au centre de la barre */
@@ -247,13 +279,13 @@ code {
   flex: 1 1 auto;
 }
 .project-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 28ch;
+  max-width: 40ch;
 }
 
 /* ── Progression ────────────────────────────────────────────── */
@@ -271,9 +303,9 @@ code {
   white-space: nowrap;
 }
 .progress-bar {
-  width: 120px;
-  height: 6px;
-  background: var(--surface-alt);
+  width: 96px;
+  height: 4px;
+  background: var(--surface-alt-2);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1058,6 +1090,17 @@ textarea#response:focus {
 .menu > summary:hover { background: var(--surface-alt-2); }
 .menu > summary::-webkit-details-marker { display: none; }
 .menu[open] > summary { background: var(--surface-alt-2); }
+/* Dans la barre, l'export reprend la taille des liens de navigation. */
+.topbar .menu > summary {
+  min-height: 32px;
+  padding: 0 10px;
+  gap: 6px;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+}
+.topbar .menu > summary:hover,
+.topbar .menu[open] > summary { background: var(--hairline); }
 
 .menu__panel {
   position: absolute;
@@ -1653,12 +1696,12 @@ textarea#response:focus {
   .panes__grid[data-active="answer"] .pane[data-pane="source"] { display: none; }
 
   .pane { border-radius: var(--r-lg); }
-  .project-name { display: none; }
+  .project-name, .crumb-sep { display: none; }
 }
 
 /* Petites fenêtres : le dock passe en icônes */
 @media (max-width: 760px) {
-  .topbar { padding: 8px 10px; }
+  .topbar { padding: 0 12px; gap: 8px; }
   /* Seule la vue « travail » a besoin de ce gain de place */
   .shell--fixed .brand__name { display: none; }
   .progress-bar { width: 72px; }
@@ -1740,7 +1783,7 @@ textarea#response:focus {
 
 /* Fenêtres très basses (écran partagé, bas de page) */
 @media (max-height: 560px) {
-  .topbar { padding: 6px 10px; }
+  .topbar { height: 46px; padding: 0 10px; }
   .dock { padding: 6px 10px calc(6px + var(--safe-b)); }
   :root { --tap: 36px; --pad: 8px; --gap: 8px; }
   .pane__head { padding: 8px 12px 6px; }

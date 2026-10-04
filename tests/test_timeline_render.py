@@ -157,6 +157,12 @@ class TestSvg(unittest.TestCase):
         result = rs.render(self.docs["mondialisation.json"], LayoutOptions(theme="dark"))
         self.assertIn('fill="#1C1C1E"', result.svg)
 
+    def test_compact_reference_is_smaller_with_the_actual_font(self):
+        compact = self.rendered["mondialisation.json"]
+        airy = rs.render(self.docs["mondialisation.json"], LayoutOptions(density="comfortable"))
+        self.assertLess(compact.width * compact.height, airy.width * airy.height * 0.85)
+        self.assertNotIn("layout_violation", {w["code"] for w in compact.warnings})
+
 
 class TestRaster(unittest.TestCase):
     @classmethod

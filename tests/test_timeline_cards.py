@@ -193,6 +193,13 @@ class TestImageCards(unittest.TestCase):
         self.assertEqual(again[0].media, by_type(self.cards, "whole_image")[0].media)
         self.assertNotEqual(other[0].media, again[0].media)
 
+    def test_names_change_when_the_renderer_changes(self):
+        from unittest.mock import patch
+        current = tc.generate(self.doc, types=["whole_image"], layout=self.layout, media_prefix=self.prefix)
+        with patch.object(tc, "RENDER_VERSION", tc.RENDER_VERSION - 1):
+            previous = tc.generate(self.doc, types=["whole_image"], layout=self.layout, media_prefix=self.prefix)
+        self.assertNotEqual(current[0].media, previous[0].media)
+
     def test_masked_cards_are_important_labeled_and_capped(self):
         masked = by_type(self.cards, "masked_image")
         labeled = {p.ref for p in self.layout.primitives if p.role == "event-label"}

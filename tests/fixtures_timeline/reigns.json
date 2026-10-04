@@ -1,0 +1,19 @@
+{
+  "schema": "ankigen.timeline/1",
+  "title": "Deux règnes et leurs événements",
+  "subtitle": "Exemple fictif de regroupement par période et par piste",
+  "lang": "fr",
+  "tracks": [{"id": "kingdom", "label": "Royaume"}, {"id": "neighbor", "label": "Pays voisin"}],
+  "periods": [
+    {"id": "first", "track": "kingdom", "label": "Règne d’Henri", "start": "1600", "end": "1640"},
+    {"id": "second", "track": "kingdom", "label": "Règne de Louise", "start": "1641", "end": "1690"}
+  ],
+  "events": [
+    {"id": "reform", "track": "kingdom", "date": "1612", "label": "Réforme des institutions", "importance": 3},
+    {"id": "assembly", "track": "kingdom", "date": "1628", "label": "Assemblée du royaume", "importance": 1},
+    {"id": "treaty", "track": "kingdom", "date": "1656", "label": "Signature d’un traité", "approx": true},
+    {"id": "capital", "track": "kingdom", "date": "1674", "label": "Installation dans la nouvelle capitale"},
+    {"id": "other", "track": "neighbor", "date": "1620", "label": "Événement indépendant"},
+    {"id": "outside", "track": "kingdom", "date": "1698", "label": "Événement après les deux règnes"}
+  ]
+}

@@ -609,7 +609,7 @@ def _render_options(raw):
     from timeline_layout import WIDTH_MAX, WIDTH_MIN, LayoutOptions
     raw = raw if isinstance(raw, dict) else {}
     theme = raw.get("theme") if raw.get("theme") in TIMELINE_THEMES else "light"
-    density = raw.get("density") if raw.get("density") in ("comfortable", "compact") else "comfortable"
+    density = raw.get("density") if raw.get("density") in ("comfortable", "compact") else "compact"
     width_mode = "fixed" if raw.get("width_mode") == "fixed" else "auto"
     try:
         width_px = min(WIDTH_MAX, max(WIDTH_MIN, int(raw.get("width_px") or 1200)))
@@ -1114,7 +1114,7 @@ def _export_options(source, record):
     return {
         # L'export est en clair par défaut, quel que soit le thème de l'interface (§8.4).
         "theme": source.get("theme") if source.get("theme") in TIMELINE_THEMES else "light",
-        "density": density if density in ("comfortable", "compact") else stored.get("density", "comfortable"),
+        "density": density if density in ("comfortable", "compact") else stored.get("density", "compact"),
         "width_mode": "fixed" if source.get("width_mode") == "fixed" else "auto",
         "width_px": number("width_px", 1200, WIDTH_MIN, WIDTH_MAX, int),
         "scale": number("scale", 2.0, 1.0, 4.0),

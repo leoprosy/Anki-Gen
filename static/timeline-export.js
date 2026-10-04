@@ -24,7 +24,7 @@
   const RASTER = ["png", "jpeg", "webp"];
   const STORAGE_KEY = "ankigen.timeline.export";
   const DEFAULTS = {
-    fmt: "png", theme: "light", density: (DATA.render_options && DATA.render_options.density) || "comfortable",
+    fmt: "png", theme: "light", density: (DATA.render_options && DATA.render_options.density) || "compact",
     width_mode: "auto", width_px: 1200, scale: 2, quality: 90, transparent: false, lossless: false,
     page: "fit", orientation: "landscape", margin: 10, embed_font: true, unverified: false,
   };

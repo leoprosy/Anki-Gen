@@ -35,7 +35,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--theme", choices=THEMES, action="append")
     parser.add_argument("--only", action="append", help="nom de fixture (sans .json)")
-    parser.add_argument("--density", default="comfortable", choices=("comfortable", "compact"))
+    parser.add_argument("--density", default="compact", choices=("comfortable", "compact"))
     parser.add_argument("--width", type=int, help="largeur fixe en px (sinon automatique)")
     args = parser.parse_args(argv)
 

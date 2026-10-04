@@ -32,13 +32,14 @@
     dates: {},
     notes: {},            // id → numéro de note
     trackStyles: {},      // id → { color, shape }
+    eraStyles: {},        // id → couleur de la colonne
     report: null,         // dernier rapport de validation du document
     layoutWarnings: [],
     svgSize: null,
     zoom: 1,
     fit: "height",        // "height" à l'ouverture, "width" après « Ajuster », null après un zoom manuel
     theme: "auto",
-    density: (DATA.render_options && DATA.render_options.density) || "comfortable",
+    density: (DATA.render_options && DATA.render_options.density) || "compact",
     editing: null,        // { kind, index } ; index null pour un nouvel élément
     renderSeq: 0,
     quotes: {},           // id → verified | fuzzy | not_found (§6.5)
@@ -154,6 +155,8 @@
     for (const note of data.notes || []) for (const id of note.ref.split("+")) state.notes[id] = note.number;
     state.trackStyles = {};
     for (const track of (data.stats && data.stats.tracks) || []) state.trackStyles[track.id] = track;
+    state.eraStyles = {};
+    for (const era of (data.stats && data.stats.eras) || []) state.eraStyles[era.id] = era;
     els.empty.hidden = true;
     els.viewport.hidden = false;
     els.canvas.innerHTML = data.svg;
@@ -313,9 +316,7 @@
 
   function badges(item) {
     const out = [];
-    if (item.importance === 3) out.push(`<span class="badge tl-badge--pivot" title="${escapeHtml(T("timeline.ui.badge_pivot"))}">★</span>`);
-    if (item.importance === 1) out.push(`<span class="badge" title="${escapeHtml(T("timeline.ui.badge_detail"))}">·</span>`);
-    if (item.origin === "model") out.push(`<span class="badge" title="${escapeHtml(T("timeline.ui.badge_model"))}">✦</span>`);
+    if (item.origin === "model") out.push(`<span class="badge">${escapeHtml(T("timeline.ui.badge_model"))}</span>`);
     if (state.quotes[item.id] === "not_found") {
       out.push(`<span class="badge tl-badge--warn" title="${escapeHtml(T("timeline.ui.quote_not_found"))}">⚠</span>`);
     }
@@ -342,7 +343,7 @@
     return `<li class="tl-item${active ? " active" : ""}"><button type="button" class="tl-row" data-kind="${kind}" data-index="${index}">`
       + (extra || "")
       + `<span class="tl-row__date">${escapeHtml(dateText)}</span>`
-      + `<span class="tl-row__label">${escapeHtml(item.label || item.id)}</span>`
+      + `<span class="tl-row__label${item.importance === 3 ? " tl-row__label--pivot" : ""}">${escapeHtml(item.label || item.id)}</span>`
       + `<span class="tl-row__badges">${badges(item)}</span></button></li>`;
   }
 
@@ -440,11 +441,15 @@
     const eras = doc.eras || [];
     parts.push(section("eras", T("timeline.ui.section_eras"),
       `<ul class="tl-list">${sortedIndexes(eras, "start").map((i) =>
-        row("eras", i, state.dates[eras[i].id] || `${eras[i].start}–${eras[i].end}`)).join("")}</ul>`, eras.length));
+        row("eras", i, state.dates[eras[i].id] || `${eras[i].start}–${eras[i].end}`,
+            `<span class="tl-swatch tl-swatch--era"${state.eraStyles[eras[i].id]
+              ? ` style="--swatch:${escapeHtml(state.eraStyles[eras[i].id].color)}"` : ""} aria-hidden="true"></span>`
+        )).join("")}</ul>`, eras.length));
 
     const periods = doc.periods || [];
     parts.push(section("periods", T("timeline.ui.section_periods"),
-      `<ul class="tl-list">${sortedIndexes(periods, "start").map((i) =>
+      `<p class="tl-section__help">${escapeHtml(T("timeline.ui.period_container_help"))}</p>`
+      + `<ul class="tl-list">${sortedIndexes(periods, "start").map((i) =>
         row("periods", i, state.dates[periods[i].id] || `${periods[i].start}–${periods[i].end}`,
             tracks.length ? swatch(periods[i].track) : "")).join("")}</ul>`, periods.length));
 

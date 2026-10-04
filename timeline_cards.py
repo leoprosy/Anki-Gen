@@ -47,7 +47,7 @@ MAX_MASKED = 30
 MASK_WINDOW = 450                   # px de part et d'autre de l'évènement (§10.3)
 CROP_GAP = 8                        # liseré entre la gouttière des pistes et la fenêtre
 # À incrémenter quand le dessin des images change : leurs noms changent avec lui.
-RENDER_VERSION = 1
+RENDER_VERSION = 3  # Durées contenant leurs événements : renouveler les médias mis en cache.
 # Style des dates, aligné sur skill_templates/fr.md (rouge, gras, souligné) : une
 # seule constante, remplaçable plus tard par les balises sémantiques de l'agent local.
 DATE_STYLE = "color: red; font-weight: bold; text-decoration: underline;"
@@ -71,7 +71,7 @@ class Card:
 def card_layout_options(render_options=None) -> LayoutOptions:
     """Les images des cartes : thème clair, densité de la frise, sans marquage des citations."""
     density = (render_options or {}).get("density")
-    return LayoutOptions(theme="light", density=density if density in ("comfortable", "compact") else "comfortable",
+    return LayoutOptions(theme="light", density=density if density in ("comfortable", "compact") else "compact",
                          show_unverified=False)
 
 

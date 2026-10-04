@@ -9,8 +9,8 @@ moteurs de rendu, et produit une liste de primitives (Rect, Line, Path, Marker,
 Text) que le SVG et le raster dessinent tels quels : l'aperçu est l'export.
 
 Principes (voir le §7 du contrat et la spec) :
-  * la position horizontale d'un marqueur est exactement `scale(date)` ; seules
-    les étiquettes bougent ;
+  * la position horizontale d'un marqueur est exactement `scale(date)` ; la
+    compaction verticale déplace ensemble marqueurs, étiquettes et traits ;
   * chaque étiquette est essayée à des niveaux croissants au-dessus et en dessous
     de sa piste, avec plusieurs décalages horizontaux, et n'est acceptée que si
     sa boîte (plus une marge) ne touche aucun obstacle déjà placé ;
@@ -51,11 +51,13 @@ LANE_GAP = 4
 LABEL_MARGIN = 4            # marge autour d'une étiquette candidate (§7.6)
 TEXT_GAP = 2                # I1 : écart minimal entre deux textes
 DATE_LABEL_GAP = 3          # entre la ligne de date et le libellé d'une même étiquette
+INLINE_DATE_GAP = 8
+ERA_PAD = 8
 STEM_GAP = 3                # la tige s'arrête avant l'étiquette
 STEM_START = 2              # et démarre au bord du marqueur
-MARKER_R = {1: 4.0, 2: 5.5, 3: 7.0}
+MARKER_R = {1: 5.5, 2: 5.5, 3: 5.5}
 MARKER_RING = 1.5           # anneau couleur du fond autour des marqueurs (skill dataviz)
-BAR_H, BAR_PAD, BAR_MIN = 18, 6, 8
+BAR_H, BAR_PAD, BAR_MIN = 18, 8, 48
 BADGE_R = 8
 BREAK_PX = 40
 CLUSTER_GUARD = 24          # px de part et d'autre d'un bloc de temps, quand l'axe est interrompu
@@ -68,13 +70,13 @@ GRID_CELL = 64
 EPS = 0.01
 
 DENSITIES = {
-    "comfortable": {"label_max_width": 180, "max_levels": 4, "lane_pad": 12, "row_gap": 6,
+    "comfortable": {"label_max_width": 180, "max_levels": 4, "lane_pad": 12, "row_gap": 6, "pack": False,
                     "level_first": 16, "level_step": 8, "level_pitch": 32, "min_tick_px": 56},
-    "compact": {"label_max_width": 140, "max_levels": 6, "lane_pad": 8, "row_gap": 4,
-                "level_first": 14, "level_step": 6, "level_pitch": 28, "min_tick_px": 48},
+    "compact": {"label_max_width": 208, "max_levels": 6, "lane_pad": 6, "row_gap": 4, "pack": True,
+                "level_first": 16, "level_step": 6, "level_pitch": 24, "min_tick_px": 56},
 }
 
-SHAPES = ("circle", "diamond", "square", "triangle", "hexagon")
+SHAPES = ("circle",)
 
 # Avertissements propres au dessin (clés timeline.warn.<code>), à côté de ceux du schéma.
 WARNING_CODES = ("label_truncated", "labels_in_notes", "label_unsupported_chars", "layout_violation")
@@ -82,26 +84,29 @@ WARNING_CODES = ("label_truncated", "labels_in_notes", "label_unsupported_chars"
 # Palette des pistes : Okabe–Ito ajustée (jaune pur et noir exclus, violet et brun
 # ajoutés), pas choisis et ordre validés avec le validateur du skill dataviz :
 # ≥ 3:1 sur le fond du thème, séparation CVD des pistes voisines ≥ 15 (ΔE OKLab),
-# bande de luminosité respectée. Au-delà de 8 pistes, chaque piste garde un couple
-# (couleur, forme) unique : l'identité ne repose jamais sur la couleur seule.
+# bande de luminosité respectée. Les pistes sont identifiées par leurs noms et
+# leurs couleurs ; les évènements gardent tous le même repère rond.
 THEMES = {
     "light": {
         "bg": "#FFFFFF", "ink": "#1D1D1F", "secondary": "#6E6E73", "axis": "#AEAEB2",
-        "grid": "#EBEBEF", "lane_bg": ("#F6F6F8", None), "era_bg": ("#C9C9DA", None), "era_opacity": 0.28,
+        "grid": "#EBEBEF", "lane_bg": ("#F6F6F8", None),
         "palette": ("#0371B1", "#169D74", "#6A3E99", "#D45E00",
                     "#3F9CCF", "#C58801", "#974E40", "#CB7AA7"),
+        "era_palette": ("#0D9488", "#D97706", "#7C3AED", "#2563EB", "#DB2777", "#65A30D"),
     },
     "dark": {
         "bg": "#1C1C1E", "ink": "#F5F5F7", "secondary": "#AEAEB2", "axis": "#636366",
-        "grid": "#2C2C2E", "lane_bg": ("#232326", None), "era_bg": ("#5A5A66", None), "era_opacity": 0.28,
+        "grid": "#2C2C2E", "lane_bg": ("#232326", None),
         "palette": ("#0371B1", "#169D74", "#7E52AF", "#D45E00",
                     "#429FD2", "#C18501", "#9C5344", "#C574A1"),
+        "era_palette": ("#2DD4BF", "#FBBF24", "#A78BFA", "#60A5FA", "#F472B6", "#A3E635"),
     },
     # Impression : fond blanc, encre noire, pistes en niveaux de gris, pas de fonds pâles.
     "print": {
         "bg": "#FFFFFF", "ink": "#000000", "secondary": "#3A3A3C", "axis": "#000000",
-        "grid": "#D4D4D8", "lane_bg": (None, None), "era_bg": None, "era_opacity": 0,
+        "grid": "#D4D4D8", "lane_bg": (None, None),
         "palette": ("#1D1D1F", "#767676", "#454545", "#8A8A8A"),
+        "era_palette": ("#1D1D1F", "#767676", "#454545", "#8A8A8A"),
     },
 }
 
@@ -311,9 +316,9 @@ class LayoutOptions:
     orientation: str = "horizontal"     # « vertical » : phase 8
     width_mode: str = "auto"            # auto | fixed
     width_px: int = 1200
-    density: str = "comfortable"        # comfortable | compact
+    density: str = "compact"            # comfortable | compact
     axis_breaks: str = "auto"           # auto | off
-    label_max_width: object = None      # défaut selon la densité (180 / 140)
+    label_max_width: object = None      # défaut selon la densité (180 / 208)
     max_levels_per_side: object = None  # défaut selon la densité (4 / 6)
     show_descriptions: bool = False
     show_unverified: bool = True
@@ -643,6 +648,23 @@ def _lanes(doc):
     return [track for _, track in ordered]
 
 
+def _era_columns(eras, scale):
+    """Colonnes disjointes ; les ères partageant une année se rejoignent au milieu."""
+    columns = []
+    for era, start, end in sorted(eras, key=lambda e: (e[1].t0, e[2].t1, e[0]["id"])):
+        x0, x1 = scale.x(start.t0), scale.x(end.t1)
+        if columns and x0 < columns[-1][2]:
+            cut = (x0 + columns[-1][2]) / 2
+            columns[-1][2] = cut
+            x0 = cut
+        columns.append([era, x0, x1])
+    return columns
+
+
+def _column_at(columns, x):
+    return next((i for i, (_, left, right) in enumerate(columns) if left <= x <= right), None)
+
+
 class _LaneState:
     """Tout ce qu'une piste accumule d'une passe à l'autre, dans son propre repère."""
 
@@ -699,7 +721,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
     lanes_spec = tracks or [None]
     lane_of = {track["id"]: i for i, track in enumerate(tracks)}
 
-    # ── Couleurs et formes des pistes (couple unique par piste) ──────────
+    # ── Couleurs des pistes ; un même cercle pour tous les événements ───
     palette = theme["palette"]
     marked = frozenset(options.unverified) if options.show_unverified else frozenset()
     lane_states = []
@@ -754,17 +776,27 @@ def _attempt(doc, options, measure, forced_width, iteration):
         if gaps:
             gaps.sort()
             p20 = gaps[int(0.2 * (len(gaps) - 1))]
-            natural = chrome + kept_years * TARGET_GAP_PX / p20
+            target_gap = 14 if options.density == "compact" else TARGET_GAP_PX
+            natural = chrome + kept_years * target_gap / p20
         else:
             natural = 1200
         width = int(max(WIDTH_MIN, min(WIDTH_MAX, math.ceil(natural))))
     plot_right = width - MARGIN
     scale, ppy = _build_scale(clusters, plot_left, plot_right, min_cluster)
+    era_bands = _era_columns(eras, scale)
+    era_fills = [mix(bg, theme["era_palette"][i % len(theme["era_palette"])],
+                     0.20 if options.theme == "dark" else 0.10)
+                 for i in range(len(era_bands))]
+    for state in lane_states:
+        lane_fill = mix(bg, state.color, 0.055) if options.theme != "print" else bg
+        state.date_fill = readable(state.color, [bg, lane_fill] + era_fills, 4.5)
+        state.interval_fill = None if options.theme == "print" else mix(
+            bg, state.color, 0.20 if options.theme == "dark" else 0.10)
 
     # Zones interdites aux étiquettes : ruptures d'axe.
     break_boxes = [(x0 - 2, -1e6, x1 + 2, 1e6) for _, _, x0, x1 in scale.breaks]
 
-    # ── Périodes : mode du libellé et rangées (en x seulement) ──────────
+    # ── Durées : rectangles titrés, contenant leurs évènements ─────────
     period_notes = []
     by_lane = defaultdict(list)
     for period, start, end in periods:
@@ -773,32 +805,36 @@ def _attempt(doc, options, measure, forced_width, iteration):
         state = lane_states[lane]
         entries = []
         for period, start, end in items_in_lane:
-            x0 = scale.x(start.t0)
+            x0 = min(scale.x(start.t0), plot_right - BAR_MIN)
             x1 = max(scale.x(end.t1), x0 + BAR_MIN)
-            weight = 600 if period["importance"] == 3 else 400
+            weight = 600
             label = period["label"] + (" *" if period.get("origin") == "model" else "")
             w = measure(label, SIZES["label"], weight)
-            tail = 6 if end.present else 0       # flèche ouverte d'une période en cours
-            if w + 2 * BAR_PAD <= x1 - x0:
-                mode, reach = "inside", x1 + tail
-            elif x1 + tail + 6 + w <= plot_right:
-                mode, reach = "right", x1 + tail + 6 + w
-            else:
-                # Pastille numérotée dans la barre si elle y tient, sinon juste à droite.
-                inside_badge = x1 - x0 >= 2 * BADGE_R + 12
+            title_lines = wrap(label, x1 - x0 - 2 * BAR_PAD, SIZES["label"], weight, measure)
+            mode, reach = "inside", x1
+            if len(title_lines) > 3:
                 mode = "note"
-                reach = x1 + tail if inside_badge else x1 + tail + 2 * BADGE_R + 16
                 period_notes.append((x0, lane, period["id"]))
-            note_text = f"{format_range(start, end, lang, approx=period.get('approx', False))} — {label}"
+            date_line = format_range(start, end, lang, approx=period.get('approx', False))
+            date_inside = measure(date_line, SIZES["date"], 400) <= x1 - x0 - 2 * BAR_PAD
+            title_h = _text_height(SIZES["label"], len(title_lines)) if mode == "inside" else 2 * BADGE_R
+            header_h = title_h + 2 * BAR_PAD
+            if date_inside:
+                header_h += _text_height(SIZES["date"], 1) + DATE_LABEL_GAP
+            note_text = f"{date_line} — {label}"
             entries.append({"period": period, "start": start, "end": end, "x0": x0, "x1": x1,
                             "mode": mode, "reach": reach, "label": label, "weight": weight, "w": w,
-                            "note_text": note_text})
+                            "note_text": note_text, "title_lines": title_lines, "date_line": date_line,
+                            "date_inside": date_inside, "header_h": header_h, "height": header_h,
+                            "events": [], "child_prims": []})
         # Partitionnement glouton d'intervalles : optimal en nombre de rangées.
         entries.sort(key=lambda e: (e["x0"], -e["period"]["importance"], e["period"]["id"]))
         row_ends = []
         for entry in entries:
             for r, end_x in enumerate(row_ends):
-                if end_x + 8 <= entry["x0"]:
+                # Les rectangles consécutifs peuvent partager leur bord : le
+                # padding intérieur sépare déjà leurs titres et événements.
+                if end_x <= entry["x0"] + 1e-6:
                     entry["row"] = r
                     row_ends[r] = entry["reach"]
                     break
@@ -808,9 +844,21 @@ def _attempt(doc, options, measure, forced_width, iteration):
         state.periods = entries
         state.period_rows = len(row_ends)
 
+    owners = {}
+    for event, date in events:
+        state = lane_states[lane_index(event)]
+        candidates = [entry for entry in state.periods
+                      if entry["start"].t0 <= date.t0 and date.t1 <= entry["end"].t1]
+        if candidates:
+            entry = min(candidates, key=lambda e: (e["end"].t1 - e["start"].t0, e["period"]["id"]))
+            owners[event["id"]] = entry
+            entry["events"].append((scale.x(date.position), event["id"], event, date))
+
     # ── Évènements : unités de placement (évènements simultanés regroupés) ──
     per_lane_events = defaultdict(list)
     for event, date in events:
+        if event["id"] in owners:
+            continue
         per_lane_events[lane_index(event)].append((scale.x(date.position), event["id"], event, date))
     anchors = []
     grouped_count = 0
@@ -822,12 +870,21 @@ def _attempt(doc, options, measure, forced_width, iteration):
             radius = MARKER_R[entry[2]["importance"]]
             if groups:
                 last = groups[-1][-1]
-                if entry[0] - last[0] < MARKER_R[last[2]["importance"]] + radius + 2:
+                same_era = _column_at(era_bands, entry[0]) == _column_at(era_bands, last[0])
+                if same_era and entry[0] - last[0] < MARKER_R[last[2]["importance"]] + radius + 2:
                     groups[-1].append(entry)
                     continue
             groups.append([entry])
         for members in groups:
-            state.units.append(_make_unit(members, lang, measure, label_max, state, scale))
+            column = _column_at(era_bands, members[0][0])
+            bounds = None
+            if column is not None:
+                _, x0, x1 = era_bands[column]
+                # Une colonne trop étroite garde le placement libre et les notes de repli.
+                if x1 - x0 >= 96:
+                    bounds = (x0 + ERA_PAD, x1 - ERA_PAD)
+            state.units.append(_make_unit(members, lang, measure, label_max, state, scale,
+                                          compact=options.density == "compact", bounds=bounds))
             if len(members) == 1:
                 anchors.append((members[0][1], members[0][3].position))
             else:
@@ -849,17 +906,57 @@ def _attempt(doc, options, measure, forced_width, iteration):
         for rank, unit in enumerate(order):
             spot = None
             for lines, truncated in unit["variants"]:
-                widths = [measure(line, SIZES["label"], unit["weight"]) for line in lines]
-                w = max(max(widths), unit["date_w"])
-                h = _block_height(len(lines))
+                w, h = _unit_size(unit, lines, measure)
+                left, right = unit.get("bounds") or (left_limit, right_limit)
                 spot = _find_spot(state.grid, unit["x"], unit["r"], w, h, rank % 2 == 0,
-                                  _label_modes, left_limit, right_limit, d_first, d_step, d_limit)
+                                  _label_modes, left, right, d_first, d_step, d_limit)
                 if spot:
                     unit["placed"] = (spot, lines, truncated)
                     _commit_label(state, unit, spot, lines, measure)
                     break
             if not spot:
                 state.failed.append(unit)
+
+    # Chaque durée possède son espace de placement : ses enfants ne peuvent
+    # ni en sortir ni se confondre avec ceux d'une période voisine.
+    container_states = []
+    for state in lane_states:
+        for entry in state.periods:
+            child = _LaneState(state.index, state.track, state.color, "circle", state.date_fill, marked)
+            child.date_fill = readable(state.color, [bg, mix(bg, state.color,
+                                      0.20 if options.theme == "dark" else 0.10)], 4.5)
+            child.interval_fill = state.interval_fill
+            entry["child"] = child
+            container_states.append(child)
+            groups = []
+            for member in sorted(entry["events"], key=lambda m: (m[0], m[1])):
+                if groups and member[0] - groups[-1][-1][0] < 2 * MARKER_R[2] + 2:
+                    groups[-1].append(member)
+                else:
+                    groups.append([member])
+            bounds = (entry["x0"] + BAR_PAD, entry["x1"] - BAR_PAD)
+            for members in groups:
+                unit = _make_unit(members, lang, measure, label_max, child, scale,
+                                  compact=options.density == "compact", bounds=bounds)
+                child.units.append(unit)
+                for prim in unit["graphics"]:
+                    child.prims.append(prim)
+                    child.grid.add(prim.bbox, "marker")
+                if len(members) == 1:
+                    anchors.append((members[0][1], members[0][3].position))
+                else:
+                    grouped_count += len(members)
+            for rank, unit in enumerate(child.units):
+                for lines, truncated in unit["variants"]:
+                    w, h = _unit_size(unit, lines, measure)
+                    spot = _find_spot(child.grid, unit["x"], unit["r"], w, h, rank % 2 == 0,
+                                      _label_modes, *bounds, d_first, d_step, d_limit)
+                    if spot:
+                        unit["placed"] = (spot, lines, truncated)
+                        _commit_label(child, unit, spot, lines, measure)
+                        break
+                else:
+                    child.failed.append(unit)
 
     failures = sum(len(state.failed) for state in lane_states)
     if failures and options.width_mode == "auto" and iteration < MAX_WIDEN and width < WIDTH_MAX:
@@ -868,7 +965,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
 
     # ── Numérotation globale des notes (ordre chronologique) ────────────
     note_items = [(x, lane, ref) for x, lane, ref in period_notes]
-    for state in lane_states:
+    for state in lane_states + container_states:
         for unit in state.failed:
             note_items.append((unit["x"], state.index, unit["ref"]))
     note_items.sort()
@@ -901,6 +998,22 @@ def _attempt(doc, options, measure, forced_width, iteration):
             _place_cluster(state, members, measure, left_limit, right_limit, d_first, d_step, d_limit,
                            ink, bg)
 
+    for state in container_states:
+        for rank, unit in enumerate(state.failed):
+            _place_badge(state, unit, str(numbers[unit["ref"]]), measure, rank,
+                         left_limit, right_limit, d_first, d_step, d_limit, ink, bg, required=True)
+    for state in lane_states:
+        for entry in state.periods:
+            child = entry["child"]
+            child_prims = [_resolve_colors(p, ink, bg) for p in child.prims]
+            if child_prims:
+                child_prims = _pack_event_blocks(child_prims)
+                child_top = min(p.bbox[1] for p in child_prims)
+                child_bottom = max(p.bbox[3] for p in child_prims)
+                entry["child_prims"] = [_shift(p, entry["header_h"] + BAR_PAD - child_top, state.index)
+                                        for p in child_prims]
+                entry["height"] += child_bottom - child_top + 2 * BAR_PAD
+
     # ── Assemblage vertical ──────────────────────────────────────────────
     prims = []
     lang_text = lambda key, **params: translate(key, lang, **params)   # noqa: E731
@@ -914,40 +1027,34 @@ def _attempt(doc, options, measure, forced_width, iteration):
         prims.append(_text(MARGIN, y + ASCENT * SIZES["subtitle"], sub_lines, SIZES["subtitle"], 400,
                            secondary, "start", measure, "subtitle"))
         y += _text_height(SIZES["subtitle"], len(sub_lines))
-    y += 16
+    y += 10 if options.density == "compact" else 16
 
-    # Ères : bandes (x) et rangées de libellés.
-    era_bands = []
-    for era, start, end in sorted(eras, key=lambda e: (e[1].t0, e[2].t1, e[0]["id"])):
-        x0, x1 = scale.x(start.t0), scale.x(end.t1)
-        if era_bands and x0 < era_bands[-1][2]:
-            cut = (x0 + era_bands[-1][2]) / 2          # recouvrement d'une unité : coupé au contact
-            era_bands[-1][2] = cut
-            x0 = cut
-        era_bands.append([era, x0, x1])
-    era_rows = []
-    era_texts = []
-    for era, x0, x1 in era_bands:
-        w = measure(era["label"], SIZES["era"], 600)
-        lx = min(max((x0 + x1) / 2 - w / 2, plot_left), max(plot_left, plot_right - w))
-        for r, end_x in enumerate(era_rows):
-            if end_x + 12 <= lx:
-                era_rows[r] = lx + w
-                break
+    # Les titres tiennent dans l'en-tête de leur colonne. Les ères minuscules
+    # gardent un libellé extérieur complet, rangé sans recouvrement.
+    era_headers = []
+    outside = []
+    header_h = 0
+    for i, (era, x0, x1) in enumerate(era_bands):
+        lines = wrap(era["label"], max(1, x1 - x0 - 2 * ERA_PAD), SIZES["era"], 600, measure)
+        if x1 - x0 >= 80 and len(lines) <= 4:
+            era_headers.append((i, era, x0, x1, lines))
+            header_h = max(header_h, _text_height(SIZES["era"], len(lines)) + 2 * ERA_PAD)
         else:
-            r = len(era_rows)
-            era_rows.append(lx + w)
-        era_texts.append((era, lx, r))
-    row_h = 20
-    for era, lx, r in era_texts:
-        prims.append(_text(lx, y + r * row_h + ASCENT * SIZES["era"], [era["label"]], SIZES["era"], 600,
-                           secondary, "start", measure, "era-label", era["id"]))
-    y += len(era_rows) * row_h + (4 if era_rows else 0)
-    # Impression : pas de fond pâle, un crochet par ère sous sa rangée de libellés.
-    bracket_y = None
-    if era_rows and not theme["era_bg"]:
-        bracket_y = y
-        y += 8
+            lines = wrap(era["label"], min(180, plot_right - plot_left), SIZES["era"], 600, measure)
+            w = max(measure(line, SIZES["era"], 600) for line in lines)
+            lx = min(max((x0 + x1 - w) / 2, plot_left), plot_right - w)
+            ly = y
+            h = _text_height(SIZES["era"], len(lines))
+            while True:
+                blockers = [box for box in outside if _intersects((lx, ly, lx + w, ly + h), box, 4)]
+                if not blockers:
+                    break
+                ly = max(box[3] for box in blockers) + 4
+            prims.append(_text(lx, ly + ASCENT * SIZES["era"], lines, SIZES["era"], 600,
+                               secondary, "start", measure, "era-label", era["id"]))
+            outside.append((lx, ly, lx + w, ly + h))
+    if outside:
+        y = max(box[3] for box in outside) + 8
 
     # Axe haut : libellés de graduation, puis la ligne.
     unit_name, step = _tick_unit(ppy, density["min_tick_px"])
@@ -957,7 +1064,17 @@ def _attempt(doc, options, measure, forced_width, iteration):
     prims.extend(tick_texts)
     y = tick_base + DESCENT * SIZES["tick"] + 6
     axis_y = y
-    lanes_top = axis_y + 8
+    band_top = axis_y + 8
+    lanes_top = band_top + header_h
+    for i, era, x0, x1, lines in era_headers:
+        color = theme["era_palette"][i % len(theme["era_palette"])]
+        header_fill = mix(bg, color, 0.30 if options.theme == "dark" else 0.16)
+        prims.append(Rect(x=x0, y=band_top, w=x1 - x0, h=header_h,
+                          fill=None if options.theme == "print" else header_fill,
+                          role="era-header", ref=era["id"]))
+        prims.append(_text(x0 + ERA_PAD, band_top + ERA_PAD + ASCENT * SIZES["era"], lines,
+                           SIZES["era"], 600, readable(color, [header_fill], 4.5),
+                           "start", measure, "era-label", era["id"]))
 
     # Pistes.
     lane_bounds = []
@@ -965,9 +1082,9 @@ def _attempt(doc, options, measure, forced_width, iteration):
     for state in lane_states:
         label_lines = lane_labels[state.index] if tracks else None
         local, local_top, local_bottom = _assemble_lane(state, label_lines, measure, density,
-                                                        numbers, ink, bg, secondary)
+                                                        numbers, ink, bg, secondary, options.theme)
         offset = cursor - local_top
-        lane_bg = theme["lane_bg"][state.index % 2]
+        lane_bg = mix(bg, state.color, 0.055) if options.theme != "print" else None
         top = round(cursor, 2)
         bottom = round(cursor + (local_bottom - local_top), 2)
         if lane_bg:
@@ -992,22 +1109,17 @@ def _attempt(doc, options, measure, forced_width, iteration):
     for _, _, x0, x1 in scale.breaks:
         chrome.append(_zigzag_h(x0, x1, axis_y, theme["axis"]))
         chrome.append(_zigzag_v((x0 + x1) / 2, axis_y + 4, lanes_bottom, theme["axis"]))
-    # Bandes d'ères, de l'axe haut au bas des pistes (ou à l'axe bas).
+    # Colonnes colorées : en-tête et évènements partagent le même rectangle.
     bands = []
     bottom_axis = lanes_bottom - MARGIN > 600
     band_bottom = lanes_bottom + (8 if bottom_axis else 0)
     for i, (era, x0, x1) in enumerate(era_bands):
-        if theme["era_bg"]:
-            fill = theme["era_bg"][i % 2]
-            if fill:
-                bands.append(Rect(x=round(x0, 2), y=round(axis_y, 2), w=round(x1 - x0, 2),
-                                  h=round(band_bottom - axis_y, 2), fill=fill, opacity=theme["era_opacity"],
-                                  role="era-band", ref=era["id"]))
-        elif bracket_y is not None:
-            left, right = round(x0 + 1.5, 2), round(max(x0 + 3, x1 - 1.5), 2)
-            bands.append(Path(points=(("M", left, round(bracket_y - 3, 2)), ("L", left, round(bracket_y, 2)),
-                                      ("L", right, round(bracket_y, 2)), ("L", right, round(bracket_y - 3, 2))),
-                              stroke=theme["axis"], width=1, role="era-band", ref=era["id"]))
+        color = theme["era_palette"][i % len(theme["era_palette"])]
+        bands.append(Rect(x=x0, y=band_top, w=x1 - x0, h=band_bottom - band_top,
+                          fill=None if options.theme == "print" else era_fills[i],
+                          stroke=mix(bg, color, 0.35), role="era-band", ref=era["id"]))
+        bands.append(Rect(x=x0, y=band_top, w=x1 - x0, h=3, fill=color,
+                          role="era-accent", ref=era["id"]))
     y = lanes_bottom
     if bottom_axis:
         y += 8
@@ -1019,7 +1131,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
             chrome.append(Line(x1=tick.x, y1=y, x2=tick.x, y2=y + 4, stroke=theme["axis"], width=1, role="tick"))
             prims.append(replace(tick, y=round(base, 2)))
         y = base + DESCENT * SIZES["tick"]
-    y += 20
+    y += 12 if options.density == "compact" else 20
 
     # ── Légende ──────────────────────────────────────────────────────────
     notes = []
@@ -1037,7 +1149,7 @@ def _attempt(doc, options, measure, forced_width, iteration):
 
     labeled = sum(1 for p in ordered if p.role in ("event-label", "period-label"))
     warnings = []
-    for state in lane_states:
+    for state in lane_states + container_states:
         for unit in state.units:
             if unit.get("placed") and unit["placed"][2]:
                 warnings.append({"code": "label_truncated", "ref": unit["ref"], "params": {}})
@@ -1053,6 +1165,10 @@ def _attempt(doc, options, measure, forced_width, iteration):
         "notes": len(notes), "clusters": cluster_count, "breaks": len(scale.breaks),
         "width": width, "height": height, "iterations": iteration + 1,
         "period_rows": [state.period_rows for state in lane_states],
+        "containers": [{"id": entry["period"]["id"], "events": [e[1] for e in entry["events"]]}
+                       for state in lane_states for entry in state.periods],
+        "eras": [{"id": era["id"], "color": theme["era_palette"][i % len(theme["era_palette"])]}
+                 for i, (era, _, _) in enumerate(era_bands)],
         # Couleur et forme réelles de chaque piste : le rail de l'éditeur les reprend.
         "tracks": [{"id": state.track["id"], "color": state.color, "shape": state.shape}
                    for state in lane_states if state.track],
@@ -1072,6 +1188,13 @@ def _attempt(doc, options, measure, forced_width, iteration):
 def _block_height(lines):
     date_part = (ASCENT + DESCENT) * SIZES["date"] + DATE_LABEL_GAP
     return date_part + _text_height(SIZES["label"], lines)
+
+
+def _unit_size(unit, lines, measure):
+    w = max(measure(line, SIZES["label"], unit["weight"]) for line in lines)
+    if unit["inline"]:
+        return unit["date_w"] + INLINE_DATE_GAP + w, _text_height(SIZES["label"], len(lines))
+    return max(w, unit["date_w"]), _block_height(len(lines))
 
 
 def _label_modes(sx, w):
@@ -1103,7 +1226,12 @@ def _find_spot(grid, sx, r, w, h, prefer_above, modes, left, right, d_first, d_s
     while d_limit is None or d + h <= d_limit + 1e-9:
         for above in (prefer_above, not prefer_above):
             top = -d - h if above else d
-            for anchor, ax, x0 in modes(sx, w):
+            candidates = list(modes(sx, w))
+            # Aux limites d'une ère ou du canevas, aligner le bloc sur le bord disponible.
+            if w <= right - left:
+                x0 = max(left, min(sx - w / 2, right - w))
+                candidates.append(("start", x0, x0))
+            for anchor, ax, x0 in candidates:
                 if x0 < left or x0 + w > right:
                     continue
                 box = (x0, top, x0 + w, top + h)
@@ -1136,13 +1264,15 @@ def _must_place(grid, sx, r, w, h, prefer_above, modes, left, right, d_first, d_
                       with_stem=False)
 
 
-def _make_unit(members, lang, measure, label_max, state, scale):
+def _make_unit(members, lang, measure, label_max, state, scale, *, compact=False, bounds=None):
     events = [m[2] for m in members]
     dates = [m[3] for m in members]
     ids = [m[1] for m in members]
     importance = max(e["importance"] for e in events)
     x = sum(m[0] for m in members) / len(members)
-    formatted = [format_date(d, lang, approx=e.get("approx", False)) for e, d in zip(events, dates)]
+    full_dates = [format_date(d, lang, approx=e.get("approx", False)) for e, d in zip(events, dates)]
+    formatted = [_compact_date(d, lang, e.get("approx", False)) if compact else full
+                 for e, d, full in zip(events, dates, full_dates)]
     if len(set(formatted)) == 1:
         date_line = formatted[0]
     else:
@@ -1153,43 +1283,66 @@ def _make_unit(members, lang, measure, label_max, state, scale):
     label = " · ".join(labels)
     weight = 600 if importance == 3 else 400
     r = MARKER_R[importance]
-    hollow = all(e.get("origin") == "model" for e in events)
-    unverified = not hollow and any(i in state.marked for i in ids)
-    approx = all(e.get("approx") for e in events)
+    unverified = any(i in state.marked for i in ids)
     ref = "+".join(ids)
+    date_w = measure(date_line, SIZES["date"], 600)
+    available = min(label_max, bounds[1] - bounds[0]) if bounds else label_max
+    inline_width = available - date_w - INLINE_DATE_GAP
+    inline = (compact and inline_width >= 64
+              and len(wrap(label, inline_width, SIZES["label"], weight, measure)) <= 3)
+    label_width = available - date_w - INLINE_DATE_GAP if inline else available
     graphics = []
     for _, event_id, event, date in members:
         if date.precision not in ("day", "month", "year"):
-            # Moustache d'incertitude : tout l'intervalle de la décennie, du siècle…
+            # Même rectangle pour une date couvrant une décennie, un siècle…
             x0, x1 = scale.x(date.t0), scale.x(date.t1)
-            graphics.append(Line(x1=x0, y1=0.0, x2=x1, y2=0.0, stroke=state.color, width=1.5,
+            graphics.append(Rect(x=x0, y=-BAR_H / 2, w=x1-x0, h=BAR_H,
+                                 fill=state.interval_fill, stroke=state.color,
                                  role="whisker", ref=event_id, lane=state.index))
-            for cap in (x0, x1):
-                graphics.append(Line(x1=cap, y1=-4.0, x2=cap, y2=4.0, stroke=state.color, width=1.5,
-                                     role="whisker", ref=event_id, lane=state.index))
     marker = Marker(shape=state.shape, cx=x, cy=0.0, r=r,
-                    fill=None if hollow else state.color,
-                    stroke=state.color if hollow else "ink" if unverified else "bg",
-                    stroke_width=2.0 if hollow or unverified else MARKER_RING, dashed=approx,
+                    fill=state.color, stroke="ink" if unverified else "bg",
+                    stroke_width=2.0 if unverified else MARKER_RING,
                     role="marker", ref=ref, lane=state.index)
     graphics.append(marker)
     return {
         "ids": ids, "ref": ref, "x": x, "r": r, "importance": importance, "weight": weight,
-        "date_line": date_line, "date_w": measure(date_line, SIZES["date"], 600),
-        "label": label, "variants": label_variants(label, label_max, SIZES["label"], weight, measure),
+        "date_line": date_line, "date_w": date_w, "inline": inline, "bounds": bounds,
+        "label": label, "variants": label_variants(label, label_width, SIZES["label"], weight, measure),
         "marker": marker, "graphics": graphics, "lane": state.index,
-        "note_text": f"{date_line} — {label}",
+        "note_text": f"{'–'.join(dict.fromkeys(full_dates))} — {label}",
     }
+
+
+def _compact_date(date, lang, approx=False):
+    """Date numérique locale, en conservant précision, avant J.-C. et approximation."""
+    year = str(abs(date.year))
+    if date.precision == "day":
+        value = (f"{date.day:02d}/{date.month:02d}/{year}" if lang == "fr"
+                 else f"{year}-{date.month:02d}-{date.day:02d}")
+    elif date.precision == "month":
+        value = f"{date.month:02d}/{year}" if lang == "fr" else f"{year}-{date.month:02d}"
+    else:
+        return format_date(date, lang, approx=approx, short=True)
+    if date.bc:
+        value = translate("timeline.date.bc", lang, date=value)
+    return translate("timeline.date.approx", lang, date=value) if approx else value
 
 
 def _commit_label(state, unit, spot, lines, measure):
     anchor, ax, box = spot["anchor"], spot["ax"], spot["box"]
     top = box[1]
-    date_base = top + ASCENT * SIZES["date"]
-    label_base = date_base + DESCENT * SIZES["date"] + DATE_LABEL_GAP + ASCENT * SIZES["label"]
+    if unit["inline"]:
+        anchor = "start"
+        ax = box[0]
+        label_base = date_base = top + ASCENT * SIZES["label"]
+        label_x = ax + unit["date_w"] + INLINE_DATE_GAP
+    else:
+        date_base = top + ASCENT * SIZES["date"]
+        label_base = date_base + DESCENT * SIZES["date"] + DATE_LABEL_GAP + ASCENT * SIZES["label"]
+        label_x = ax
     date_text = _text(ax, date_base, [unit["date_line"]], SIZES["date"], 600, state.date_fill, anchor,
                       measure, "event-date", unit["ref"], state.index)
-    label_text = _text(ax, label_base, lines, SIZES["label"], unit["weight"], "ink", anchor, measure,
+    label_text = _text(label_x, label_base, lines, SIZES["label"], unit["weight"], "ink", anchor, measure,
                        "event-label", unit["ref"], state.index)
     state.prims.extend([date_text, label_text])
     state.grid.add(_union(date_text.bbox, label_text.bbox), "text")
@@ -1222,6 +1375,7 @@ def _place_badge(state, unit, label, measure, rank, left, right, d_first, d_step
     `required` : la pastille doit être posée (voir _must_place).
     """
     w = badge_diameter(label, measure)
+    left, right = unit.get("bounds") or (left, right)
     find = _must_place if required else _find_spot
     spot = find(state.grid, unit["x"], unit["r"], w, w, rank % 2 == 0, _badge_modes,
                 left, right, d_first, d_step, d_limit)
@@ -1250,15 +1404,24 @@ def _place_cluster(state, members, measure, left, right, d_first, d_step, d_limi
     x1 = max(u["x"] for u in members)
     r = max(u["r"] for u in members)
     ref = "+".join(u["ref"] for u in members)
-    y0, y1 = r + 3, r + 6
-    brace = Path(points=(("M", x0, y0), ("L", x0, y1), ("L", x1, y1), ("L", x1, y0)),
-                 stroke=state.color, width=1.5, role="brace", ref=ref, lane=state.index)
+    distance = r + 3
+    while True:
+        for above in (False, True):
+            y0, y1 = (-distance, -distance - 3) if above else (distance, distance + 3)
+            brace = Path(points=(("M", x0, y0), ("L", x0, y1), ("L", x1, y1), ("L", x1, y0)),
+                         stroke=state.color, width=1.5, role="brace", ref=ref, lane=state.index)
+            if not state.grid.hits(brace.bbox, kinds=("text", "badge"), gap=TEXT_GAP):
+                break
+        else:
+            distance += d_step
+            continue
+        break
     state.grid.add(brace.bbox, "brace")
     state.prims.append(brace)
     label = f"×{len(members)}"
     w = badge_diameter(label, measure)
     cx_stem = (x0 + x1) / 2
-    spot = _must_place(state.grid, cx_stem, y1 + 1, w, w, False, _badge_modes,
+    spot = _must_place(state.grid, cx_stem, max(abs(y0), abs(y1)) + 1, w, w, above, _badge_modes,
                        left, right, d_first, d_step, d_limit)
     box = spot["box"]
     cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
@@ -1269,24 +1432,55 @@ def _place_cluster(state, members, measure, left, right, d_first, d_step, d_limi
         unit["cluster"] = ref
 
 
-def _assemble_lane(state, label_lines, measure, density, numbers, ink, bg, secondary):
+def _pack_event_blocks(prims):
+    """Aligner en haut les blocs disjoints en x, sans déplacer leurs dates en x.
+
+    Un évènement, son marqueur et ses traits restent solidaires. Deux blocs
+    séparés horizontalement peuvent partager la même hauteur sans collision.
+    """
+    by_ref = defaultdict(list)
+    for prim in prims:
+        by_ref[prim.ref].append(prim)
+    blocks = []
+    for ref, items in by_ref.items():
+        box = items[0].bbox
+        for prim in items[1:]:
+            box = _union(box, prim.bbox)
+        blocks.append((box, ref))
+    components = []
+    for box, ref in sorted(blocks, key=lambda b: (b[0][0], b[0][2], b[1])):
+        if components and box[0] < components[-1][0][2] + LABEL_MARGIN:
+            components[-1][0] = _union(components[-1][0], box)
+            components[-1][1].append(ref)
+        else:
+            components.append([box, [ref]])
+    offsets = {ref: -box[1] for box, refs in components for ref in refs}
+    return [_shift(prim, offsets[prim.ref], prim.lane) for prim in prims]
+
+
+def _assemble_lane(state, label_lines, measure, density, numbers, ink, bg, secondary, theme):
     """Primitives de la piste dans son repère, plus ses bornes verticales (haut, bas)."""
     prims = [_resolve_colors(prim, ink, bg) for prim in state.prims]
+    if density["pack"]:
+        prims = _pack_event_blocks(prims)
     extents = [p.bbox for p in prims]
     if state.units:
-        top = min([-12.0] + [b[1] for b in extents])
-        bottom = max([12.0] + [b[3] for b in extents])
+        top = min(b[1] for b in extents) if density["pack"] else min([-12.0] + [b[1] for b in extents])
+        bottom = max(b[3] for b in extents) if density["pack"] else max([12.0] + [b[3] for b in extents])
     else:
         top = bottom = 0.0                # piste sans évènement : pas de zone vide
-    middle = 0.0
+    middle = (top + bottom) / 2 if density["pack"] else 0.0
     # Périodes : rangées au-dessus de la zone des évènements.
     if state.period_rows:
-        row_step = BAR_H + density["row_gap"]
+        row_heights = [max(e["height"] for e in state.periods if e["row"] == r)
+                       for r in range(state.period_rows)]
         block_bottom = top - 8 if state.units else 0.0
-        block_top = block_bottom - state.period_rows * row_step + density["row_gap"]
+        block_top = block_bottom - sum(row_heights) - (state.period_rows - 1) * density["row_gap"]
+        row_offsets = [sum(row_heights[:r]) + r * density["row_gap"]
+                       for r in range(state.period_rows)]
         for entry in state.periods:
-            y = block_top + entry["row"] * row_step
-            prims.extend(_period_prims(state, entry, y, measure, numbers, ink, bg))
+            y = block_top + row_offsets[entry["row"]]
+            prims.extend(_period_prims(state, entry, y, measure, numbers, ink, bg, theme))
         top = block_top
         if not state.units:
             middle = (block_top + block_bottom) / 2
@@ -1295,7 +1489,8 @@ def _assemble_lane(state, label_lines, measure, density, numbers, ink, bg, secon
         h = _text_height(SIZES["lane"], len(label_lines))
         label_top = middle - h / 2
         label = _text(MARGIN + 4, label_top + ASCENT * SIZES["lane"], label_lines, SIZES["lane"], 600,
-                      ink, "start", measure, "lane-label", state.track["id"], state.index)
+                      readable(state.color, [bg], 4.5), "start", measure, "lane-label",
+                      state.track["id"], state.index)
         prims.append(label)
         top = min(top, label.bbox[1])
         bottom = max(bottom, label.bbox[3])
@@ -1303,31 +1498,38 @@ def _assemble_lane(state, label_lines, measure, density, numbers, ink, bg, secon
     return prims, top - pad, bottom + pad
 
 
-def _period_prims(state, entry, y, measure, numbers, ink, bg):
+def _period_prims(state, entry, y, measure, numbers, ink, bg, theme):
     period = entry["period"]
     ref = period["id"]
     x0, x1 = entry["x0"], entry["x1"]
-    fade = "end" if entry["end"].present else ("both" if period.get("approx") else "")
-    out = [Rect(x=x0, y=y, w=x1 - x0, h=BAR_H, rx=BAR_H / 2, fill=state.color, fade=fade,
-                stroke=ink if ref in state.marked else None, role="period-bar", ref=ref, lane=state.index)]
-    if entry["end"].present:
-        out.append(Path(points=(("M", x1 + 1, y + 4), ("L", x1 + 5, y + BAR_H / 2), ("L", x1 + 1, y + BAR_H - 4)),
-                        stroke=state.color, width=1.5, role="period-bar", ref=ref, lane=state.index))
-    baseline = y + BAR_H / 2 + (ASCENT - DESCENT) / 2 * SIZES["label"]
+    body_fill = mix(bg, state.color, 0.20 if theme == "dark" else 0.10)
+    header_fill = mix(bg, state.color, 0.30 if theme == "dark" else 0.16)
+    out = [Rect(x=x0, y=y, w=x1-x0, h=entry["height"],
+                fill=None if theme == "print" else body_fill,
+                stroke=ink if ref in state.marked else mix(bg, state.color, 0.40),
+                role="period-container", ref=ref, lane=state.index),
+           Rect(x=x0, y=y, w=x1-x0, h=entry["header_h"],
+                fill=None if theme == "print" else header_fill,
+                role="period-header", ref=ref, lane=state.index),
+           Rect(x=x0, y=y, w=x1-x0, h=3, fill=state.color,
+                role="period-accent", ref=ref, lane=state.index)]
+    baseline = y + BAR_PAD + ASCENT * SIZES["label"]
     if entry["mode"] == "inside":
-        fill = best_text_on(state.color, ["#FFFFFF", "#1D1D1F"])
-        out.append(_text(x0 + BAR_PAD, baseline, [entry["label"]], SIZES["label"], entry["weight"], fill,
-                         "start", measure, "period-label", ref, state.index))
-    elif entry["mode"] == "right":
-        tail = 6 if entry["end"].present else 0
-        out.append(_text(x1 + tail + 6, baseline, [entry["label"]], SIZES["label"], entry["weight"], ink,
+        fill = readable(state.color, [header_fill, bg], 4.5)
+        out.append(_text(x0 + BAR_PAD, baseline, entry["title_lines"], SIZES["label"], entry["weight"], fill,
                          "start", measure, "period-label", ref, state.index))
     else:
         diameter = badge_diameter(str(numbers[ref]), measure)
-        cx = x0 + diameter / 2 + 2 if x1 - x0 >= 2 * BADGE_R + 12 else x1 + diameter / 2 + 4
-        circle, number, _ = _badge_prims(state, ref, cx, y + BAR_H / 2, str(numbers[ref]), measure,
-                                         mix(state.color, "#000000", 0.25), ink, bg)
+        circle, number, _ = _badge_prims(state, ref, x0 + BAR_PAD + diameter / 2,
+                                        y + BAR_PAD + BADGE_R, str(numbers[ref]), measure,
+                                        state.color, ink, bg)
         out.extend([circle, number])
+    if entry["date_inside"]:
+        date_y = y + entry["header_h"] - BAR_PAD - DESCENT * SIZES["date"]
+        out.append(_text(x0 + BAR_PAD, date_y, [entry["date_line"]], SIZES["date"], 400,
+                         readable(state.color, [header_fill, bg], 4.5), "start", measure,
+                         "period-date", ref, state.index))
+    out.extend(_shift(p, y, state.index) for p in entry["child_prims"])
     return out
 
 
@@ -1468,6 +1670,9 @@ def _note_text(ref, lane_states):
         for entry in state.periods:
             if entry["period"]["id"] == ref:
                 return entry.get("note_text") or entry["label"]
+            for unit in entry["child"].units:
+                if unit["ref"] == ref:
+                    return unit["note_text"]
     return ref
 
 

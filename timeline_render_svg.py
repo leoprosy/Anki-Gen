@@ -39,7 +39,9 @@ ATTR = {'"': "&quot;", "\n": "&#10;", "\r": "&#13;", "\t": "&#9;"}
 # Ordre de dessin : les fonds, puis la grille, puis les barres et les traits, puis
 # les marqueurs, et le texte en dernier. Rien ne se chevauche entre texte et
 # graphismes ; l'ordre ne règle que les graphismes entre eux.
-LAYER = {"lane-bg": 0, "era-band": 1, "gridline": 2, "axis": 3, "tick": 3, "break": 3,
+LAYER = {"lane-bg": 0, "era-band": 1, "era-header": 2, "gridline": 2, "era-accent": 3,
+         "period-container": 3, "period-header": 3, "period-accent": 3,
+         "axis": 3, "tick": 3, "break": 3,
          "period-bar": 4, "whisker": 4, "brace": 4, "stem": 4, "marker": 5, "badge": 5, "legend": 5}
 
 

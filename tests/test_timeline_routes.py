@@ -179,6 +179,16 @@ class TestValidationAndSaving(RoutesTestCase):
 
 
 class TestRender(RoutesTestCase):
+    def test_compact_defaults_are_shared_by_preview_export_and_cards(self):
+        from timeline_cards import card_layout_options
+        options, stored = web._render_options({})
+        self.assertEqual(options.density, "compact")
+        self.assertEqual(stored["density"], "compact")
+        self.assertEqual(web._export_options({}, {})["density"], "compact")
+        self.assertEqual(card_layout_options().density, "compact")
+        self.assertEqual(web._export_options({}, {"render_options": {"density": "comfortable"}})["density"], "comfortable")
+        self.assertEqual(card_layout_options({"density": "comfortable"}).density, "comfortable")
+
     def test_render_the_saved_document(self):
         tid = self.created_id()
         body = self.client.post(f"/api/timeline/{tid}/render", json={"options": {"theme": "dark"}}).get_json()

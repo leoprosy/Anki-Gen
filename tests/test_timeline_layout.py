@@ -172,7 +172,7 @@ class TestScale(unittest.TestCase):
 # ──────────────────────────────────────────────────────────────
 OPTION_SETS = [
     LayoutOptions(),
-    LayoutOptions(density="compact"),
+    LayoutOptions(density="comfortable"),
     LayoutOptions(width_mode="fixed", width_px=1200),
     LayoutOptions(width_mode="fixed", width_px=900, density="compact"),
     LayoutOptions(theme="dark"),
@@ -255,9 +255,9 @@ class TestFixtures(unittest.TestCase):
                    for ref in p.ref.split("+")}
         self.assertEqual(markers["gatt"].stroke, ink)
         self.assertNotEqual(markers["omc"].stroke, ink)
-        bars = {p.ref: p for p in marked.primitives if isinstance(p, Rect) and p.role == "period-bar"}
+        bars = {p.ref: p for p in marked.primitives if isinstance(p, Rect) and p.role == "period-container"}
         self.assertEqual(bars["bretton_woods"].stroke, ink)
-        self.assertIsNone(bars["etalon_or"].stroke)
+        self.assertNotEqual(bars["etalon_or"].stroke, ink)
         legend = " ".join(" ".join(p.lines) for p in marked.primitives if p.role == "legend" and isinstance(p, Text))
         self.assertIn("Marqueur cerclé", legend)
         self.assertEqual(violations(marked), [])
@@ -269,7 +269,113 @@ class TestFixtures(unittest.TestCase):
             self.assertNotIn("cerclé", legend)
 
 
+class TestCompactLayout(unittest.TestCase):
+    def test_default_is_compact_and_reduces_simple_canvas(self):
+        self.assertEqual(LayoutOptions().density, "compact")
+        doc = load("single_event.json")
+        compact = tl.layout(doc, LayoutOptions(), fake_measure)
+        airy = tl.layout(doc, LayoutOptions(density="comfortable"), fake_measure)
+        self.assertLess(compact.width * compact.height, airy.width * airy.height * 0.85)
+        self.assertEqual(violations(compact), [])
+
+    def test_headers_and_event_labels_stay_in_their_era(self):
+        doc = ts.validate({"schema": ts.SCHEMA_ID, "title": "Deux ères", "lang": "fr",
+            "eras": [
+                {"id": "a", "label": "Première ère", "start": "1900", "end": "1950"},
+                {"id": "b", "label": "Seconde ère", "start": "1950", "end": "2000"}],
+            "events": [
+                {"id": "e1", "date": "1910", "label": "Premier événement"},
+                {"id": "e2", "date": "1949", "label": "Près de la frontière"},
+                {"id": "e3", "date": "1951", "label": "De l'autre côté"},
+                {"id": "e4", "date": "1999", "label": "Dernier événement"}]
+        })["normalized"]
+        for theme in ("light", "dark", "print"):
+            result = tl.layout(doc, LayoutOptions(width_mode="fixed", width_px=1000, theme=theme), fake_measure)
+            bands = {p.ref: p for p in result.primitives if p.role == "era-band"}
+            for prim in result.primitives:
+                era_id = prim.ref if prim.role == "era-label" else {"e1": "a", "e2": "a", "e3": "b", "e4": "b"}.get(prim.ref)
+                if era_id and prim.role in ("era-label", "event-label", "event-date"):
+                    band = bands[era_id]
+                    self.assertGreaterEqual(prim.bbox[0], band.bbox[0], (theme, prim.ref))
+                    self.assertLessEqual(prim.bbox[2], band.bbox[2], (theme, prim.ref))
+                    self.assertGreaterEqual(prim.bbox[1], band.bbox[1])
+                    self.assertLessEqual(prim.bbox[3], band.bbox[3])
+                if era_id and prim.role == "marker":
+                    # Un marqueur sur la frontière garde sa date exacte ; son centre
+                    # appartient à l'ère, même si son contour déborde de quelques pixels.
+                    self.assertGreaterEqual(prim.cx, bands[era_id].bbox[0])
+                    self.assertLessEqual(prim.cx, bands[era_id].bbox[2])
+            self.assertEqual(violations(result), [])
+            self.assertEqual(len({e["color"] for e in result.stats["eras"]}), 2)
+
+    def test_inline_dates_and_short_months_preserve_precision(self):
+        self.assertEqual(tl._compact_date(tl.parse_date("1971-08-15"), "fr"), "15/08/1971")
+        self.assertEqual(tl._compact_date(tl.parse_date("1971-08-15"), "en"), "1971-08-15")
+        self.assertEqual(tl._compact_date(tl.parse_date("1971-08"), "fr"), "08/1971")
+        self.assertEqual(tl._compact_date(tl.parse_date("-44-03-15"), "fr", True), "v. 15/03/44 av. J.-C.")
+        result = tl.layout(load("single_event.json"), LayoutOptions(), fake_measure)
+        date = next(p for p in result.primitives if p.role == "event-date")
+        label = next(p for p in result.primitives if p.role == "event-label")
+        self.assertEqual(date.y, label.y)
+        self.assertGreaterEqual(label.bbox[0] - date.bbox[2], tl.TEXT_GAP)
+
+    def test_narrow_eras_keep_full_titles_without_overlap(self):
+        doc = ts.validate({"schema": ts.SCHEMA_ID, "title": "Ères étroites", "lang": "fr",
+            "eras": [{"id": "a", "start": "1900", "end": "1901", "label": "Une ère très courte au titre complet"},
+                     {"id": "b", "start": "1902", "end": "1903", "label": "Une autre ère très courte au titre complet"}],
+            "events": [{"id": "e", "date": "2000", "label": "Évènement éloigné"}]
+        })["normalized"]
+        result = tl.layout(doc, LayoutOptions(width_mode="fixed", width_px=900), fake_measure)
+        labels = {p.ref: " ".join(p.lines) for p in result.primitives if p.role == "era-label"}
+        for era in doc["eras"]:
+            self.assertEqual(labels[era["id"]], era["label"])
+        self.assertEqual(violations(result), [])
+
+
 class TestPeriods(unittest.TestCase):
+    def test_reigns_contain_their_events_in_both_densities(self):
+        for density in ("compact", "comfortable"):
+            for theme in ("light", "dark", "print"):
+                result = tl.layout(load("reigns.json"), LayoutOptions(
+                    density=density, theme=theme, width_mode="fixed", width_px=1200), fake_measure)
+                self.assertEqual(violations(result), [])
+                boxes = {p.ref: p for p in result.primitives if p.role == "period-container"}
+                owners = {ref: entry["id"] for entry in result.stats["containers"] for ref in entry["events"]}
+                self.assertEqual(owners, {"reform": "first", "assembly": "first",
+                                          "treaty": "second", "capital": "second"})
+                for prim in result.primitives:
+                    owner = next((owners[ref] for ref in (prim.ref or "").split("+") if ref in owners), None)
+                    if owner and prim.role in ("event-label", "event-date", "badge", "stem"):
+                        box = boxes[owner].bbox
+                        for axis in (0, 1):
+                            self.assertGreaterEqual(prim.bbox[axis], box[axis] - 0.02)
+                            self.assertLessEqual(prim.bbox[axis + 2], box[axis + 2] + 0.02)
+                markers = [p for p in result.primitives if p.role == "marker"]
+                self.assertEqual({p.shape for p in markers}, {"circle"})
+                self.assertEqual(len({p.r for p in markers}), 1)
+                self.assertFalse(any(p.dashed for p in markers))
+
+    def test_shortest_containing_period_wins_and_other_tracks_stay_outside(self):
+        doc = load("reigns.json")
+        doc["periods"].append(dict(doc["periods"][0], id="nested", start="1610", end="1620"))
+        result = tl.layout(doc, LayoutOptions(), fake_measure)
+        owners = {ref: entry["id"] for entry in result.stats["containers"] for ref in entry["events"]}
+        self.assertEqual(owners["reform"], "nested")
+        self.assertEqual(owners["assembly"], "first")
+        self.assertNotIn("other", owners)
+        self.assertNotIn("outside", owners)
+        self.assertEqual(violations(result), [])
+
+    def test_small_container_keeps_its_children_and_full_note_text(self):
+        doc = load("reigns.json")
+        doc["periods"][0]["end"] = "1600"
+        doc["events"][0].update(date="1600-12-31", label="Un événement au titre trop long pour tenir dans ce petit rectangle")
+        result = tl.layout(doc, LayoutOptions(width_mode="fixed", width_px=900), fake_measure)
+        self.assertEqual(violations(result), [])
+        self.assertIn("reform", next(c["events"] for c in result.stats["containers"] if c["id"] == "first"))
+        note = next(n for n in result.notes if n["ref"] == "reform")
+        self.assertIn(doc["events"][0]["label"], note["text"])
+
     def periods_doc(self, spans):
         return ts.validate({
             "schema": ts.SCHEMA_ID, "title": "Périodes", "lang": "fr",

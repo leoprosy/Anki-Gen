@@ -25,6 +25,17 @@
         {% endfor %}
       </select>
     </div>
+    <div class="settings-row">
+      <div class="settings-description">
+        <label for="set-theme">{{ t('settings.theme_label') }}</label>
+        <p id="theme-help">{{ t('settings.theme_help') }}</p>
+      </div>
+      <select id="set-theme" aria-describedby="theme-help">
+        {% for value in ('system', 'light', 'dark') %}
+        <option value="{{ value }}" {% if value == prefs.theme %}selected{% endif %}>{{ t('settings.theme_' ~ value) }}</option>
+        {% endfor %}
+      </select>
+    </div>
   </section>
   <section class="card settings-section" aria-labelledby="defaults-title">
     <div class="settings-section-heading">
@@ -120,6 +131,13 @@
       }
     });
 
+    // Aperçu immédiat du thème ; il n'est enregistré qu'avec le reste du formulaire.
+    document.getElementById('set-theme').addEventListener('change', (event) => {
+      const theme = event.target.value;
+      if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+      else document.documentElement.setAttribute('data-theme', theme);
+    });
+
     document.getElementById('set-download-dir').addEventListener('input', () => {
       folderStatus.textContent = '';
     });
@@ -131,6 +149,7 @@
       status.textContent = '';
       const payload = {
         language: document.getElementById('set-language').value,
+        theme: document.getElementById('set-theme').value,
         deck_prefix: document.getElementById('set-deck-prefix').value,
         download_dir: document.getElementById('set-download-dir').value,
       };

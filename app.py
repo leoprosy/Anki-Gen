@@ -10,6 +10,7 @@ puis ouvre http://127.0.0.1:5000
 import io
 import json
 import re
+import time
 import zipfile
 from dataclasses import replace
 from pathlib import Path
@@ -115,6 +116,17 @@ def inject_i18n():
         "js_i18n": catalog_for_js(lang),
         "languages": available_languages(),
     }
+
+
+@app.template_filter("ago")
+def ago(timestamp):
+    """Durée écoulée depuis `timestamp`, en clair (« il y a 2 h »)."""
+    seconds = max(0, time.time() - timestamp)
+    if seconds < 60:
+        return tr("upload.ago_now")
+    for unit, size in (("days", 86400), ("hours", 3600), ("minutes", 60)):
+        if seconds >= size:
+            return tr(f"upload.ago_{unit}", n=int(seconds // size))
 
 
 def sanitize_filename(filename):

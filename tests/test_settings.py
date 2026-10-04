@@ -72,6 +72,26 @@ class TestValidation(SettingsTestCase):
         self.assertEqual(loaded["language"], "en")
         self.assertEqual(loaded["deck_prefix"], "Econ")
 
+    def test_default_theme_follows_the_system(self):
+        self.assertEqual(settings.load_settings()["theme"], "system")
+
+    def test_known_theme_is_kept(self):
+        self.write_raw(json.dumps({"theme": "dark"}))
+        self.assertEqual(settings.load_settings()["theme"], "dark")
+
+    def test_unknown_theme_falls_back_without_touching_other_keys(self):
+        self.write_raw(json.dumps({"theme": "sepia", "language": "fr"}))
+        loaded = settings.load_settings()
+        self.assertEqual(loaded["theme"], "system")
+        self.assertEqual(loaded["language"], "fr")
+
+    def test_saving_theme_keeps_other_preferences(self):
+        settings.save_settings({"language": "fr", "deck_prefix": "Econ"})
+        saved = settings.save_settings({"theme": "light"})
+        self.assertEqual(saved["theme"], "light")
+        self.assertEqual(saved["language"], "fr")
+        self.assertEqual(saved["deck_prefix"], "Econ")
+
     def test_wrong_type_falls_back_for_that_key_only(self):
         self.write_raw(json.dumps({"deck_prefix": 42, "language": "fr"}))
         loaded = settings.load_settings()

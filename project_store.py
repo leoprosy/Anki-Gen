@@ -126,12 +126,15 @@ def list_projects() -> list:
         images, tables = count_media(project)
         out.append({
             "id": file.stem,
+            "updated": file.stat().st_mtime,
             "progress": progress(project),
             "deck": project["prompts"][0].get("deck") or project.get("deck_prefix") or "",
             "source": project.get("source"),
             "images": images,
             "tables": tables,
         })
+    # Le dernier cours touché d'abord : c'est presque toujours celui qu'on reprend.
+    out.sort(key=lambda p: p["updated"], reverse=True)
     return out
 
 

@@ -266,12 +266,12 @@ class TestCompatCheckDecisions(unittest.TestCase):
     def test_picks_the_newest_published_release_that_ships_the_exe(self):
         releases = [
             {"tag_name": "v1.4.0", "draft": True,
-             "assets": [{"name": "flask-server.exe", "browser_download_url": "draft"}]},
+             "assets": [{"name": "flask-server.exe", "url": "draft"}]},
             {"tag_name": "v1.3.0", "assets": [{"name": "app.zip"}]},
             {"tag_name": "v1.2.9",
-             "assets": [{"name": "flask-server.exe", "browser_download_url": "u129"}]},
+             "assets": [{"name": "flask-server.exe", "url": "u129"}]},
             {"tag_name": "v1.2.8",
-             "assets": [{"name": "flask-server.exe", "browser_download_url": "u128"}]},
+             "assets": [{"name": "flask-server.exe", "url": "u128"}]},
         ]
         self.assertEqual(find_previous_exe(releases), ("v1.2.9", "u129"))
         self.assertEqual(find_previous_exe(releases, exclude_tag="v1.2.9"), ("v1.2.8", "u128"))

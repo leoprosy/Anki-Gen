@@ -32,12 +32,13 @@ REPO = "leoprosy/Anki-Gen"
 ASSET = "flask-server.exe"
 
 
-def _request(url):
-    headers = {"User-Agent": "Ankigen-CI", "Accept": "application/vnd.github+json"}
+def _request(url, accept="application/vnd.github+json"):
+    req = Request(url, headers={"User-Agent": "Ankigen-CI", "Accept": accept})
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return Request(url, headers=headers)
+        # Non transmis à la redirection : l'URL S3 signée refuse un 2e mode d'auth.
+        req.add_unredirected_header("Authorization", f"Bearer {token}")
+    return req
 
 
 def find_previous_exe(releases, exclude_tag=None):
@@ -49,7 +50,8 @@ def find_previous_exe(releases, exclude_tag=None):
             continue
         for asset in release.get("assets", []):
             if asset.get("name") == ASSET:
-                return release["tag_name"], asset["browser_download_url"]
+                # URL d'API, pas browser_download_url : celle-ci renvoie 404 sur un dépôt privé.
+                return release["tag_name"], asset["url"]
     return None
 
 
@@ -89,7 +91,7 @@ def main(argv=None) -> int:
     work = Path(tempfile.mkdtemp(prefix="ankigen-compat-"))
     try:
         exe = work / ASSET
-        with urlopen(_request(url), timeout=300) as resp, open(exe, "wb") as out:
+        with urlopen(_request(url, "application/octet-stream"), timeout=300) as resp, open(exe, "wb") as out:
             shutil.copyfileobj(resp, out)
         # APPDATA isolé : importer app.py crée les dossiers de données.
         env = dict(os.environ, APPDATA=str(work / "appdata"))

@@ -6,17 +6,11 @@
 <main class="page home">
   <header class="home-hero">
     <h2>{{ t('upload.page_title') }}</h2>
-    <p>{{ t('upload.page_subtitle') }}</p>
-    <div class="home-hero__row">
-      <ol class="stepper">
-        <li class="is-active" aria-current="step"><span class="stepper__dot"></span>{{ t('upload.step_import') }}</li>
-        <li><span class="stepper__dot"></span>{{ t('upload.step_generate') }}</li>
-        <li><span class="stepper__dot"></span>{{ t('upload.step_review') }}</li>
-        <li><span class="stepper__dot"></span>{{ t('upload.step_export') }}</li>
-      </ol>
+    <p class="home-hero__sub">
+      {{ t('upload.page_subtitle') }}
       <a class="home-link" href="{{ url_for('help_page') }}">{{ t('upload.how_it_works') }}
         <svg width="14" height="14" aria-hidden="true"><use href="#i-next"></use></svg></a>
-    </div>
+    </p>
   </header>
 
   <div class="home-grid">

@@ -208,9 +208,5 @@
   "upload.ago_minutes": "il y a {n} min",
   "upload.ago_hours": "il y a {n} h",
   "upload.ago_days": "il y a {n} j",
-  "upload.more_actions": "Plus d'actions",
-  "upload.step_import": "Importer",
-  "upload.step_generate": "Générer",
-  "upload.step_review": "Vérifier",
-  "upload.step_export": "Exporter"
+  "upload.more_actions": "Plus d'actions"
 }

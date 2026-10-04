@@ -18,6 +18,8 @@ from pathlib import Path
 import paths
 
 LANGUAGES = ("en", "fr")
+# "system" suit le réglage clair/sombre du système d'exploitation.
+THEMES = ("system", "light", "dark")
 
 # Global de module, et non constante figée à l'import : les tests le redirigent
 # vers un dossier jetable pour ne jamais écrire dans %APPDATA%.
@@ -33,6 +35,7 @@ def default_download_dir():
 def defaults():
     return {
         "language": "en",
+        "theme": "system",
         "download_dir": default_download_dir(),
         "deck_prefix": "",
         "analytics_enabled": False,
@@ -65,6 +68,10 @@ def _clean(raw):
     language = raw.get("language")
     if isinstance(language, str) and language in LANGUAGES:
         out["language"] = language
+
+    theme = raw.get("theme")
+    if isinstance(theme, str) and theme in THEMES:
+        out["theme"] = theme
 
     deck_prefix = raw.get("deck_prefix")
     if isinstance(deck_prefix, str):

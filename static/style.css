@@ -64,8 +64,10 @@
   --safe-b:   env(safe-area-inset-bottom, 0px);
 }
 
+/* Thème sombre : suit le système, sauf si l'utilisateur a forcé un thème
+   dans les paramètres (attribut data-theme sur <html>). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg:            #0E0E10;
     --bg-blur:       rgba(14, 14, 16, 0.78);
     --surface:       #1B1B1F;
@@ -95,6 +97,39 @@
     --hairline:  rgba(255, 255, 255, 0.10);
   }
 }
+:root[data-theme="dark"] {
+  --bg:            #0E0E10;
+  --bg-blur:       rgba(14, 14, 16, 0.78);
+  --surface:       #1B1B1F;
+  --surface-hover: #212126;
+  --surface-alt:   #26262B;
+  --surface-alt-2: #303036;
+
+  --text-primary:   #F2F2F5;
+  --text-secondary: #9A9AA2;
+  --text-tertiary:  #6E6E77;
+
+  --accent:        #2A8CF5;
+  --accent-hover:  #3E99F7;
+  --accent-subtle: rgba(42, 140, 245, 0.16);
+  --accent-ring:   rgba(42, 140, 245, 0.32);
+
+  --success:      #46D06C;
+  --success-soft: rgba(52, 199, 89, 0.16);
+  --warning:      #FFB340;
+  --warning-soft: rgba(255, 159, 10, 0.16);
+  --error:        #FF6259;
+  --error-soft:   rgba(255, 59, 48, 0.16);
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.45);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.55);
+  --hairline:  rgba(255, 255, 255, 0.10);
+}
+
+/* Contrôles natifs (barres de défilement, listes) alignés sur le thème forcé. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
 
 /* ── Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }

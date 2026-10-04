@@ -30,3 +30,4 @@ Tests : runtime Python du projet, `unittest discover -s tests -p 'test_timeline_
 - Suite Python complète : 624 tests réussis, dont les cas de retour au paragraphe, source ambiguë ou supprimée et mise à jour des liens après collage, fusion et sauvegarde.
 - Tests JavaScript existants : 21 réussis ; vérification de syntaxe des trois scripts modifiés.
 - Navigateur : aller-retour, accès aux sources, création et collage par paragraphe, protection du brouillon, ouverture au clavier. Navigation sans débordement à 320, 768, 1024 et 1440 px ; aucune erreur console.
+- Après intégration des nouveaux en-tête et thème de `main` : 628 tests Python et 21 tests JavaScript réussis. Aller-retour et menus vérifiés sur bureau et à 320 px. Capture de démonstration : `docs/images/course-timeline-navigation.png`.

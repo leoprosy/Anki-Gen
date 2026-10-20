@@ -68,7 +68,8 @@ def runtime_requirements(text: str) -> list:
         if raw.strip().startswith(PACKAGING_MARKER):
             break
         line = raw.split("#", 1)[0].strip()
-        if line:
+        # Les options de pip (--extra-index-url…) disent où trouver un paquet, pas lequel.
+        if line and not line.startswith("-"):
             lines.append(re.sub(r"\s+", "", line).lower())
     return sorted(lines)
 

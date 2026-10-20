@@ -17,7 +17,7 @@ from pathlib import Path as _Path
 _sys.path.insert(0, _os.path.join(SPECPATH, "scripts"))
 from build_app_payload import build_payload, current_commit, tauri_version  # noqa: E402
 from runtime_contract import runtime_import_names, stdlib_modules  # noqa: E402
-from PyInstaller.utils.hooks import collect_submodules  # noqa: E402
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules  # noqa: E402
 
 _version = tauri_version()
 _commit = current_commit()
@@ -57,7 +57,9 @@ print(f"[spec] hiddenimports : {len(_hidden)} modules")
 a = Analysis(
     ['launcher.py'],
     pathex=[],
-    binaries=[],
+    # llama_cpp charge ses DLL par ctypes depuis llama_cpp/lib : aucune analyse
+    # d'import ne les voit, et pyinstaller-hooks-contrib n'a pas de hook pour lui.
+    binaries=collect_dynamic_libs("llama_cpp"),
     datas=[
         (str(_bundle_dir), 'app_bundle'),
         # Identité du runtime : lue par launcher --self-check et par l'updater.

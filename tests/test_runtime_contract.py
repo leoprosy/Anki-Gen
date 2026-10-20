@@ -56,6 +56,10 @@ class TestRequirementsContract(unittest.TestCase):
         self.assertEqual(runtime_contract.requirements_digest(a),
                          runtime_contract.requirements_digest(b))
 
+    def test_pip_options_are_not_requirements(self):
+        lines = runtime_contract.runtime_requirements("--extra-index-url https://x/whl\na==1\n")
+        self.assertEqual(lines, ["a==1"])
+
     def test_distribution_names_are_canonical(self):
         self.assertEqual(runtime_contract.distribution_name("python_docx==1.2.0"), "python-docx")
         self.assertEqual(runtime_contract.distribution_name("MarkupSafe>=3"), "markupsafe")

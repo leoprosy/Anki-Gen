@@ -317,7 +317,8 @@ def complete(messages: list, schema: dict) -> str:
         if _llm is None:
             # Lu par llama.cpp à son chargement : il ne voit que la carte choisie, ou aucune.
             index = _device()[0]
-            os.environ["GGML_VK_VISIBLE_DEVICES"] = "" if index is None else str(index)
+            # Une valeur vide efface la variable sous Windows (toutes les cartes visibles) : une espace ne désigne aucune carte.
+            os.environ["GGML_VK_VISIBLE_DEVICES"] = " " if index is None else str(index)
             from llama_cpp import Llama
             _llm = _grammar_first(Llama(str(model_path()), n_ctx=N_CTX, n_gpu_layers=-1, verbose=False))
         # ponytail: estimation (contenus + ~8 jetons de gabarit par message), assez juste pour une marge

@@ -62,6 +62,27 @@
       </div>
     </div>
   </section>
+  {% if local_model.available %}
+  <section class="card settings-section" aria-labelledby="local-model-title">
+    <div class="settings-section-heading">
+      <span class="settings-section-icon" aria-hidden="true"><svg width="20" height="20"><use href="#i-refresh"></use></svg></span>
+      <h3 id="local-model-title">{{ t('settings.local_model_title') }}</h3>
+    </div>
+    <div class="settings-row">
+      <div class="settings-description">
+        <span>{{ local_model.name }}</span>
+        <p id="local-model-help">{{ t('settings.local_model_help', size=(local_model.size / 1e9) | round(1)) }}</p>
+      </div>
+      <div class="settings-folder-control">
+        <button type="button" class="btn sm" id="local-model-download"
+          {% if local_model.installed or local_model.downloading %}hidden{% endif %}>{{ t('settings.local_model_download') }}</button>
+        <button type="button" class="btn sm" id="local-model-delete"
+          {% if not local_model.installed %}hidden{% endif %}>{{ t('settings.local_model_delete') }}</button>
+        <p class="settings-feedback" id="local-model-status" role="status" aria-describedby="local-model-help"></p>
+      </div>
+    </div>
+  </section>
+  {% endif %}
   <section class="card settings-section" aria-labelledby="privacy-title">
     <div class="settings-section-heading">
       <h3 id="privacy-title">{{ t('settings.privacy_title') }}</h3>
@@ -130,6 +151,37 @@
         checkBtn.disabled = false;
       }
     });
+
+    // Modèle local : téléchargement suivi par sondage, l'état vit côté serveur.
+    const localStatus = document.getElementById('local-model-status');
+    if (localStatus) {
+      const downloadBtn = document.getElementById('local-model-download');
+      const deleteBtn = document.getElementById('local-model-delete');
+      const showModel = (m) => {
+        downloadBtn.hidden = m.installed || m.downloading;
+        deleteBtn.hidden = !m.installed;
+        localStatus.className = 'settings-feedback' + (m.error ? ' is-error' : m.installed ? ' is-success' : '');
+        localStatus.textContent = m.downloading
+          ? window.T('js.local_model_progress', { pct: Math.floor(100 * m.done / m.size) })
+          : m.error ? window.T('js.local_model_error', { error: m.error })
+          : m.installed ? window.T('js.local_model_ready') : '';
+        if (m.downloading) setTimeout(pollModel, 1000);
+      };
+      const modelRequest = async (method) => {
+        try {
+          showModel(await (await fetch('/api/local-model', { method })).json());
+        } catch (e) {
+          localStatus.textContent = window.T('js.network_error');
+          localStatus.className = 'settings-feedback is-error';
+        }
+      };
+      const pollModel = () => modelRequest('GET');
+      downloadBtn.addEventListener('click', () => modelRequest('POST'));
+      deleteBtn.addEventListener('click', () => {
+        if (window.confirm(window.T('js.local_model_delete_confirm'))) modelRequest('DELETE');
+      });
+      showModel({{ local_model | tojson }});
+    }
 
     // Aperçu immédiat du thème ; il n'est enregistré qu'avec le reste du formulaire.
     document.getElementById('set-theme').addEventListener('change', (event) => {

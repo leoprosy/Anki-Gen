@@ -111,6 +111,11 @@ back to course paragraphs and, when a quotation identifies it unambiguously, an 
 - **Long chapters, paragraph by paragraph.** Past about 25,000 characters, Ankigen suggests one
   prompt per paragraph and merges the answers: tracks with the same name are matched, and an event
   found twice becomes one, which you can split again.
+- **Or a local model, without Claude.** Settings → *Local model* downloads a small model once
+  (Qwen3-4B, 2.5 GB) that runs inside Ankigen, on the CPU, with no account and no connection.
+  *Generate locally* then extracts the current paragraph, and the model fixes its own rejected
+  answers. It is slow — several minutes per paragraph on a CPU — and meant for paragraph-by-paragraph
+  extraction; Claude stays better on long or tricky chapters.
 - **Exports.** PNG, JPEG, WebP, PDF (A4, A3 or fitted to the content, at 300 dpi), SVG with the
   typeface embedded, JSON, or a copy to the clipboard.
 - **Cards.** The timeline writes its own cards, without Claude — "In which year…?", period bounds,
@@ -190,7 +195,8 @@ Before each release, CI runs the new code on the previous release's executable
   into a temporary folder, and anything written there disappears when the app closes.
 
 Each timeline is one JSON file in `timelines/`. The pictures of its cards are rendered on demand
-into `media/_timelines/<timeline>/` and deleted with the timeline.
+into `media/_timelines/<timeline>/` and deleted with the timeline. The local model, once
+downloaded, lives in `models/` (2.5 GB); Settings deletes it.
 
 ---
 

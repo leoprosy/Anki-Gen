@@ -643,5 +643,20 @@
   "upload.ago_minutes": "il y a {n} min",
   "upload.ago_hours": "il y a {n} h",
   "upload.ago_days": "il y a {n} j",
-  "upload.more_actions": "Plus d'actions"
+  "upload.more_actions": "Plus d'actions",
+  "settings.local_model_title": "Modèle local",
+  "settings.local_model_help": "Un petit modèle qui tourne sur cet ordinateur, sans compte ni connexion, pour extraire une frise paragraphe par paragraphe. Téléchargement unique de {size} Go ; il occupe environ 4 Go de mémoire pendant qu'il travaille.",
+  "settings.local_model_download": "Télécharger",
+  "settings.local_model_delete": "Supprimer",
+  "js.local_model_progress": "Téléchargement… {pct} %",
+  "js.local_model_ready": "Installé. Le bouton « Générer en local » apparaît sur les frises.",
+  "js.local_model_error": "Échec du téléchargement : {error}",
+  "js.local_model_delete_confirm": "Supprimer le modèle local ? Il faudra le retélécharger pour s'en resservir.",
+  "timeline.ui.local": "Générer en local",
+  "timeline.ui.local_title": "Envoyer ce prompt au modèle local, sur cet ordinateur, au lieu de passer par Claude",
+  "timeline.ui.local_running": "Génération…",
+  "local_model.no_prompt": "Aucun prompt à envoyer au modèle local.",
+  "local_model.missing": "Le modèle local n'est pas installé : téléchargez-le dans Réglages.",
+  "local_model.too_long": "Ce prompt est trop long pour le modèle local ({tokens} jetons) : passez en extraction paragraphe par paragraphe.",
+  "local_model.failed": "Le modèle local a échoué. Le détail est dans le journal de l'app."
 }

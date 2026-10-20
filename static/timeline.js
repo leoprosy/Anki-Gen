@@ -71,6 +71,7 @@
     correctionWarnings: $("tl-correction-warnings"), correctionBack: $("tl-correction-back"),
     copyPrompt: $("tl-copy-prompt"), copyPromptLabel: $("tl-copy-prompt-label"),
     dockCounter: $("tl-dock-counter"), jsonCorrection: $("tl-json-correction"),
+    local: $("tl-local"), localLabel: $("tl-local-label"),
   };
 
   // ── Requêtes ─────────────────────────────────────────────────
@@ -959,14 +960,20 @@
   /** L'URL du prompt à montrer : correction du dernier collage raté, ou extraction. */
   function promptUrl() {
     if (!hasSource) return null;
-    const params = new URLSearchParams();
     if (state.correction) {
+      const params = new URLSearchParams();
       if (state.correction.chunk !== null) params.set("chunk_id", state.correction.chunk);
       if (els.correctionWarnings.checked) params.set("warnings", "1");
       return `${URLS.correction}?${params}`;
     }
+    return extractionUrl();
+  }
+
+  /** `skill` : le modèle local n'a pas le Skill, il lui faut le prompt complet. */
+  function extractionUrl({ skill = state.extraction.skill } = {}) {
+    const params = new URLSearchParams();
     params.set("mode", state.extraction.mode);
-    params.set("skill", state.extraction.skill ? "1" : "0");
+    params.set("skill", skill ? "1" : "0");
     if (perChunk() && state.currentChunk !== null) params.set("chunk_id", state.currentChunk);
     return `${URLS.prompt}?${params}`;
   }
@@ -1181,9 +1188,9 @@
     pasteText(text);
   });
 
-  async function pasteText(text) {
+  async function pasteText(text, chunkId = state.currentChunk) {
     if (!text.trim()) { toast(T("timeline.ui.clipboard_empty"), "err"); return; }
-    if (perChunk()) { await pasteChunk(text); return; }
+    if (perChunk()) { await pasteChunk(text, chunkId); return; }
     if (isDirty() && !window.confirm(T("timeline.ui.paste_replace_confirm"))) return;
     // Le collage part au serveur : il est gardé (audit, prompt de correction) et
     // enregistré s'il est valide.
@@ -1214,8 +1221,7 @@
     if (first) focusPath(first.path, first.params);
   }
 
-  async function pasteChunk(text) {
-    const chunkId = state.currentChunk;
+  async function pasteChunk(text, chunkId) {
     if (isDirty() && !window.confirm(T("timeline.ui.merge_unsaved_confirm"))) return;
     let { status, data } = await postJson(URLS.api, { raw: text, chunk_id: chunkId });
     if (!data || !data.chunk) { toast((data && data.error) || T("timeline.ui.network_error"), "err"); return; }
@@ -1248,6 +1254,31 @@
     if (activeTab === "prompt" || activeTab === "json") setTab("preview");
   }
   $("tl-paste").addEventListener("click", paste);
+
+  // Modèle local : il reçoit toujours le prompt d'extraction (il corrige lui-même
+  // ses réponses refusées, côté serveur), et sa réponse suit le chemin d'un collage.
+  async function runLocal() {
+    if (!hasSource || els.local.disabled) return;
+    els.local.disabled = true;
+    els.local.setAttribute("aria-busy", "true");
+    els.localLabel.textContent = T("timeline.ui.local_running");
+    // Le paragraphe est figé au départ : l'utilisateur peut naviguer pendant la génération.
+    const chunkId = state.currentChunk;
+    try {
+      const built = await (await fetch(extractionUrl({ skill: false }))).json();
+      if (!built.ok) { toast(built.error || T("timeline.ui.network_error"), "err", 6000); return; }
+      const { data } = await postJson(URLS.local, { prompt: built.prompt, lang: state.doc.lang, chunk: perChunk() });
+      if (data && data.ok) await pasteText(data.raw, chunkId);
+      else toast((data && data.error) || T("timeline.ui.network_error"), "err", 6000);
+    } catch (e) {
+      toast(T("timeline.ui.network_error"), "err");
+    } finally {
+      els.local.disabled = false;
+      els.local.removeAttribute("aria-busy");
+      els.localLabel.textContent = T("timeline.ui.local");
+    }
+  }
+  if (els.local) els.local.addEventListener("click", runLocal);
   $("tl-empty-paste").addEventListener("click", paste);
   $("tl-empty-json").addEventListener("click", () => { setTab("json"); els.json.focus(); });
 

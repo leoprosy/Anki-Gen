@@ -85,11 +85,30 @@ def _timeline_raster():
         raise ValueError("PDF invalide")
 
 
+def _local_llm():
+    """
+    local_llm.py : les DLL de llama.cpp chargées depuis l'exécutable, et le schéma
+    de frise compilé en grammaire (c'est elle qui force une réponse JSON conforme).
+    Le modèle lui-même n'est pas chargé : il se télécharge à la demande.
+    """
+    import json
+
+    import llama_cpp
+    from llama_cpp.llama_grammar import LlamaGrammar, json_schema_to_gbnf
+
+    import timeline_schema
+
+    if b"CPU" not in llama_cpp.llama_print_system_info():
+        raise ValueError("llama.cpp sans backend CPU")
+    LlamaGrammar.from_string(json_schema_to_gbnf(json.dumps(timeline_schema.json_schema())), verbose=False)
+
+
 PROBES = {
     "pillow_roundtrip": _pillow_roundtrip,
     "docx_and_lxml": _docx_and_lxml,
     "server_stack": _server_stack,
     "timeline_raster": _timeline_raster,
+    "local_llm": _local_llm,
 }
 
 

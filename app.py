@@ -31,7 +31,7 @@ from flask import (
 import paths
 import settings as user_settings
 from build_anki_csv import ANKI_HEADER_LINES, parse_tsv_response
-from i18n import DEFAULT_LANG, available_languages, catalog_for_js, translate
+from i18n import DEFAULT_LANG, LANGUAGES, available_languages, catalog_for_js, translate
 from parse_cours import build_prompts, parse_docx
 from project_store import (
     PROJECT_VERSION,
@@ -277,7 +277,8 @@ def work(project_id):
 
 @app.route("/settings")
 def settings_page():
-    return render_template("settings.html")
+    import local_llm
+    return render_template("settings.html", local_model=local_llm.status())
 
 
 def load_skill_template(lang):
@@ -322,6 +323,48 @@ def api_settings_check_dir():
     data = request.get_json(silent=True) or {}
     ok, message_key = user_settings.check_dir(data.get("path") or "")
     return jsonify(ok=ok, message=tr(message_key))
+
+
+# ──────────────────────────────────────────────────────────────
+# Modèle local (local_llm.py)
+# ──────────────────────────────────────────────────────────────
+@app.route("/api/local-model", methods=["GET", "POST", "DELETE"])
+def api_local_model():
+    """GET : état. POST : lance le téléchargement. DELETE : supprime le modèle."""
+    import local_llm
+    if request.method == "POST":
+        local_llm.start_download()
+    elif request.method == "DELETE":
+        local_llm.delete()
+    return jsonify(ok=True, **local_llm.status())
+
+
+@app.route("/api/local-model/timeline", methods=["POST"])
+def api_local_model_timeline():
+    """
+    `{prompt, lang, chunk}` → `{raw}` : le prompt d'extraction passe par le modèle
+    local, qui corrige lui-même ses réponses refusées ; la dernière repart côté
+    client par le même chemin qu'un collage. Rien n'est enregistré ici.
+    """
+    import local_llm
+    import timeline_extract
+    payload = request.get_json(silent=True) or {}
+    prompt = payload.get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip():
+        return _timeline_error("local_model.no_prompt", 400)
+    # Liste fermée : la langue désigne un dossier de gabarits de prompt.
+    lang = payload.get("lang") if payload.get("lang") in LANGUAGES else DEFAULT_LANG
+    try:
+        raw = timeline_extract.LocalExtractor(local_llm.complete).run(
+            prompt, lang=lang, chunk=bool(payload.get("chunk")))
+    except local_llm.ModelMissing:
+        return _timeline_error("local_model.missing", 409)
+    except local_llm.PromptTooLong as error:
+        return _timeline_error("local_model.too_long", 413, tokens=error.tokens)
+    except Exception:           # noqa: BLE001 — llama.cpp absent, modèle illisible, mémoire…
+        app.logger.exception("modèle local en échec")
+        return _timeline_error("local_model.failed", 500)
+    return jsonify(ok=True, raw=raw)
 
 
 # ──────────────────────────────────────────────────────────────
@@ -815,6 +858,7 @@ def _chunk_source(record, chunk_arg):
 
 @app.route("/timeline/<tid>")
 def timeline_page(tid):
+    import local_llm
     record, error = _load_timeline_or_error(tid)
     if error:
         return redirect(url_for("index"))
@@ -827,6 +871,8 @@ def timeline_page(tid):
         course_id=course["id"] if course else None,
         course_url=course["url"] if course else None, course_page="timeline",
         course_timelines=[t for t in _timeline_summaries() if course and t.get("project_id") == course["id"]],
+        # Faux sur un exécutable antérieur, qui n'embarque pas llama.cpp.
+        local_model=local_llm.available(),
     )
 
 

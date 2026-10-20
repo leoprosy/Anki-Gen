@@ -1333,6 +1333,7 @@ textarea#response:focus {
 .settings-folder-control { min-width: 0; }
 .settings-folder-control input { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
 .settings-folder-control .btn { margin-top: 12px; min-height: 40px; }
+.settings-folder-control .btn[hidden] { display: none; }
 .settings-feedback { font-size: 13px; overflow-wrap: anywhere; }
 .settings-folder-control .settings-feedback:not(:empty) { margin-top: 10px; }
 .settings-feedback.is-success { color: var(--success); }

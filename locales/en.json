@@ -643,5 +643,20 @@
   "upload.ago_minutes": "{n} min ago",
   "upload.ago_hours": "{n} h ago",
   "upload.ago_days": "{n} d ago",
-  "upload.more_actions": "More actions"
+  "upload.more_actions": "More actions",
+  "settings.local_model_title": "Local model",
+  "settings.local_model_help": "A small model that runs on this computer, with no account or connection, to extract a timeline paragraph by paragraph. One-time {size} GB download; it uses about 4 GB of memory while it works.",
+  "settings.local_model_download": "Download",
+  "settings.local_model_delete": "Delete",
+  "js.local_model_progress": "Downloading… {pct}%",
+  "js.local_model_ready": "Installed. The “Generate locally” button now shows on timelines.",
+  "js.local_model_error": "Download failed: {error}",
+  "js.local_model_delete_confirm": "Delete the local model? You will need to download it again to use it.",
+  "timeline.ui.local": "Generate locally",
+  "timeline.ui.local_title": "Send this prompt to the local model, on this computer, instead of going through Claude",
+  "timeline.ui.local_running": "Generating…",
+  "local_model.no_prompt": "No prompt to send to the local model.",
+  "local_model.missing": "The local model is not installed: download it in Settings.",
+  "local_model.too_long": "This prompt is too long for the local model ({tokens} tokens): switch to paragraph-by-paragraph extraction.",
+  "local_model.failed": "The local model failed. The details are in the app log."
 }

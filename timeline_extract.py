@@ -4,11 +4,10 @@ timeline_extract.py — Extraction d'une frise par un modèle (§6.7).
 
 L'extraction passe par une interface, `TimelineExtractor` : préparer la requête
 (le prompt, le schéma), puis lire la réponse (nettoyage, validation, citations).
-La v1 n'en a qu'une implémentation, `ManualExtractor` : l'utilisateur copie le
-prompt dans Claude et colle la réponse. Quand l'agent local existera, un
-`LocalExtractor` enverra `static/schemas/timeline-v1.json` en `response_format`,
-et réutilisera `parse_response` et le prompt de correction pour ses nouvelles
-tentatives.
+`ManualExtractor` : l'utilisateur copie le prompt dans Claude et colle la
+réponse. `LocalExtractor` : le prompt part au modèle embarqué (local_llm.py),
+contraint par `static/schemas/timeline-v1.json` ; une réponse refusée repart
+avec le prompt de correction, dans la même conversation.
 
 On y trouve aussi ce qui relie les réponses d'une extraction paragraphe par
 paragraphe à la frise : l'état de chaque paragraphe, et la fusion.
@@ -71,6 +70,39 @@ class ManualExtractor(TimelineExtractor):
         prompt = timeline_prompt.correction_prompt(report, lang=lang, include_warnings=include_warnings)
         return {"prompt": prompt, "errors": len(report.get("errors") or []),
                 "warnings": len(report.get("warnings") or [])}
+
+
+class LocalExtractor(ManualExtractor):
+    """
+    Modèle local. Le prompt de correction ne recopie pas le JSON fautif (Claude
+    l'a dans sa conversation) : on rejoue donc toute la conversation, réponse
+    fautive comprise. `complete(messages, schema) → texte` est injecté, pour
+    que ce module reste pur et testable sans modèle.
+    """
+
+    name = "local"
+
+    def __init__(self, complete, max_corrections=2):
+        self.complete = complete
+        self.max_corrections = max_corrections
+
+    def run(self, prompt, *, lang, chunk=False) -> str:
+        """Le prompt d'extraction → la dernière réponse brute, valide ou non (elle suit le chemin d'un collage)."""
+        schema = timeline_schema.json_schema()
+        messages = [{"role": "user", "content": prompt}]
+        for attempt in range(self.max_corrections + 1):
+            try:
+                raw = self.complete(messages, schema)
+            except Exception:   # noqa: BLE001 — une correction ratée (conversation trop longue…) n'efface pas la réponse d'avant
+                if attempt == 0:
+                    raise
+                return raw
+            report = timeline_schema.validate_raw(raw, default_lang=lang)
+            if response_status(report, chunk=chunk) != "error" or attempt == self.max_corrections:
+                return raw
+            messages += [{"role": "assistant", "content": raw},
+                         {"role": "user", "content": self.correction_request(report, lang=lang)["prompt"]}]
+        return raw
 
 
 def response_status(report, *, chunk=False) -> str:

@@ -971,11 +971,10 @@
     return extractionUrl();
   }
 
-  /** `skill` : le modèle local n'a pas le Skill, il lui faut le prompt complet. */
-  function extractionUrl({ skill = state.extraction.skill } = {}) {
+  function extractionUrl() {
     const params = new URLSearchParams();
     params.set("mode", state.extraction.mode);
-    params.set("skill", skill ? "1" : "0");
+    params.set("skill", state.extraction.skill ? "1" : "0");
     if (perChunk() && state.currentChunk !== null) params.set("chunk_id", state.currentChunk);
     return `${URLS.prompt}?${params}`;
   }
@@ -1262,7 +1261,8 @@
   // Pendant ce temps, la carte de l'aperçu montre où il en est : l'état du modèle
   // est relu toutes les demi-secondes.
   const GEN_STEPS = ["reading", "writing", "checking"];
-  const gen = { started: 0, attempt: 1, shown: 0, seen: false, hide: 0 };
+  // part : morceau en cours quand le serveur a dû couper le texte ; partStart : ses éléments dans la liste.
+  const gen = { started: 0, part: null, parts: null, attempt: 1, shown: 0, partStart: 0, seen: false, hide: 0 };
 
   function genStep(stage) {
     els.gen.dataset.stage = stage;
@@ -1280,10 +1280,13 @@
       return;
     }
     gen.seen = true;
-    if (progress.attempt !== gen.attempt) {   // une correction repart d'une page blanche
-      gen.attempt = progress.attempt;
-      gen.shown = 0;
-      els.genItems.replaceChildren();
+    if (progress.part !== gen.part) {         // un nouveau morceau s'ajoute aux précédents
+      Object.assign(gen, { part: progress.part, parts: progress.parts, attempt: progress.attempt, shown: 0,
+                           partStart: els.genItems.children.length });
+    } else if (progress.attempt !== gen.attempt || progress.parts !== gen.parts) {
+      // Une correction réécrit le morceau ; un morceau recoupé (le total change) repart de zéro.
+      Object.assign(gen, { parts: progress.parts, attempt: progress.attempt, shown: 0 });
+      while (els.genItems.children.length > gen.partStart) els.genItems.lastChild.remove();
     }
     genStep(progress.stage);
     els.genStage.textContent = progress.stage === "writing" && progress.attempt > 1
@@ -1292,6 +1295,7 @@
     const meta = [gpu || T("timeline.ui.local_cpu")];
     if (progress.tokens) meta.unshift(T("timeline.ui.local_tokens", { n: progress.tokens }));
     if (progress.speed) meta.splice(1, 0, T("timeline.ui.local_speed", { n: Math.round(progress.speed) }));
+    if (progress.parts > 1) meta.unshift(T("timeline.ui.local_part", { n: progress.part, total: progress.parts }));
     els.genMeta.textContent = meta.join(" · ");
     const items = C.partialItems(progress.text);
     for (const item of items.slice(gen.shown)) {
@@ -1319,12 +1323,13 @@
     els.local.disabled = true;
     els.local.setAttribute("aria-busy", "true");
     clearTimeout(gen.hide);
-    Object.assign(gen, { started: performance.now(), attempt: 1, shown: 0, seen: false });
+    Object.assign(gen, { started: performance.now(), part: null, attempt: 1, shown: 0, partStart: 0, seen: false });
     els.genItems.replaceChildren();
     els.genRaw.textContent = els.genMeta.textContent = "";
     els.genStage.textContent = T("timeline.ui.local_stage_reading");
     genStep("reading");
     els.gen.hidden = false;
+    if (activeTab !== "preview") setTab("preview");   // la carte vit sur l'aperçu
     tickGen();
     let polling = false, done = false;
     const timer = setInterval(async () => {
@@ -1339,15 +1344,17 @@
     // Le paragraphe est figé au départ : l'utilisateur peut naviguer pendant la génération.
     const chunkId = state.currentChunk;
     try {
-      const built = await (await fetch(extractionUrl({ skill: false }))).json();
-      if (!built.ok) { toast(built.error || T("timeline.ui.network_error"), "err", 6000); return; }
-      const { data } = await postJson(URLS.local, { prompt: built.prompt, lang: state.doc.lang, chunk: perChunk() });
+      // Le serveur construit lui-même le prompt, et coupe le texte s'il est trop long pour le modèle.
+      const { data } = await postJson(URLS.local, { chunk_id: perChunk() ? chunkId : null, mode: state.extraction.mode });
       if (data && data.ok) {
         done = true;
         clearInterval(timer);
         genStep("done");
-        els.genStage.textContent = T("timeline.ui.local_done", { time: tickGen() });
+        const summary = [T("timeline.ui.local_done", { time: tickGen() })];
+        if (data.parts > 1) summary.push(T("timeline.ui.local_parts", { n: data.parts }));
+        els.genStage.textContent = summary.join(" · ");
         await pasteText(data.raw, chunkId);
+        if (data.failed) toast(T("timeline.ui.local_parts_failed", { n: data.failed, total: data.parts }), "err", 6000);
       } else toast((data && data.error) || T("timeline.ui.network_error"), "err", 6000);
     } catch (e) {
       toast(T("timeline.ui.network_error"), "err");

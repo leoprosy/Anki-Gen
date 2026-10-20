@@ -52,7 +52,7 @@ def prefixed_id(chunk_id, original, taken) -> str:
     return candidate
 
 
-def _unique_id(wanted, taken) -> str:
+def unique_id(wanted, taken) -> str:
     candidate, n = wanted[:ID_MAX], 2
     while candidate in taken:
         suffix = f"-{n}"
@@ -124,7 +124,7 @@ def merge(parts, *, title, lang, keep_separate=()) -> tuple:
             index = by_label.get(key, by_id.get(track["id"]))
             if index is None:
                 index = len(tracks)
-                merged = {"id": _unique_id(track["id"], taken), "label": track["label"]}
+                merged = {"id": unique_id(track["id"], taken), "label": track["label"]}
                 if track.get("color"):
                     merged["color"] = track["color"]
                 tracks.append(merged)
@@ -178,7 +178,7 @@ def merge(parts, *, title, lang, keep_separate=()) -> tuple:
     elements = [entry["element"] for kind in ("periods", "events") for entry in items[kind]]
     other = None
     if trackless:
-        other = {"id": _unique_id(OTHER_TRACK, taken), "label": translate("timeline.merge.other_track", lang)}
+        other = {"id": unique_id(OTHER_TRACK, taken), "label": translate("timeline.merge.other_track", lang)}
         tracks.append(other)
         for element in elements:
             element.setdefault("track", other["id"])
@@ -191,7 +191,7 @@ def merge(parts, *, title, lang, keep_separate=()) -> tuple:
         keep = set(ranked[:MAX_TRACKS - 1])
         folded = [tracks[i] for i in candidates if i not in keep]
         if other is None:
-            other = {"id": _unique_id(OTHER_TRACK, taken), "label": translate("timeline.merge.other_track", lang)}
+            other = {"id": unique_id(OTHER_TRACK, taken), "label": translate("timeline.merge.other_track", lang)}
         folded_ids = {track["id"] for track in folded}
         for element in elements:
             if element.get("track") in folded_ids:

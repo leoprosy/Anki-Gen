@@ -25,6 +25,7 @@ import local_llm  # noqa: E402
 import paths  # noqa: E402
 import timeline_extract  # noqa: E402
 import timeline_schema  # noqa: E402
+from test_timeline_extraction_routes import COBDEN, MELINE, ExtractionTestCase, doc  # noqa: E402
 from test_timeline_routes import RoutesTestCase  # noqa: E402
 
 
@@ -74,41 +75,96 @@ class TestRoutes(RoutesTestCase):
         self.assertFalse(body["downloading"])
         self.assertEqual(body["size"], local_llm.MODEL["size"])
 
-    def test_missing_model_is_explained(self):
-        response = self.client.post("/api/local-model/timeline", json={"prompt": "Extrais."})
-        self.assertEqual(response.status_code, 409)
-        self.assertIn("Réglages", response.get_json()["error"])
-
-    def test_empty_prompt_is_refused(self):
-        response = self.client.post("/api/local-model/timeline", json={"prompt": " "})
-        self.assertEqual(response.status_code, 400)
-
-    def test_too_long_prompt_names_its_size(self):
-        with mock.patch.object(local_llm, "complete", side_effect=local_llm.PromptTooLong(9000)):
-            response = self.client.post("/api/local-model/timeline", json={"prompt": "x"})
-        self.assertEqual(response.status_code, 413)
-        self.assertIn("9000", response.get_json()["error"])
-
-    def test_answer_comes_back_raw_with_the_timeline_schema(self):
-        with mock.patch.object(local_llm, "complete", return_value=EMPTY) as complete:
-            body = self.client.post("/api/local-model/timeline",
-                                    json={"prompt": "Extrais.", "lang": "fr", "chunk": True}).get_json()
-        self.assertEqual(body, {"ok": True, "raw": EMPTY})
-        messages, schema = complete.call_args.args
-        self.assertEqual(messages, [{"role": "user", "content": "Extrais."}])
-        self.assertIn("events", schema["properties"])
-
     def test_progress_of_the_running_generation(self):
         self.assertIsNone(self.client.get("/api/local-model").get_json()["progress"])
-        with mock.patch.dict(local_llm._progress, stage="writing", attempt=2, tokens=3, parts=['{"a', '":', ' 1'],
+        with mock.patch.dict(local_llm._progress, stage="writing", attempt=2, tokens=3, written=['{"a', '":', ' 1'],
+                             part=2, parts=3,
                              writing_since=local_llm.time.monotonic() - 1):
             progress = self.client.get("/api/local-model").get_json()["progress"]
-        self.assertEqual((progress["stage"], progress["attempt"], progress["text"]), ("writing", 2, '{"a": 1'))
+        self.assertEqual((progress["stage"], progress["attempt"], progress["part"], progress["parts"], progress["text"]),
+                         ("writing", 2, 2, 3, '{"a": 1'))
         self.assertLess(progress["speed"], 3.1)
 
     def test_delete_without_model_is_harmless(self):
         body = self.client.delete("/api/local-model").get_json()
         self.assertFalse(body["installed"])
+
+
+class TestLocalRoute(ExtractionTestCase):
+    """La frise passe par le modèle local ; un texte trop long pour sa fenêtre est coupé."""
+
+    def setUp(self):
+        super().setUp()
+        patcher = mock.patch.object(paths, "MODELS_DIR", self.tmp / "models")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.tid = self.created({"kind": "project"}, title="Mondialisation")
+
+    def local(self, **payload):
+        return self.client.post(f"/api/timeline/{self.tid}/local", json=payload)
+
+    def test_missing_model_is_explained(self):
+        response = self.local()
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("Réglages", response.get_json()["error"])
+
+    def test_a_paragraph_comes_back_raw_with_the_local_schema(self):
+        with mock.patch.object(local_llm, "complete", return_value=EMPTY) as complete:
+            body = self.local(chunk_id=1).get_json()
+        self.assertEqual(body, {"ok": True, "raw": EMPTY, "parts": 1, "failed": 0})
+        (messages, schema), = [call.args for call in complete.call_args_list]
+        self.assertIn("Cobden-Chevalier", messages[0]["content"])
+        self.assertNotIn("Méline", messages[0]["content"])
+        self.assertNotIn("description", schema["properties"]["events"]["items"]["properties"])
+
+    def test_a_text_too_long_is_cut_and_merged(self):
+        def complete(messages, schema):
+            prompt = messages[0]["content"]
+            if "Cobden" in prompt and "Méline" in prompt:
+                raise local_llm.PromptTooLong(9000)
+            return doc([COBDEN]) if "Cobden" in prompt else doc([MELINE]) if "Méline" in prompt else EMPTY
+        with mock.patch.object(local_llm, "complete", side_effect=complete):
+            body = self.local().get_json()
+        self.assertTrue(body["ok"])
+        self.assertGreater(body["parts"], 1)
+        self.assertEqual(body["failed"], 0)
+        merged = json.loads(body["raw"])
+        self.assertEqual([e["label"] for e in merged["events"]], [COBDEN["label"], MELINE["label"]])
+        self.assertTrue(self.client.post(f"/api/timeline/{self.tid}", json={"raw": body["raw"]}).get_json()["ok"])
+        self.assertIsNone(local_llm.progress())
+
+    def test_an_unbreakable_passage_names_its_size(self):
+        with mock.patch.object(local_llm, "complete", side_effect=local_llm.PromptTooLong(9000)):
+            response = self.local()
+        self.assertEqual(response.status_code, 413)
+        self.assertIn("9000", response.get_json()["error"])
+
+
+class TestDedupeIds(unittest.TestCase):
+    def test_repeats_are_dropped_and_reused_ids_renamed(self):
+        meline = dict(MELINE, id="cobden")
+        raw = doc([COBDEN, dict(COBDEN), meline])
+        cleaned = json.loads(timeline_extract.dedupe_ids(raw))
+        self.assertEqual([(e["id"], e["label"]) for e in cleaned["events"]],
+                         [("cobden", COBDEN["label"]), ("cobden-2", MELINE["label"])])
+        self.assertTrue(timeline_schema.validate_raw(json.dumps(cleaned), default_lang="fr")["ok"])
+
+    def test_clean_or_unreadable_answers_are_untouched(self):
+        for raw in (doc([COBDEN, MELINE]), '{"events": [', "[]"):
+            self.assertEqual(timeline_extract.dedupe_ids(raw), raw)
+
+
+class TestSplitText(unittest.TestCase):
+    def test_cuts_before_the_heading_nearest_the_middle(self):
+        text = "## A\n\nUn. Deux.\n\n## B\n\nTrois.\n\n## C\n\nQuatre."
+        self.assertEqual(timeline_extract.split_text(text), ["## A\n\nUn. Deux.", "## B\n\nTrois.\n\n## C\n\nQuatre."])
+
+    def test_a_single_paragraph_is_cut_between_sentences(self):
+        self.assertEqual(timeline_extract.split_text("En 1860, un traité. En 1892, un tarif."),
+                         ["En 1860, un traité.", "En 1892, un tarif."])
+
+    def test_a_single_word_cannot_be_cut(self):
+        self.assertIsNone(timeline_extract.split_text("Cobden"))
 
 
 class TestLocalExtractor(unittest.TestCase):

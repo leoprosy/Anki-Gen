@@ -448,7 +448,7 @@
     prompt: {{ url_for('api_timeline_prompt', tid=timeline.id) | tojson }},
     correction: {{ url_for('api_timeline_correction_prompt', tid=timeline.id) | tojson }},
     merge: {{ url_for('api_timeline_merge', tid=timeline.id) | tojson }},
-    local: {{ url_for('api_local_model_timeline') | tojson }},
+    local: {{ url_for('api_timeline_local', tid=timeline.id) | tojson }},
     localStatus: {{ url_for('api_local_model') | tojson }},
     skill: {{ url_for('timeline_skill') | tojson }},
     exportPreview: {{ url_for('api_timeline_export_preview', tid=timeline.id) | tojson }},

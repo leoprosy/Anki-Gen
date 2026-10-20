@@ -41,14 +41,17 @@ MODEL = {
 # 8192 jetons ≈ 1,2 Go de RAM en plus des poids. Assez pour un paragraphe et
 # son prompt ; une frise entière d'un long cours n'y tient pas (PromptTooLong).
 N_CTX = 8192
+# Place gardée pour la réponse ; au-delà, le texte est coupé (timeline_extract.split_text).
+ANSWER_TOKENS = 3072
 # Le modèle chargé occupe ~4 Go : on le libère après ce délai sans requête.
 IDLE_UNLOAD_SECONDS = 600
 
 _download = {"running": False, "done": 0, "error": None}
 _llm = None
 # La génération en cours, lue par l'interface pendant qu'elle attend : stade
-# (loading, reading, writing), essai (1, puis les corrections), jetons écrits.
-_progress = {"stage": None}
+# (loading, reading, writing), essai (1, puis les corrections), jetons écrits,
+# et le morceau en cours quand le texte a dû être coupé (set_part).
+_progress = {"stage": None, "part": None, "parts": None}
 _lock = threading.Lock()  # ponytail: une inférence à la fois — l'app n'a qu'un utilisateur
 _unload_timer = None
 
@@ -183,14 +186,19 @@ def status() -> dict:
     }
 
 
+def set_part(part=None, parts=None):
+    """Le morceau en cours (1, 2…) sur le nombre de morceaux connus ; rien pour finir."""
+    _progress.update(part=part, parts=parts)
+
+
 def progress():
-    """La génération en cours, ou None : {stage, attempt, tokens, speed, text}."""
+    """La génération en cours, ou None : {stage, attempt, part, parts, tokens, speed, text}."""
     p = dict(_progress)
     if p["stage"] is None:
         return None
     since = p.pop("writing_since")
     p["speed"] = round(p["tokens"] / (time.monotonic() - since), 1) if since and p["tokens"] else None
-    p["text"] = "".join(p.pop("parts"))
+    p["text"] = "".join(p.pop("written"))
     return p
 
 
@@ -332,7 +340,7 @@ def complete(messages: list, schema: dict) -> str:
     with _lock:
         # 1 message, puis 2 de plus par correction (la réponse refusée et la consigne).
         _progress.update(stage="loading" if _llm is None else "reading", attempt=len(messages) // 2 + 1,
-                         tokens=0, writing_since=None, parts=[])
+                         tokens=0, writing_since=None, written=[])
         try:
             if _llm is None:
                 # Lu par llama.cpp à son chargement : il ne voit que la carte choisie, ou aucune.
@@ -344,8 +352,9 @@ def complete(messages: list, schema: dict) -> str:
                 _progress["stage"] = "reading"
             # ponytail: estimation (contenus + ~8 jetons de gabarit par message), assez juste pour une marge
             tokens = sum(len(_llm.tokenize(m["content"].encode("utf-8"))) + 8 for m in messages)
-            # Il faut aussi la place de la réponse : une frise de paragraphe tient en ~1500 jetons.
-            if tokens > N_CTX - 1536:
+            # Il faut aussi la place de la réponse : la plus longue frise que la grammaire
+            # permet (1 ère, 15 périodes, 30 évènements) fait ~3000 jetons.
+            if tokens > N_CTX - ANSWER_TOKENS:
                 raise PromptTooLong(tokens)
             stream = _llm.create_chat_completion(
                 messages=messages,
@@ -355,14 +364,19 @@ def complete(messages: list, schema: dict) -> str:
                 stream=True,
             )
             # Un morceau par jeton (à peu près : un caractère coupé en deux attend le suivant).
+            finish = None
             for chunk in stream:
+                finish = chunk["choices"][0].get("finish_reason") or finish
                 text = chunk["choices"][0]["delta"].get("content")
                 if text:
                     if _progress["writing_since"] is None:
                         _progress.update(stage="writing", writing_since=time.monotonic())
-                    _progress["parts"].append(text)
+                    _progress["written"].append(text)
                     _progress["tokens"] += 1
-            raw = "".join(_progress["parts"])
+            # Réponse coupée par la fin de la fenêtre : le texte était trop long pour elle.
+            if finish == "length":
+                raise PromptTooLong(tokens + _progress["tokens"])
+            raw = "".join(_progress["written"])
         finally:
             _progress["stage"] = None
     _schedule_unload()

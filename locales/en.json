@@ -661,7 +661,7 @@
   "timeline.ui.local_step_writing": "Writing",
   "timeline.ui.local_step_checking": "Checking",
   "timeline.ui.local_stage_loading": "Loading the model…",
-  "timeline.ui.local_stage_reading": "Reading the paragraph…",
+  "timeline.ui.local_stage_reading": "Reading the text…",
   "timeline.ui.local_stage_writing": "Writing the timeline…",
   "timeline.ui.local_stage_correcting": "Correcting, attempt {n}…",
   "timeline.ui.local_stage_checking": "Checking the answer…",
@@ -669,8 +669,10 @@
   "timeline.ui.local_tokens": "{n} tokens",
   "timeline.ui.local_speed": "{n} tokens/s",
   "timeline.ui.local_cpu": "CPU",
-  "local_model.no_prompt": "No prompt to send to the local model.",
+  "timeline.ui.local_part": "Part {n} / {total}",
+  "timeline.ui.local_parts": "{n} parts",
+  "timeline.ui.local_parts_failed": "{n} of {total} parts could not be extracted: the timeline is incomplete.",
   "local_model.missing": "The local model is not installed: download it in Settings.",
-  "local_model.too_long": "This prompt is too long for the local model ({tokens} tokens): switch to paragraph-by-paragraph extraction.",
+  "local_model.too_long": "A passage of the text is too long for the local model ({tokens} tokens), even cut as short as possible.",
   "local_model.failed": "The local model failed. The details are in the app log."
 }

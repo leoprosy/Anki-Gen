@@ -339,34 +339,6 @@ def api_local_model():
     return jsonify(ok=True, **local_llm.status())
 
 
-@app.route("/api/local-model/timeline", methods=["POST"])
-def api_local_model_timeline():
-    """
-    `{prompt, lang, chunk}` → `{raw}` : le prompt d'extraction passe par le modèle
-    local, qui corrige lui-même ses réponses refusées ; la dernière repart côté
-    client par le même chemin qu'un collage. Rien n'est enregistré ici.
-    """
-    import local_llm
-    import timeline_extract
-    payload = request.get_json(silent=True) or {}
-    prompt = payload.get("prompt")
-    if not isinstance(prompt, str) or not prompt.strip():
-        return _timeline_error("local_model.no_prompt", 400)
-    # Liste fermée : la langue désigne un dossier de gabarits de prompt.
-    lang = payload.get("lang") if payload.get("lang") in LANGUAGES else DEFAULT_LANG
-    try:
-        raw = timeline_extract.LocalExtractor(local_llm.complete).run(
-            prompt, lang=lang, chunk=bool(payload.get("chunk")))
-    except local_llm.ModelMissing:
-        return _timeline_error("local_model.missing", 409)
-    except local_llm.PromptTooLong as error:
-        return _timeline_error("local_model.too_long", 413, tokens=error.tokens)
-    except Exception:           # noqa: BLE001 — llama.cpp absent, modèle illisible, mémoire…
-        app.logger.exception("modèle local en échec")
-        return _timeline_error("local_model.failed", 500)
-    return jsonify(ok=True, raw=raw)
-
-
 # ──────────────────────────────────────────────────────────────
 # Médias
 # ──────────────────────────────────────────────────────────────
@@ -1065,6 +1037,64 @@ def api_timeline_merge(tid):
     return jsonify(ok=True, **_merge_payload(record, result))
 
 
+def _extraction_source(record, chunk_arg):
+    """
+    (texte à extraire, pistes à réutiliser) : toute la frise, ou un paragraphe.
+    ValueError si le paragraphe n'en fait pas partie.
+    """
+    if not chunk_arg and chunk_arg != 0:
+        return record.get("source_text") or "", ()
+    _, text = _chunk_source(record, chunk_arg)
+    # Le modèle réutilise les pistes déjà présentes : la fusion reste lisible.
+    return text, [{"id": t["id"], "label": t["label"]} for t in (record.get("data") or {}).get("tracks") or []]
+
+
+@app.route("/api/timeline/<tid>/local", methods=["POST"])
+def api_timeline_local(tid):
+    """
+    `{chunk_id?, mode?}` → `{raw, parts, failed}` : le modèle local extrait la
+    frise, ou un paragraphe, et corrige lui-même ses réponses refusées. Un texte
+    dont le prompt dépasse sa fenêtre est coupé en morceaux, extraits un à un puis
+    fusionnés. La réponse repart côté client par le chemin d'un collage : rien
+    n'est enregistré ici.
+    """
+    import local_llm
+    import timeline_extract
+    import timeline_prompt
+    import timeline_store
+    record, error = _load_timeline_or_error(tid)
+    if error:
+        return error
+    if not record.get("source_text"):
+        return _timeline_error("timeline.api.no_source", 404)
+    payload = request.get_json(silent=True) or {}
+    chunk_arg = payload.get("chunk_id")
+    try:
+        text, tracks = _extraction_source(record, chunk_arg)
+    except ValueError:
+        return _timeline_error("timeline.api.chunk_unknown", 404)
+    view = _timeline_view(record)
+    mode = payload.get("mode") if payload.get("mode") in timeline_store.EXTRACTION_MODES else record["extraction"]["mode"]
+
+    def build_prompt(piece, chunk):
+        return timeline_prompt.extraction_prompt(piece, lang=view["lang"], mode=mode, title=view["title"],
+                                                 chunk=chunk, tracks=tracks)
+    extractor = timeline_extract.LocalExtractor(local_llm.complete, too_long=local_llm.PromptTooLong)
+    try:
+        raw, parts = extractor.extract(text, build_prompt, lang=view["lang"], title=view["title"],
+                                       chunk=chunk_arg is not None, on_part=local_llm.set_part)
+    except local_llm.ModelMissing:
+        return _timeline_error("local_model.missing", 409)
+    except local_llm.PromptTooLong as error:     # un mot de plusieurs milliers de jetons…
+        return _timeline_error("local_model.too_long", 413, tokens=error.tokens)
+    except Exception:           # noqa: BLE001 — llama.cpp absent, modèle illisible, mémoire…
+        app.logger.exception("modèle local en échec")
+        return _timeline_error("local_model.failed", 500)
+    finally:
+        local_llm.set_part()
+    return jsonify(ok=True, raw=raw, **parts)
+
+
 @app.route("/api/timeline/<tid>/prompt")
 def api_timeline_prompt(tid):
     """Prompt d'extraction : de toute la frise, ou d'un paragraphe (`?chunk_id=`), `?mode=`, `?skill=1`."""
@@ -1082,14 +1112,10 @@ def api_timeline_prompt(tid):
     mode = mode if mode in timeline_store.EXTRACTION_MODES else extraction["mode"]
     skill = request.args.get("skill") == "1" if "skill" in request.args else extraction["skill"]
     chunk_arg = request.args.get("chunk_id")
-    tracks = ()
-    if chunk_arg:
-        try:
-            _, text = _chunk_source(record, chunk_arg)
-        except ValueError:
-            return _timeline_error("timeline.api.chunk_unknown", 404)
-        # Le modèle réutilise les pistes déjà présentes : la fusion reste lisible.
-        tracks = [{"id": t["id"], "label": t["label"]} for t in (record.get("data") or {}).get("tracks") or []]
+    try:
+        text, tracks = _extraction_source(record, chunk_arg)
+    except ValueError:
+        return _timeline_error("timeline.api.chunk_unknown", 404)
     built = timeline_extract.ManualExtractor().build_request(
         text, view["lang"], mode, title=view["title"], skill=skill, chunk=bool(chunk_arg), tracks=tracks)
     return jsonify(ok=True, prompt=built["prompt"], chars=built["chars"], tokens=built["tokens"],

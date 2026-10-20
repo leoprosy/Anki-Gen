@@ -22,6 +22,7 @@ import importlib.util
 import os
 import sys
 import threading
+import time
 import urllib.request
 from pathlib import Path
 
@@ -45,6 +46,9 @@ IDLE_UNLOAD_SECONDS = 600
 
 _download = {"running": False, "done": 0, "error": None}
 _llm = None
+# La génération en cours, lue par l'interface pendant qu'elle attend : stade
+# (loading, reading, writing), essai (1, puis les corrections), jetons écrits.
+_progress = {"stage": None}
 _lock = threading.Lock()  # ponytail: une inférence à la fois — l'app n'a qu'un utilisateur
 _unload_timer = None
 
@@ -175,7 +179,19 @@ def status() -> dict:
         "downloading": _download["running"],
         "done": _download["done"],
         "error": _download["error"],
+        "progress": progress(),
     }
+
+
+def progress():
+    """La génération en cours, ou None : {stage, attempt, tokens, speed, text}."""
+    p = dict(_progress)
+    if p["stage"] is None:
+        return None
+    since = p.pop("writing_since")
+    p["speed"] = round(p["tokens"] / (time.monotonic() - since), 1) if since and p["tokens"] else None
+    p["text"] = "".join(p.pop("parts"))
+    return p
 
 
 # ──────────────────────────────────────────────────────────────
@@ -314,23 +330,40 @@ def complete(messages: list, schema: dict) -> str:
     if not model_path().is_file():
         raise ModelMissing()
     with _lock:
-        if _llm is None:
-            # Lu par llama.cpp à son chargement : il ne voit que la carte choisie, ou aucune.
-            index = _device()[0]
-            # Une valeur vide efface la variable sous Windows (toutes les cartes visibles) : une espace ne désigne aucune carte.
-            os.environ["GGML_VK_VISIBLE_DEVICES"] = " " if index is None else str(index)
-            from llama_cpp import Llama
-            _llm = _grammar_first(Llama(str(model_path()), n_ctx=N_CTX, n_gpu_layers=-1, verbose=False))
-        # ponytail: estimation (contenus + ~8 jetons de gabarit par message), assez juste pour une marge
-        tokens = sum(len(_llm.tokenize(m["content"].encode("utf-8"))) + 8 for m in messages)
-        # Il faut aussi la place de la réponse : une frise de paragraphe tient en ~1500 jetons.
-        if tokens > N_CTX - 1536:
-            raise PromptTooLong(tokens)
-        out = _llm.create_chat_completion(
-            messages=messages,
-            response_format={"type": "json_object", "schema": schema},
-            temperature=0,
-            max_tokens=N_CTX - tokens,
-        )
+        # 1 message, puis 2 de plus par correction (la réponse refusée et la consigne).
+        _progress.update(stage="loading" if _llm is None else "reading", attempt=len(messages) // 2 + 1,
+                         tokens=0, writing_since=None, parts=[])
+        try:
+            if _llm is None:
+                # Lu par llama.cpp à son chargement : il ne voit que la carte choisie, ou aucune.
+                index = _device()[0]
+                # Une valeur vide efface la variable sous Windows (toutes les cartes visibles) : une espace ne désigne aucune carte.
+                os.environ["GGML_VK_VISIBLE_DEVICES"] = " " if index is None else str(index)
+                from llama_cpp import Llama
+                _llm = _grammar_first(Llama(str(model_path()), n_ctx=N_CTX, n_gpu_layers=-1, verbose=False))
+                _progress["stage"] = "reading"
+            # ponytail: estimation (contenus + ~8 jetons de gabarit par message), assez juste pour une marge
+            tokens = sum(len(_llm.tokenize(m["content"].encode("utf-8"))) + 8 for m in messages)
+            # Il faut aussi la place de la réponse : une frise de paragraphe tient en ~1500 jetons.
+            if tokens > N_CTX - 1536:
+                raise PromptTooLong(tokens)
+            stream = _llm.create_chat_completion(
+                messages=messages,
+                response_format={"type": "json_object", "schema": schema},
+                temperature=0,
+                max_tokens=N_CTX - tokens,
+                stream=True,
+            )
+            # Un morceau par jeton (à peu près : un caractère coupé en deux attend le suivant).
+            for chunk in stream:
+                text = chunk["choices"][0]["delta"].get("content")
+                if text:
+                    if _progress["writing_since"] is None:
+                        _progress.update(stage="writing", writing_since=time.monotonic())
+                    _progress["parts"].append(text)
+                    _progress["tokens"] += 1
+            raw = "".join(_progress["parts"])
+        finally:
+            _progress["stage"] = None
     _schedule_unload()
-    return out["choices"][0]["message"]["content"]
+    return raw

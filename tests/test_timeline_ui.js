@@ -191,3 +191,19 @@ test('nextPendingChunk prefers the next paragraph that cites dates, and wraps ar
   assert.equal(core.nextPendingChunk(onlyDateless, 1).id, 2);
   assert.equal(core.nextPendingChunk([{ id: 1, status: 'ok', mentions: 1 }], 1), null);
 });
+
+test('partialItems : seuls les éléments datés au libellé complet', () => {
+  const text = '{"tracks":[{"id":"pol","label":"Politique"}],"eras":[{"id":"era_rev","label":"Révolution","start":"1789",'
+    + '"end":"1799"}],"events":[{"id":"bastille","track":"pol","date":"1789-07-14","label":"Prise de la \\"Bastille\\""},'
+    + '{"id":"varennes","track":"pol","date":"1791-06","label":"Fuite à Vare';
+  assert.deepEqual(core.partialItems(text), [
+    { date: '1789', label: 'Révolution' },
+    { date: '1789-07-14', label: 'Prise de la "Bastille"' },
+  ]);
+  assert.deepEqual(core.partialItems(''), []);
+});
+
+test('clock : minutes et secondes', () => {
+  assert.equal(core.clock(0), '0:00');
+  assert.equal(core.clock(65.9), '1:05');
+});

@@ -98,6 +98,14 @@ class TestRoutes(RoutesTestCase):
         self.assertEqual(messages, [{"role": "user", "content": "Extrais."}])
         self.assertIn("events", schema["properties"])
 
+    def test_progress_of_the_running_generation(self):
+        self.assertIsNone(self.client.get("/api/local-model").get_json()["progress"])
+        with mock.patch.dict(local_llm._progress, stage="writing", attempt=2, tokens=3, parts=['{"a', '":', ' 1'],
+                             writing_since=local_llm.time.monotonic() - 1):
+            progress = self.client.get("/api/local-model").get_json()["progress"]
+        self.assertEqual((progress["stage"], progress["attempt"], progress["text"]), ("writing", 2, '{"a": 1'))
+        self.assertLess(progress["speed"], 3.1)
+
     def test_delete_without_model_is_harmless(self):
         body = self.client.delete("/api/local-model").get_json()
         self.assertFalse(body["installed"])

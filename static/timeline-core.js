@@ -272,6 +272,27 @@
     return pending.find((c) => c.mentions > 0) || pending[0] || null;
   }
 
+  /**
+   * JSON en cours d'écriture par le modèle local → les éléments datés déjà
+   * écrits, [{date, label}], dans l'ordre. Un élément n'y entre qu'avec son
+   * libellé complet (guillemet fermant écrit) ; les pistes, sans date, n'y sont pas.
+   */
+  function partialItems(text) {
+    const items = [];
+    for (const part of String(text || "").split(/\{\s*"id"\s*:/).slice(1)) {
+      const date = /"(?:date|start)"\s*:\s*"([^"]*)"/.exec(part);
+      const label = /"label"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(part);
+      if (date && label) items.push({ date: date[1], label: JSON.parse(`"${label[1]}"`) });
+    }
+    return items;
+  }
+
+  /** Secondes → « m:ss ». */
+  function clock(seconds) {
+    const s = Math.max(0, Math.floor(seconds));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
+
   return { ORDER, serialize, debounce, singleFlight, parsePointer, elementAt, pointerRange, lineColumnOffset,
-           dateKey, compareDates, uniqueId, slug, renameId, trackUsage, nextPendingChunk };
+           dateKey, compareDates, uniqueId, slug, renameId, trackUsage, nextPendingChunk, partialItems, clock };
 });

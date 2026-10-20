@@ -72,6 +72,8 @@
     copyPrompt: $("tl-copy-prompt"), copyPromptLabel: $("tl-copy-prompt-label"),
     dockCounter: $("tl-dock-counter"), jsonCorrection: $("tl-json-correction"),
     local: $("tl-local"), localLabel: $("tl-local-label"),
+    gen: $("tl-gen"), genStage: $("tl-gen-stage"), genTime: $("tl-gen-time"), genSteps: $("tl-gen-steps"),
+    genMeta: $("tl-gen-meta"), genItems: $("tl-gen-items"), genRaw: $("tl-gen-raw"),
   };
 
   // ── Requêtes ─────────────────────────────────────────────────
@@ -1257,22 +1259,102 @@
 
   // Modèle local : il reçoit toujours le prompt d'extraction (il corrige lui-même
   // ses réponses refusées, côté serveur), et sa réponse suit le chemin d'un collage.
+  // Pendant ce temps, la carte de l'aperçu montre où il en est : l'état du modèle
+  // est relu toutes les demi-secondes.
+  const GEN_STEPS = ["reading", "writing", "checking"];
+  const gen = { started: 0, attempt: 1, shown: 0, seen: false, hide: 0 };
+
+  function genStep(stage) {
+    els.gen.dataset.stage = stage;
+    const at = GEN_STEPS.indexOf(stage === "loading" ? "reading" : stage);
+    els.genSteps.querySelectorAll("li").forEach((li, i) => {
+      li.classList.toggle("is-done", stage === "done" || i < at);
+      li.classList.toggle("is-active", i === at);
+    });
+  }
+
+  function renderGen(progress, gpu) {
+    // Pas de génération en cours : le prompt se prépare, ou le serveur vérifie la réponse.
+    if (!progress) {
+      if (gen.seen) { genStep("checking"); els.genStage.textContent = T("timeline.ui.local_stage_checking"); }
+      return;
+    }
+    gen.seen = true;
+    if (progress.attempt !== gen.attempt) {   // une correction repart d'une page blanche
+      gen.attempt = progress.attempt;
+      gen.shown = 0;
+      els.genItems.replaceChildren();
+    }
+    genStep(progress.stage);
+    els.genStage.textContent = progress.stage === "writing" && progress.attempt > 1
+      ? T("timeline.ui.local_stage_correcting", { n: progress.attempt })
+      : T(`timeline.ui.local_stage_${progress.stage}`);
+    const meta = [gpu || T("timeline.ui.local_cpu")];
+    if (progress.tokens) meta.unshift(T("timeline.ui.local_tokens", { n: progress.tokens }));
+    if (progress.speed) meta.splice(1, 0, T("timeline.ui.local_speed", { n: Math.round(progress.speed) }));
+    els.genMeta.textContent = meta.join(" · ");
+    const items = C.partialItems(progress.text);
+    for (const item of items.slice(gen.shown)) {
+      const li = document.createElement("li");
+      const date = document.createElement("span");
+      date.className = "tl-gen__date";
+      date.textContent = item.date;
+      li.append(date, document.createTextNode(item.label));
+      els.genItems.append(li);
+    }
+    if (items.length > gen.shown) els.genItems.scrollTop = els.genItems.scrollHeight;
+    gen.shown = items.length;
+    els.genRaw.textContent = progress.text.slice(-240);
+  }
+
+  function tickGen() {
+    const time = C.clock((performance.now() - gen.started) / 1000);
+    els.genTime.textContent = time;
+    els.localLabel.textContent = `${T("timeline.ui.local_running")} ${time}`;
+    return time;
+  }
+
   async function runLocal() {
     if (!hasSource || els.local.disabled) return;
     els.local.disabled = true;
     els.local.setAttribute("aria-busy", "true");
-    els.localLabel.textContent = T("timeline.ui.local_running");
+    clearTimeout(gen.hide);
+    Object.assign(gen, { started: performance.now(), attempt: 1, shown: 0, seen: false });
+    els.genItems.replaceChildren();
+    els.genRaw.textContent = els.genMeta.textContent = "";
+    els.genStage.textContent = T("timeline.ui.local_stage_reading");
+    genStep("reading");
+    els.gen.hidden = false;
+    tickGen();
+    let polling = false, done = false;
+    const timer = setInterval(async () => {
+      tickGen();
+      if (polling) return;
+      polling = true;
+      try {
+        const status = await (await fetch(URLS.localStatus)).json();
+        if (!done) renderGen(status.progress, status.gpu);
+      } catch (e) { /* l'état reviendra au prochain tour */ } finally { polling = false; }
+    }, 500);
     // Le paragraphe est figé au départ : l'utilisateur peut naviguer pendant la génération.
     const chunkId = state.currentChunk;
     try {
       const built = await (await fetch(extractionUrl({ skill: false }))).json();
       if (!built.ok) { toast(built.error || T("timeline.ui.network_error"), "err", 6000); return; }
       const { data } = await postJson(URLS.local, { prompt: built.prompt, lang: state.doc.lang, chunk: perChunk() });
-      if (data && data.ok) await pasteText(data.raw, chunkId);
-      else toast((data && data.error) || T("timeline.ui.network_error"), "err", 6000);
+      if (data && data.ok) {
+        done = true;
+        clearInterval(timer);
+        genStep("done");
+        els.genStage.textContent = T("timeline.ui.local_done", { time: tickGen() });
+        await pasteText(data.raw, chunkId);
+      } else toast((data && data.error) || T("timeline.ui.network_error"), "err", 6000);
     } catch (e) {
       toast(T("timeline.ui.network_error"), "err");
     } finally {
+      clearInterval(timer);
+      // Le bilan reste un instant sur l'aperçu, le temps de voir la frise arriver dessous.
+      gen.hide = setTimeout(() => { els.gen.hidden = true; }, done ? 2500 : 0);
       els.local.disabled = false;
       els.local.removeAttribute("aria-busy");
       els.localLabel.textContent = T("timeline.ui.local");

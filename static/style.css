@@ -2027,6 +2027,102 @@ body.tl-drawer-open .tl-work {
 .tl-empty p { font-size: 14px; }
 .tl-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: var(--space-md); }
 
+/* Génération locale en cours : une carte posée sur l'aperçu */
+.tl-gen {
+  position: absolute;
+  z-index: 10;
+  inset: var(--space-md) var(--space-md) auto;
+  margin-inline: auto;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: var(--space-md);
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  animation: pulseIn 0.25s var(--ease) both;
+}
+.tl-gen[hidden] { display: none; }
+.tl-gen__head { display: flex; align-items: center; gap: 10px; }
+.tl-gen__stage { flex: 1; font-size: 15px; font-weight: 600; }
+.tl-gen__time { font-size: 14px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.tl-gen__pulse {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.tl-gen__pulse::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: genPulse 1.4s var(--ease) infinite;
+}
+.tl-gen[data-stage="done"] .tl-gen__pulse { background: var(--success); }
+.tl-gen[data-stage="done"] .tl-gen__pulse::after { display: none; }
+@keyframes genPulse { from { transform: scale(1); opacity: 0.6; } to { transform: scale(2.6); opacity: 0; } }
+
+.tl-gen__steps { display: flex; gap: 6px; list-style: none; font-size: 12px; }
+.tl-gen__steps li {
+  flex: 1;
+  padding-top: 6px;
+  border-top: 3px solid var(--surface-alt-2);
+  color: var(--text-tertiary);
+  transition: color 0.2s, border-color 0.2s;
+}
+.tl-gen__steps li.is-active { border-color: var(--accent); color: var(--text-primary); }
+.tl-gen__steps li.is-done { border-color: var(--success); color: var(--text-secondary); }
+.tl-gen__meta { font-size: 13px; font-variant-numeric: tabular-nums; min-height: 1.4em; }
+
+.tl-gen__items {
+  max-height: 180px;
+  overflow-y: auto;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.tl-gen__items:empty { display: none; }
+.tl-gen__items li { display: flex; gap: 8px; animation: fadeUp 0.3s var(--ease) both; }
+.tl-gen__date {
+  flex: none;
+  min-width: 78px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.tl-gen__raw {
+  height: 3.9em;
+  overflow: hidden;
+  font-family: "SF Mono", "Fira Code", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-tertiary);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  -webkit-mask-image: linear-gradient(transparent, #000 60%);
+          mask-image: linear-gradient(transparent, #000 60%);
+}
+.tl-gen__raw:has(span:empty) { display: none; }
+.tl-gen[data-stage="writing"] .tl-gen__raw span::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 1em;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  animation: genCaret 1s steps(1) infinite;
+}
+@keyframes genCaret { 50% { opacity: 0; } }
+
 .tl-tooltip {
   position: absolute;
   z-index: 20;

@@ -130,6 +130,23 @@
         <div class="tl-viewport" id="tl-viewport" tabindex="0" role="region" aria-label="{{ t('timeline.ui.tab_preview') }}">
           <div class="tl-canvas" id="tl-canvas"></div>
         </div>
+        {% if timeline.has_source_text and local_model %}
+        <section class="tl-gen" id="tl-gen" hidden aria-labelledby="tl-gen-stage">
+          <header class="tl-gen__head">
+            <span class="tl-gen__pulse" aria-hidden="true"></span>
+            <h3 class="tl-gen__stage" id="tl-gen-stage" aria-live="polite"></h3>
+            <span class="tl-gen__time" id="tl-gen-time">0:00</span>
+          </header>
+          <ol class="tl-gen__steps" id="tl-gen-steps">
+            <li data-step="reading">{{ t('timeline.ui.local_step_reading') }}</li>
+            <li data-step="writing">{{ t('timeline.ui.local_step_writing') }}</li>
+            <li data-step="checking">{{ t('timeline.ui.local_step_checking') }}</li>
+          </ol>
+          <p class="tl-gen__meta muted" id="tl-gen-meta"></p>
+          <ul class="tl-gen__items" id="tl-gen-items"></ul>
+          <pre class="tl-gen__raw" aria-hidden="true"><span id="tl-gen-raw"></span></pre>
+        </section>
+        {% endif %}
         <div class="tl-empty" id="tl-empty" hidden>
           <h3>{{ t('timeline.ui.empty_title') }}</h3>
           <p class="muted">{{ t('timeline.ui.empty_help_source' if timeline.has_source_text else 'timeline.ui.empty_help') }}</p>
@@ -432,6 +449,7 @@
     correction: {{ url_for('api_timeline_correction_prompt', tid=timeline.id) | tojson }},
     merge: {{ url_for('api_timeline_merge', tid=timeline.id) | tojson }},
     local: {{ url_for('api_local_model_timeline') | tojson }},
+    localStatus: {{ url_for('api_local_model') | tojson }},
     skill: {{ url_for('timeline_skill') | tojson }},
     exportPreview: {{ url_for('api_timeline_export_preview', tid=timeline.id) | tojson }},
     // « FORMAT » est remplacé par l'extension choisie.

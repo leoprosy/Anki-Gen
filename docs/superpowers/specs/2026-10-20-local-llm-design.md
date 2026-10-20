@@ -140,8 +140,33 @@ grammaire de frise (l'échantillonneur l'applique à tout le vocabulaire, sur le
 processeur, la roue Vulkan traite aussi le prompt sur la carte quand elle est visible (4 s au
 lieu de 31 s).
 
-Pistes suivantes : accélérer la grammaire (vérifier d'abord le jeton choisi, comme le fait
-`common_sampler` de llama.cpp), puis un prompt local sans les champs que la grammaire retire.
+### Grammaire : vérifier d'abord le jeton glouton (avant / après)
+
+`local_llm._GrammarFirstSampler` fait comme `common_sampler` de llama.cpp : il prend le jeton le
+plus probable et ne demande qu'à lui s'il respecte la grammaire ; tout le vocabulaire n'est
+filtré que s'il est refusé. En décodage glouton, c'est le même jeton : les réponses sont
+identiques octet pour octet. Paragraphes 0, 1 et 2, `build_source` sur un paragraphe,
+`extraction_prompt(chunk=True, lang="fr")`, `LocalExtractor(local_llm.complete).run`, un
+processus par colonne (le paragraphe 0 paie le prompt entier) :
+
+| Paragraphe | GPU avant | GPU après | Processeur avant | Processeur après | Jetons écrits | Éléments | Citations retrouvées |
+|---|---|---|---|---|---|---|---|
+| 0 | 53 s (26 j/s) | 17 s (82 j/s) | 176 s | 134 s | 1 402 / 1 407 | 15 | 15 / 15 |
+| 1 | 29 s (32 j/s) | 9 s (101 j/s) | 93 s | 68 s | 916 / 915 | 11 | 11 / 11 |
+| 2 | 38 s (30 j/s) | 11 s (98 j/s) | 543 s (2 essais) | 416 s (2 essais) | 1 129 / 2 309 + 2 327 | 13 / 27 | 13 / 13, 27 / 27 |
+| **Total** | **120 s** | **38 s (−68 %)** | **812 s** | **619 s (−24 %)** | | | |
+
+3 / 3 valides (GPU / processeur quand les colonnes diffèrent). Sur la carte, la génération sous
+grammaire (82 à 101 jetons/s) rejoint presque la génération libre (98 à 128) ; sur processeur,
+c'est le modèle qui domine. Retirer les `maxLength` de la grammaire n'a donc pas été essayé :
+il reste peu à gagner. Au paragraphe 2, le processeur (glouton différent du GPU) se répète
+jusqu'à 2 300 jetons et passe par une correction, avec ou sans ce changement.
+
+Cette mesure a révélé un défaut : sans carte retenue, `GGML_VK_VISIBLE_DEVICES = ""` efface la
+variable sous Windows, et llama.cpp voyait toutes les cartes (un GPU intégré compris, celui qui
+fait planter le chargement). Une espace ne désigne aucune carte.
+
+Piste suivante : un prompt local sans les champs que la grammaire retire.
 
 ## Hors périmètre
 

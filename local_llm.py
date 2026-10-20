@@ -247,6 +247,62 @@ def _schedule_unload():
     _unload_timer.start()
 
 
+class _GrammarFirstSampler:
+    """
+    Décodage glouton sous grammaire, comme `common_sampler` de llama.cpp : on
+    prend le jeton le plus probable et on ne demande qu'à lui s'il respecte la
+    grammaire ; tout le vocabulaire (151 000 jetons) n'est filtré que s'il est
+    refusé. Même jeton qu'en filtrant d'abord : le plus probable des jetons
+    permis. llama-cpp-python, lui, filtre tout le vocabulaire à chaque jeton.
+    """
+
+    def __init__(self, llm, grammar):
+        import numpy as np
+        from llama_cpp import llama_cpp as C
+        self.np, self.C, self.n_vocab = np, C, llm.n_vocab()
+        self.grammar = C.llama_sampler_init_grammar(
+            llm._model.vocab, grammar._grammar.encode("utf-8"), grammar._root.encode("utf-8"))
+        self.one = C.llama_token_data()
+        self.all = (C.llama_token_data * self.n_vocab)()
+        self.all_view = np.ctypeslib.as_array(self.all)
+
+    def _apply(self, data, size):
+        C = self.C
+        C.llama_sampler_apply(self.grammar, ctypes.byref(C.llama_token_data_array(
+            data=ctypes.cast(data, C.llama_token_data_p), size=size, selected=-1, sorted=False)))
+
+    def sample(self, ctx, idx=-1) -> int:
+        np = self.np
+        logits = np.ctypeslib.as_array(self.C.llama_get_logits_ith(ctx.ctx, idx), shape=(self.n_vocab,))
+        token = int(logits.argmax())
+        self.one.id, self.one.logit, self.one.p = token, logits[token], 0.0
+        self._apply(ctypes.byref(self.one), 1)
+        if self.one.logit == -np.inf:
+            self.all_view["id"] = np.arange(self.n_vocab)
+            self.all_view["logit"] = logits
+            self._apply(self.all, self.n_vocab)
+            token = int(self.all_view["id"][self.all_view["logit"].argmax()])
+        self.C.llama_sampler_accept(self.grammar, token)
+        return token
+
+    def __del__(self):
+        self.C.llama_sampler_free(self.grammar)
+
+
+def _grammar_first(llm):
+    """Branche `_GrammarFirstSampler` sur `llm` pour les générations sous grammaire à température nulle."""
+    # ponytail: remplace une méthode privée de llama-cpp-python (version figée dans requirements.txt)
+    default = llm._init_sampler
+
+    def init_sampler(**options):
+        if options.get("grammar") is None or options.get("temp") != 0:
+            return default(**options)
+        return _GrammarFirstSampler(llm, options["grammar"])
+
+    llm._init_sampler = init_sampler
+    return llm
+
+
 def complete(messages: list, schema: dict) -> str:
     """
     La conversation → une réponse JSON conforme à `schema` (texte brut, comme un collage).
@@ -263,7 +319,7 @@ def complete(messages: list, schema: dict) -> str:
             index = _device()[0]
             os.environ["GGML_VK_VISIBLE_DEVICES"] = "" if index is None else str(index)
             from llama_cpp import Llama
-            _llm = Llama(str(model_path()), n_ctx=N_CTX, n_gpu_layers=-1, verbose=False)
+            _llm = _grammar_first(Llama(str(model_path()), n_ctx=N_CTX, n_gpu_layers=-1, verbose=False))
         # ponytail: estimation (contenus + ~8 jetons de gabarit par message), assez juste pour une marge
         tokens = sum(len(_llm.tokenize(m["content"].encode("utf-8"))) + 8 for m in messages)
         # Il faut aussi la place de la réponse : une frise de paragraphe tient en ~1500 jetons.

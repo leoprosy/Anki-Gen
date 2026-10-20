@@ -170,6 +170,29 @@ class TestPickGpu(unittest.TestCase):
         self.assertEqual(local_llm.pick_gpu([self.dev("RTX 3060", gib=8), self.dev("RTX 4090", gib=24)]), 1)
 
 
+@unittest.skipUnless(local_llm.available() and local_llm.model_path().is_file(), "modèle local absent")
+class TestGrammarFirstSampler(unittest.TestCase):
+    """Vérifier d'abord le jeton glouton donne la même réponse que filtrer tout le vocabulaire."""
+
+    def test_same_answer_as_full_filtering(self):
+        from llama_cpp import Llama
+        llm = Llama(str(local_llm.model_path()), n_ctx=512, n_gpu_layers=0, verbose=False)
+        default = llm._init_sampler
+        schema = {"type": "object", "properties": {"year": {"type": "integer"}, "label": {"type": "string"}},
+                  "required": ["year", "label"]}
+
+        def answer():
+            # Une question en prose : le premier jeton glouton (« La ») est refusé, le repli sert.
+            out = llm.create_chat_completion(
+                messages=[{"role": "user", "content": "En une phrase : quand la Bastille a-t-elle été prise ?"}],
+                response_format={"type": "json_object", "schema": schema}, temperature=0, max_tokens=30)
+            return out["choices"][0]["message"]["content"]
+        expected = answer()
+        local_llm._grammar_first(llm)
+        self.assertIsNot(llm._init_sampler, default)
+        self.assertEqual(answer(), expected)
+
+
 class TestLocalSchema(unittest.TestCase):
     """La grammaire locale, plus serrée que le contrat, ne produit que des documents du contrat."""
 

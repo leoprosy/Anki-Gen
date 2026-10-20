@@ -1053,9 +1053,9 @@ def _extraction_source(record, chunk_arg):
 def api_timeline_local(tid):
     """
     `{chunk_id?, mode?}` → `{raw, parts, failed}` : le modèle local extrait la
-    frise, ou un paragraphe, et corrige lui-même ses réponses refusées. Un texte
-    dont le prompt dépasse sa fenêtre est coupé en morceaux, extraits un à un puis
-    fusionnés. La réponse repart côté client par le chemin d'un collage : rien
+    frise, ou un paragraphe, et corrige lui-même ses réponses refusées. Une frise
+    dont le prompt dépasse sa fenêtre est coupée en ses paragraphes (un paragraphe
+    trop long, en deux), extraits un à un puis fusionnés. La réponse repart côté client par le chemin d'un collage : rien
     n'est enregistré ici.
     """
     import local_llm
@@ -1079,10 +1079,14 @@ def api_timeline_local(tid):
     def build_prompt(piece, chunk):
         return timeline_prompt.extraction_prompt(piece, lang=view["lang"], mode=mode, title=view["title"],
                                                  chunk=chunk, tracks=tracks)
+    # Trop longue pour le modèle, la frise entière se coupe d'abord en ses paragraphes.
+    paragraphs = () if chunk_arg is not None else [
+        text[start:end] for _, start, end in record["source"].get("spans") or []]
     extractor = timeline_extract.LocalExtractor(local_llm.complete, too_long=local_llm.PromptTooLong)
     try:
         raw, parts = extractor.extract(text, build_prompt, lang=view["lang"], title=view["title"],
-                                       chunk=chunk_arg is not None, on_part=local_llm.set_part)
+                                       chunk=chunk_arg is not None, paragraphs=paragraphs,
+                                       on_part=local_llm.set_part)
     except local_llm.ModelMissing:
         return _timeline_error("local_model.missing", 409)
     except local_llm.PromptTooLong as error:     # un mot de plusieurs milliers de jetons…

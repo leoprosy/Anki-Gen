@@ -88,13 +88,16 @@ class LocalExtractor(ManualExtractor):
         # L'exception de `complete` pour un prompt plus long que la fenêtre du modèle.
         self.too_long = too_long
 
-    def extract(self, text, build_prompt, *, lang, title, chunk=False, on_part=lambda done, total: None) -> tuple:
+    def extract(self, text, build_prompt, *, lang, title, chunk=False, paragraphs=(),
+                on_part=lambda done, total: None) -> tuple:
         """
         Le texte source → (réponse brute, {"parts", "failed"}).
 
         `build_prompt(texte, chunk)` rend le prompt d'extraction. Si le modèle le
-        refuse comme trop long, le texte est coupé en deux (`split_text`) et chaque
-        moitié extraite à son tour, coupée encore s'il le faut. Les réponses
+        refuse comme trop long, le texte est coupé en ses `paragraphs` (les
+        paragraphes du cours, coupes naturelles), et un morceau encore trop long
+        en deux (`split_text`), autant qu'il le faut. Chaque morceau est extrait
+        à son tour. Les réponses
         valides des morceaux sont fusionnées comme des paragraphes ; `failed`
         compte les morceaux restés invalides après leurs corrections.
         """
@@ -107,7 +110,7 @@ class LocalExtractor(ManualExtractor):
             try:
                 raws.append((self.run(build_prompt(piece, part), lang=lang, chunk=part), part))
             except self.too_long:
-                halves = split_text(piece)
+                halves = list(paragraphs) if piece is text and len(paragraphs) > 1 else split_text(piece)
                 if not halves:
                     raise
                 pending[:0] = halves

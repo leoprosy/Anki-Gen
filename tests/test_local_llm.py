@@ -25,7 +25,7 @@ import local_llm  # noqa: E402
 import paths  # noqa: E402
 import timeline_extract  # noqa: E402
 import timeline_schema  # noqa: E402
-from test_timeline_extraction_routes import COBDEN, MELINE, ExtractionTestCase, doc  # noqa: E402
+from test_timeline_extraction_routes import COBDEN, MELINE, PROJECT, ExtractionTestCase, doc  # noqa: E402
 from test_timeline_routes import RoutesTestCase  # noqa: E402
 
 
@@ -117,16 +117,23 @@ class TestLocalRoute(ExtractionTestCase):
         self.assertNotIn("Méline", messages[0]["content"])
         self.assertNotIn("description", schema["properties"]["events"]["items"]["properties"])
 
-    def test_a_text_too_long_is_cut_and_merged(self):
+    def test_a_text_too_long_is_cut_into_its_paragraphs_and_merged(self):
+        prompts = []
+
         def complete(messages, schema):
             prompt = messages[0]["content"]
+            prompts.append(prompt)
             if "Cobden" in prompt and "Méline" in prompt:
                 raise local_llm.PromptTooLong(9000)
             return doc([COBDEN]) if "Cobden" in prompt else doc([MELINE]) if "Méline" in prompt else EMPTY
         with mock.patch.object(local_llm, "complete", side_effect=complete):
             body = self.local().get_json()
         self.assertTrue(body["ok"])
-        self.assertGreater(body["parts"], 1)
+        # La frise entière, refusée, puis un prompt par paragraphe du cours.
+        paragraphs = len(PROJECT["prompts"])
+        self.assertEqual((body["parts"], len(prompts)), (paragraphs, paragraphs + 1))
+        self.assertIn("Adam Smith", prompts[-1])
+        self.assertNotIn("Méline", prompts[-1])
         self.assertEqual(body["failed"], 0)
         merged = json.loads(body["raw"])
         self.assertEqual([e["label"] for e in merged["events"]], [COBDEN["label"], MELINE["label"]])

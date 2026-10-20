@@ -171,14 +171,21 @@ fait planter le chargement). Une espace ne désigne aucune carte.
 « Générer en local » passe par `POST /api/timeline/<tid>/local` : le serveur construit le prompt
 (toute la frise, ou le paragraphe en cours) et, s'il dépasse la fenêtre moins la place d'une
 réponse (`ANSWER_TOKENS`, ~3 000 jetons : la plus longue frise que la grammaire permet), coupe
-le texte en deux (`split_text` : avant un titre, puis entre paragraphes, phrases, mots) autant de
-fois qu'il le faut. Une réponse tronquée par la fenêtre recoupe aussi son morceau. Les morceaux
+la frise en ses paragraphes du cours, et un paragraphe encore trop long en deux (`split_text` :
+avant un titre, puis entre paragraphes, phrases, mots) autant de fois qu'il le faut. Une réponse tronquée par la fenêtre recoupe aussi son morceau. Les morceaux
 valides sont fusionnés par `timeline_merge`, comme des paragraphes ; le client colle le résultat.
 Avant validation, `dedupe_ids` retire les éléments répétés et renomme les id repris : sans lui,
 3 morceaux sur 4 restaient invalides (`id_duplicate`) après leurs deux corrections.
 
-Chapitre « L'ère des révolutions » (22 000 caractères, 9 paragraphes), RTX 4070 : 4 morceaux,
-4 valides du premier coup, 3 ères, 37 périodes et 81 évènements en ~2 min.
+Chapitre « L'ère des révolutions » (22 000 caractères, 9 paragraphes), RTX 4070 :
+
+| Coupe | Morceaux | Valides du premier coup | Durée | Éléments |
+|---|---|---|---|---|
+| En deux, récursivement | 4 | 4 / 4 | ~2 min | 121 (3 ères, 37 périodes, 81 évènements) |
+| Par paragraphe | 9 | 9 / 9 | 115 s | 116 (2 ères, 9 périodes, 105 évènements) |
+
+On coupe par paragraphe : le prompt est écrit pour un paragraphe, chaque morceau reste court
+(8 à 25 s), et une coupe ne tombe jamais au milieu d'un développement.
 
 Piste suivante : un prompt local sans les champs que la grammaire retire.
 

@@ -10,6 +10,7 @@ route. Le téléchargement passe par une URL file://, sans réseau.
 
 import hashlib
 import json
+import re
 import shutil
 import sys
 import tempfile
@@ -23,6 +24,7 @@ sys.path.insert(0, str(ROOT))
 import local_llm  # noqa: E402
 import paths  # noqa: E402
 import timeline_extract  # noqa: E402
+import timeline_schema  # noqa: E402
 from test_timeline_routes import RoutesTestCase  # noqa: E402
 
 
@@ -142,6 +144,39 @@ class TestLocalExtractor(unittest.TestCase):
     def test_failed_first_attempt_is_raised(self):
         with self.assertRaises(RuntimeError):
             self.run_with([RuntimeError("modèle illisible")])
+
+
+class TestLocalSchema(unittest.TestCase):
+    """La grammaire locale, plus serrée que le contrat, ne produit que des documents du contrat."""
+
+    def setUp(self):
+        self.schema = timeline_extract.local_schema()
+        self.events = self.schema["properties"]["events"]["items"]
+
+    def test_impossible_dates_cannot_be_written(self):
+        pattern = re.compile(self.events["properties"]["date"]["pattern"])
+        for date in ("1789", "-44", "1971-08", "1971-08-15"):
+            self.assertTrue(pattern.match(date), date)
+        for date in ("1789-17", "0", "0789", "1971-00", "1971-08-32", "present"):
+            self.assertFalse(pattern.match(date), date)
+
+    def test_verbose_fields_are_dropped_and_quotes_required(self):
+        self.assertNotIn("description", self.events["properties"])
+        self.assertNotIn("tags", self.events["properties"])
+        self.assertIn("source_quote", self.events["required"])
+        self.assertIn("track", self.events["required"])
+        self.assertEqual(self.schema["properties"]["eras"]["maxItems"], 1)
+
+    def test_the_contract_schema_is_untouched(self):
+        contract = timeline_schema.json_schema()["properties"]["events"]["items"]
+        self.assertIn("description", contract["properties"])
+        self.assertNotIn("source_quote", contract["required"])
+
+    def test_a_document_of_the_local_shape_is_valid(self):
+        doc = json.loads(VALID)
+        doc.update(eras=[], periods=[])
+        doc["events"][0]["source_quote"] = "traité de commerce"
+        self.assertTrue(timeline_schema.validate_raw(json.dumps(doc), default_lang="fr")["ok"])
 
 
 if __name__ == "__main__":

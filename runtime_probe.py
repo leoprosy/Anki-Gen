@@ -96,11 +96,11 @@ def _local_llm():
     import llama_cpp
     from llama_cpp.llama_grammar import LlamaGrammar, json_schema_to_gbnf
 
-    import timeline_schema
+    import timeline_extract
 
     if b"CPU" not in llama_cpp.llama_print_system_info():
         raise ValueError("llama.cpp sans backend CPU")
-    LlamaGrammar.from_string(json_schema_to_gbnf(json.dumps(timeline_schema.json_schema())), verbose=False)
+    LlamaGrammar.from_string(json_schema_to_gbnf(json.dumps(timeline_extract.local_schema())), verbose=False)
 
 
 PROBES = {

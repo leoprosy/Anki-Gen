@@ -6,7 +6,7 @@ L'extraction passe par une interface, `TimelineExtractor` : préparer la requêt
 (le prompt, le schéma), puis lire la réponse (nettoyage, validation, citations).
 `ManualExtractor` : l'utilisateur copie le prompt dans Claude et colle la
 réponse. `LocalExtractor` : le prompt part au modèle embarqué (local_llm.py),
-contraint par `static/schemas/timeline-v1.json` ; une réponse refusée repart
+contraint par `local_schema()`, le schéma du contrat resserré ; une réponse refusée repart
 avec le prompt de correction, dans la même conversation.
 
 On y trouve aussi ce qui relie les réponses d'une extraction paragraphe par
@@ -88,7 +88,7 @@ class LocalExtractor(ManualExtractor):
 
     def run(self, prompt, *, lang, chunk=False) -> str:
         """Le prompt d'extraction → la dernière réponse brute, valide ou non (elle suit le chemin d'un collage)."""
-        schema = timeline_schema.json_schema()
+        schema = local_schema()
         messages = [{"role": "user", "content": prompt}]
         for attempt in range(self.max_corrections + 1):
             try:
@@ -103,6 +103,50 @@ class LocalExtractor(ManualExtractor):
             messages += [{"role": "assistant", "content": raw},
                          {"role": "user", "content": self.correction_request(report, lang=lang)["prompt"]}]
         return raw
+
+
+# Grammaire du modèle local : plus serrée que le contrat, pour que les erreurs
+# les plus fréquentes d'un 4B ne puissent pas s'écrire (mois 17, année 0) et
+# qu'il n'écrive que l'utile (chaque jeton coûte ~0,1 s sur CPU). Le document
+# reste un ankigen.timeline/1 ordinaire : le validateur est inchangé.
+_YEAR = "-?[1-9][0-9]{0,4}"
+_DATE = f"{_YEAR}(-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?)?"
+# Champs facultatifs que le modèle local n'écrit pas : verbeux, ou inutiles à une
+# frise de paragraphe. Sans "origin", tout vient du texte : le mode local est strict.
+_LOCAL_DROPPED = ("subtitle", "as_of", "links", "color", "order", "description", "date_text", "tags", "origin")
+# Plafonds d'un paragraphe (une seule ère : deux se chevauchent presque toujours).
+# Sans eux, un modèle glouton peut répéter le même évènement jusqu'à remplir le
+# contexte (mesuré : ~5 000 jetons, 10 min, puis plus de place pour corriger).
+_LOCAL_MAX_ITEMS = {"tracks": 5, "eras": 1, "periods": 15, "events": 30}
+
+
+def local_schema() -> dict:
+    """Le schéma du contrat, resserré pour la grammaire du modèle local."""
+    schema = timeline_schema.json_schema()
+    root = schema["properties"]
+    for key in _LOCAL_DROPPED:
+        root.pop(key, None)
+    # Toutes les listes sont écrites, pour que le modèle ne s'arrête pas après les pistes.
+    schema["required"] = ["schema", "title", "lang", "tracks", "eras", "periods", "events"]
+    root["tracks"]["minItems"] = 1
+    for key, maximum in _LOCAL_MAX_ITEMS.items():
+        root[key]["maxItems"] = maximum
+        item = root[key]["items"]
+        for dropped in _LOCAL_DROPPED:
+            item["properties"].pop(dropped, None)
+        for field in ("date", "start"):
+            if field in item["properties"]:
+                item["properties"][field]["pattern"] = f"^{_DATE}$"
+        if "end" in item["properties"]:
+            item["properties"]["end"]["pattern"] = f"^({_DATE}|present)$"
+        if key in ("periods", "events"):
+            # Il y a toujours une piste (minItems), donc chaque élément en a une.
+            item["required"] = item["required"] + ["track", "source_quote"]
+        elif key == "eras":
+            item["required"] = item["required"] + ["source_quote"]
+            # Une ère porte souvent le nom d'une de ses périodes (« consulat ») : même id, refusé.
+            item["properties"]["id"]["pattern"] = "^era_[a-z0-9_-]{0,44}$"
+    return schema
 
 
 def response_status(report, *, chunk=False) -> str:

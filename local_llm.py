@@ -15,10 +15,15 @@ télécharge à la demande dans DATA_DIR/models, vérifié par SHA-256.
 pas (runtime antérieur) fait simplement `available() == False`.
 """
 
+import ctypes
+import functools
 import hashlib
 import importlib.util
+import os
+import sys
 import threading
 import urllib.request
+from pathlib import Path
 
 import paths
 
@@ -63,9 +68,106 @@ def model_path():
     return paths.MODELS_DIR / MODEL["file"]
 
 
+# ──────────────────────────────────────────────────────────────
+# Carte graphique
+# ──────────────────────────────────────────────────────────────
+# llama.cpp est compilé avec Vulkan : il tourne sur les cartes NVIDIA, AMD et
+# Intel, et sur le processeur s'il n'en trouve aucune. On ne lui laisse qu'une
+# carte dédiée assez grande pour tout le modèle : seul, un GPU intégré fait
+# planter le chargement (mesuré sur une Radeon de Ryzen 7000), et une carte trop
+# petite ne pourrait en prendre qu'une partie.
+# ponytail: tout ou rien ; un déchargement partiel si les cartes de 4 Go comptent.
+GPU_MIN_VRAM = 5 << 30          # poids (2,5 Go) + cache KV (1,2 Go) + calculs
+_VK_DISCRETE_GPU = 2
+_VK_DEVICE_LOCAL = 1
+# Le chargeur Vulkan vient avec le pilote de la carte (System32). Sans lui
+# llama.dll ne se charge pas : l'exécutable en embarque une copie de secours.
+_FALLBACK_LOADER_DIR = Path(getattr(sys, "_MEIPASS", "")) / "vulkan_loader" if paths.is_frozen() else None
+
+
+class _InstanceInfo(ctypes.Structure):
+    _fields_ = [("sType", ctypes.c_uint32), ("pNext", ctypes.c_void_p), ("flags", ctypes.c_uint32),
+                ("pApplicationInfo", ctypes.c_void_p), ("enabledLayerCount", ctypes.c_uint32),
+                ("ppEnabledLayerNames", ctypes.c_void_p), ("enabledExtensionCount", ctypes.c_uint32),
+                ("ppEnabledExtensionNames", ctypes.c_void_p)]
+
+
+def vulkan_devices() -> list:
+    """Les cartes que verra llama.cpp, dans son ordre : [{"name", "discrete", "vram"}]. [] sans Vulkan."""
+    try:
+        vk = ctypes.WinDLL("vulkan-1")
+    except (OSError, AttributeError):        # pas de pilote Vulkan, ou pas Windows
+        return []
+    instance = ctypes.c_void_p()
+    info = _InstanceInfo(sType=1)            # VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
+    if vk.vkCreateInstance(ctypes.byref(info), None, ctypes.byref(instance)) != 0:
+        return []
+    try:
+        count = ctypes.c_uint32()
+        vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(count), None)
+        handles = (ctypes.c_void_p * count.value)()
+        vk.vkEnumeratePhysicalDevices(instance, ctypes.byref(count), handles)
+        devices = []
+        for handle in handles:
+            # VkPhysicalDeviceProperties : deviceType à l'octet 16, deviceName (256 octets) à 20.
+            props = ctypes.create_string_buffer(2048)
+            vk.vkGetPhysicalDeviceProperties(ctypes.c_void_p(handle), props)
+            # VkPhysicalDeviceMemoryProperties : 32 types de 8 octets, puis le nombre
+            # de tas (octet 260) et les tas de 16 octets {size u64, flags u32} (octet 264).
+            memory = ctypes.create_string_buffer(1024)
+            vk.vkGetPhysicalDeviceMemoryProperties(ctypes.c_void_p(handle), memory)
+            heaps = [(int.from_bytes(memory.raw[264 + 16 * i:272 + 16 * i], "little"),
+                      int.from_bytes(memory.raw[272 + 16 * i:276 + 16 * i], "little"))
+                     for i in range(int.from_bytes(memory.raw[260:264], "little"))]
+            devices.append({
+                "name": props.raw[20:276].split(b"\0", 1)[0].decode("utf-8", "replace"),
+                "discrete": int.from_bytes(props.raw[16:20], "little") == _VK_DISCRETE_GPU,
+                "vram": max((size for size, flags in heaps if flags & _VK_DEVICE_LOCAL), default=0),
+            })
+        return devices
+    finally:
+        vk.vkDestroyInstance(instance, None)
+
+
+def pick_gpu(devices):
+    """
+    L'indice de la carte à utiliser, ou None : la carte dédiée qui a le plus de
+    mémoire, si elle suffit. Les cartes vues à travers Direct3D 12 (la couche
+    « Dozen » du pack de compatibilité Windows) doublent les vraies : écartées.
+    """
+    usable = [(d["vram"], -i) for i, d in enumerate(devices)
+              if d["discrete"] and d["vram"] >= GPU_MIN_VRAM and not d["name"].startswith("Microsoft Direct3D12")]
+    return -max(usable)[1] if usable else None
+
+
+def _vulkan_build() -> bool:
+    """L'exécutable embarque-t-il le llama.cpp Vulkan ? (le runtime 2 n'a que le processeur)"""
+    spec = importlib.util.find_spec("llama_cpp")
+    return bool(spec and spec.origin) and (Path(spec.origin).parent / "lib" / "ggml-vulkan.dll").is_file()
+
+
+@functools.cache
+def _device() -> tuple:
+    """(indice Vulkan, nom) de la carte qui fera tourner le modèle, ou (None, None). Détecté une fois."""
+    system_loader = Path(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "vulkan-1.dll")
+    if not system_loader.is_file() and _FALLBACK_LOADER_DIR and _FALLBACK_LOADER_DIR.is_dir():
+        os.add_dll_directory(str(_FALLBACK_LOADER_DIR))
+    if not _vulkan_build():
+        return None, None
+    devices = vulkan_devices()
+    index = pick_gpu(devices)
+    return (index, devices[index]["name"]) if index is not None else (None, None)
+
+
+def gpu():
+    """Nom de la carte qui fera tourner le modèle, ou None (processeur)."""
+    return _device()[1]
+
+
 def status() -> dict:
     return {
         "available": available(),
+        "gpu": gpu(),
         "installed": model_path().is_file(),
         "loaded": _llm is not None,
         "name": MODEL["name"],
@@ -157,8 +259,11 @@ def complete(messages: list, schema: dict) -> str:
         raise ModelMissing()
     with _lock:
         if _llm is None:
+            # Lu par llama.cpp à son chargement : il ne voit que la carte choisie, ou aucune.
+            index = _device()[0]
+            os.environ["GGML_VK_VISIBLE_DEVICES"] = "" if index is None else str(index)
             from llama_cpp import Llama
-            _llm = Llama(str(model_path()), n_ctx=N_CTX, verbose=False)
+            _llm = Llama(str(model_path()), n_ctx=N_CTX, n_gpu_layers=-1, verbose=False)
         # ponytail: estimation (contenus + ~8 jetons de gabarit par message), assez juste pour une marge
         tokens = sum(len(_llm.tokenize(m["content"].encode("utf-8"))) + 8 for m in messages)
         # Il faut aussi la place de la réponse : une frise de paragraphe tient en ~1500 jetons.

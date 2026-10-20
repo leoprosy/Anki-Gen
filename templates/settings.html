@@ -71,7 +71,8 @@
     <div class="settings-row">
       <div class="settings-description">
         <span>{{ local_model.name }}</span>
-        <p id="local-model-help">{{ t('settings.local_model_help', size=(local_model.size / 1e9) | round(1)) }}</p>
+        <p id="local-model-help">{{ t('settings.local_model_help', size=(local_model.size / 1e9) | round(1)) }}
+          {{ t('settings.local_model_gpu', name=local_model.gpu) if local_model.gpu else t('settings.local_model_cpu') }}</p>
       </div>
       <div class="settings-folder-control">
         <button type="button" class="btn sm" id="local-model-download"

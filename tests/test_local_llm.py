@@ -146,6 +146,30 @@ class TestLocalExtractor(unittest.TestCase):
             self.run_with([RuntimeError("modèle illisible")])
 
 
+class TestPickGpu(unittest.TestCase):
+    """Le choix de la carte : une carte dédiée assez grande, sinon le processeur."""
+
+    def dev(self, name, discrete=True, gib=12):
+        return {"name": name, "discrete": discrete, "vram": gib << 30}
+
+    def test_discrete_card_is_chosen_over_the_integrated_one(self):
+        devices = [self.dev("AMD Radeon(TM) Graphics", discrete=False, gib=16), self.dev("RTX 4070")]
+        self.assertEqual(local_llm.pick_gpu(devices), 1)
+
+    def test_direct3d12_twin_is_ignored(self):
+        devices = [self.dev("RTX 4070"), self.dev("Microsoft Direct3D12 (RTX 4070)")]
+        self.assertEqual(local_llm.pick_gpu(devices), 0)
+        self.assertIsNone(local_llm.pick_gpu(devices[1:]))
+
+    def test_integrated_or_small_cards_fall_back_to_the_cpu(self):
+        self.assertIsNone(local_llm.pick_gpu([self.dev("Radeon 780M", discrete=False, gib=16)]))
+        self.assertIsNone(local_llm.pick_gpu([self.dev("GTX 1050", gib=4)]))
+        self.assertIsNone(local_llm.pick_gpu([]))
+
+    def test_largest_card_wins(self):
+        self.assertEqual(local_llm.pick_gpu([self.dev("RTX 3060", gib=8), self.dev("RTX 4090", gib=24)]), 1)
+
+
 class TestLocalSchema(unittest.TestCase):
     """La grammaire locale, plus serrée que le contrat, ne produit que des documents du contrat."""
 

@@ -89,17 +89,26 @@ def _local_llm():
     """
     local_llm.py : les DLL de llama.cpp chargées depuis l'exécutable, et le schéma
     de frise compilé en grammaire (c'est elle qui force une réponse JSON conforme).
-    Le modèle lui-même n'est pas chargé : il se télécharge à la demande.
+    Un exécutable Vulkan doit avoir son backend Vulkan, même sur une machine sans GPU. Le modèle lui-même n'est pas chargé : il se télécharge à la demande.
     """
+    import ctypes
     import json
+    from pathlib import Path
 
+    import local_llm
+    import timeline_extract
+
+    local_llm._device()     # chargeur Vulkan de secours, comme avant le chargement du modèle
     import llama_cpp
     from llama_cpp.llama_grammar import LlamaGrammar, json_schema_to_gbnf
 
-    import timeline_extract
-
     if b"CPU" not in llama_cpp.llama_print_system_info():
         raise ValueError("llama.cpp sans backend CPU")
+    if local_llm._vulkan_build():
+        ggml = ctypes.CDLL(str(Path(llama_cpp.__file__).parent / "lib" / "ggml.dll"))
+        ggml.ggml_backend_reg_by_name.restype = ctypes.c_void_p
+        if not ggml.ggml_backend_reg_by_name(b"Vulkan"):
+            raise ValueError("llama.cpp sans backend Vulkan")
     LlamaGrammar.from_string(json_schema_to_gbnf(json.dumps(timeline_extract.local_schema())), verbose=False)
 
 

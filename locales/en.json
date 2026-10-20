@@ -646,6 +646,8 @@
   "upload.more_actions": "More actions",
   "settings.local_model_title": "Local model",
   "settings.local_model_help": "A small model that runs on this computer, with no account or connection, to extract a timeline paragraph by paragraph. One-time {size} GB download; it uses about 4 GB of memory while it works.",
+  "settings.local_model_gpu": "It runs on the graphics card: {name}.",
+  "settings.local_model_cpu": "It runs on the processor: no dedicated graphics card with at least 5 GB was found.",
   "settings.local_model_download": "Download",
   "settings.local_model_delete": "Delete",
   "js.local_model_progress": "Downloading… {pct}%",

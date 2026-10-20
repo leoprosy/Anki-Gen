@@ -12,8 +12,26 @@ compte, sans connexion après le téléchargement, et sans service tiers à lanc
   (prompt, validation, citations, fusion) est déjà en Python : le modèle s'y branche sans passer
   par Rust ni par un second processus. La roue CPU vient de l'index du projet
   (`--extra-index-url` en tête de `requirements.txt`), PyPI n'ayant pas de roue Windows.
-- **CPU d'abord.** La roue CPU (AVX2, OpenMP) tourne partout. Vulkan, pour les GPU, viendra plus
-  tard ; il faut la compiler en CI.
+- **GPU par Vulkan, processeur sinon.** Aucun index ne publie de roue Windows récente avec GPU
+  (la dernière roue CUDA est en 0.3.4) : `scripts/build_llama_vulkan.ps1` compile la version de
+  `requirements.txt` avec le SDK Vulkan de LunarG, dans les workflows d'installateur (roue en
+  cache). Vulkan couvre NVIDIA, AMD et Intel. Le ggml est lié statiquement : le chargement
+  dynamique des backends (`GGML_BACKEND_DL`) n'a pas de binding Python et range mal ses DLL CPU.
+- **Détection de la carte avant le chargement.** `local_llm` interroge Vulkan par ctypes (la
+  liste même que verra ggml), garde la carte **dédiée** qui a le plus de mémoire si elle a au
+  moins 5 Go (poids, cache KV, calculs), écarte les doublons « Microsoft Direct3D12 » du pack de
+  compatibilité, et ne montre qu'elle à llama.cpp (`GGML_VK_VISIBLE_DEVICES`), modèle entier
+  sur la carte (`n_gpu_layers=-1`). Sans carte retenue, la variable est vide : processeur seul.
+  Un GPU intégré n'est jamais utilisé : seul, celui d'un Ryzen 7700X fait planter le
+  chargement (violation d'accès), même avec `n_gpu_layers=0`. Réglages affiche la carte
+  utilisée, ou le processeur.
+- **Chargeur Vulkan.** `vulkan-1.dll` vient avec le pilote graphique, et sans lui `llama.dll` ne
+  se charge pas. L'exécutable embarque le chargeur redistribuable de LunarG
+  (`vulkan_loader/`), ajouté au chemin des DLL seulement si System32 n'en a pas : un PC sans
+  pilote Vulkan garde le modèle sur processeur. L'exe passe de ~41 à ~53 Mo.
+- **Pas de runtime 3.** `requirements.txt` ne change pas, et le code tourne aussi sur un exe
+  runtime 2 (processeur : la carte n'est annoncée que si `ggml-vulkan.dll` est là). Le GPU
+  arrive avec le prochain installateur, sans bloquer les mises à jour d'app.zip.
 - **Téléchargement à la demande** (Réglages → Modèle local) dans `DATA_DIR/models`, via
   `.part`, vérifié par SHA-256. L'installateur ne grossit que du runtime (~41 Mo pour l'exe).
 - **Un seul modèle : Qwen3-4B-Instruct-2507, Q4_K_M (2,5 Go).** Qwen3-1.7B a été mesuré : plus
@@ -102,12 +120,32 @@ génération, qui domine (~1 000 jetons par paragraphe) ; d'un paragraphe à l'a
 réutilise déjà le cache KV du préfixe commun du prompt (consignes et exemple), si bien que seul
 le premier paragraphe paie le prompt entier. Le cache quantifié est bien plus lent sur CPU.
 
-Pistes suivantes : un prompt local sans les champs que la grammaire retire (gain sur le premier
-paragraphe seulement, et il faudrait que le serveur construise le prompt), puis le GPU.
+### GPU (Vulkan)
+
+Mêmes paragraphes, même grammaire, roue Vulkan, RTX 4070 (12 Go) détectée :
+
+| Paragraphe | Processeur | RTX 4070 | Éléments | Citations retrouvées |
+|---|---|---|---|---|
+| 0 | 164 s | 42 s | 14 | 13 / 14 |
+| 1 | 108 s | 29 s | 12 | 12 / 12 |
+| 2 | 166 s | 44 s | 17 | 16 / 16 |
+| **Total** | **438 s** | **115 s (−74 %)** | | |
+
+3 / 3 valides du premier coup. Les calculs GPU changent un peu la sortie gloutonne : une
+citation du paragraphe 0 recolle deux bouts de phrase ; elle est signalée « citation
+introuvable », comme pour un collage.
+
+Sur la carte, la grammaire est le goulot : 98 à 128 jetons/s sans contrainte, ~33 sous la
+grammaire de frise (l'échantillonneur l'applique à tout le vocabulaire, sur le processeur). Sur
+processeur, la roue Vulkan traite aussi le prompt sur la carte quand elle est visible (4 s au
+lieu de 31 s).
+
+Pistes suivantes : accélérer la grammaire (vérifier d'abord le jeton choisi, comme le fait
+`common_sampler` de llama.cpp), puis un prompt local sans les champs que la grammaire retire.
 
 ## Hors périmètre
 
-GPU (Vulkan), génération de cartes Q/R (trop exigeante pour un 4B), extraction de la frise
+CUDA, déchargement partiel sur une carte de moins de 5 Go, GPU intégrés, génération de cartes Q/R (trop exigeante pour un 4B), extraction de la frise
 entière d'un long cours d'un seul prompt, choix du modèle par l'utilisateur.
 
 ## Validation
@@ -116,7 +154,8 @@ entière d'un long cours d'un seul prompt, choix du modèle par l'utilisateur.
   `file://`), routes, boucle de correction avec un faux modèle.
 - `node --test "tests/*.js"`.
 - `pyinstaller --noconfirm flask-server.spec`, puis `flask-server.exe --self-check --app-dir
-  build/app_bundle` : toutes les sondes passent, `llama_cpp\lib\*.dll` et `VCOMP140.DLL` sont
-  dans l'exécutable.
+  build/app_bundle` : toutes les sondes passent, `llama_cpp\lib\*.dll` (dont `ggml-vulkan.dll`),
+  `VCOMP140.DLL` et `vulkan_loaderulkan-1.dll` sont dans l'exécutable ; la sonde `local_llm`
+  exige le backend Vulkan dans un exe Vulkan, même sans GPU sur la machine.
 - Dans le navigateur : Réglages → Modèle local (état, téléchargement, suppression), puis
   « Générer en local » sur une frise paragraphe par paragraphe.

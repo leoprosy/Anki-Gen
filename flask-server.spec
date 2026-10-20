@@ -54,12 +54,25 @@ for _package in runtime_import_names():
                                   on_error="ignore")
 print(f"[spec] hiddenimports : {len(_hidden)} modules")
 
+# llama_cpp charge ses DLL par ctypes depuis llama_cpp/lib : aucune analyse
+# d'import ne les voit, et pyinstaller-hooks-contrib n'a pas de hook pour lui.
+_binaries = collect_dynamic_libs("llama_cpp")
+# Le llama.cpp Vulkan exige vulkan-1.dll, que le pilote graphique installe dans
+# System32. Une copie de secours, chargée seulement s'il manque (local_llm.py),
+# évite qu'un PC sans pilote Vulkan perde aussi le modèle sur processeur. Elle
+# vient du redistribuable LunarG (scripts/build_llama_vulkan.ps1).
+_loader = _Path(SPECPATH) / "build" / "vulkan-loader"
+_vulkan = any(_Path(src).name == "ggml-vulkan.dll" for src, _ in _binaries)
+if _vulkan:
+    if not (_loader / "vulkan-1.dll").is_file():
+        raise SystemExit("[spec] llama.cpp Vulkan sans chargeur : lancer scripts/build_llama_vulkan.ps1")
+    _binaries.append((str(_loader / "vulkan-1.dll"), "vulkan_loader"))
+print(f"[spec] llama.cpp : {'Vulkan' if _vulkan else 'processeur seul'}")
+
 a = Analysis(
     ['launcher.py'],
     pathex=[],
-    # llama_cpp charge ses DLL par ctypes depuis llama_cpp/lib : aucune analyse
-    # d'import ne les voit, et pyinstaller-hooks-contrib n'a pas de hook pour lui.
-    binaries=collect_dynamic_libs("llama_cpp"),
+    binaries=_binaries,
     datas=[
         (str(_bundle_dir), 'app_bundle'),
         # Identité du runtime : lue par launcher --self-check et par l'updater.

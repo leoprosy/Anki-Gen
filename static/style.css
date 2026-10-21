@@ -1510,8 +1510,12 @@ textarea#response:focus {
 .home-new__actions { display: flex; justify-content: flex-end; margin-top: 20px; }
 .home-new__actions .primary { padding: 9px 16px; gap: 4px; }
 
-/* Cours récents */
-.home-projects { display: flex; flex-direction: column; min-height: 0; }
+/* Colonne de droite : cours récents puis frises, chacun avec sa liste défilante. */
+.home-side { display: flex; flex-direction: column; gap: 36px; min-height: 0; }
+.home-projects { flex: 0 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.home-timelines .home-projects__head { align-items: center; }
+.home-timelines .home-projects__head .btn { margin-right: -11px; }
+.home-empty { padding: 10px 0; font-size: 14px; border-bottom: 1px solid var(--hairline); }
 .home-projects__head {
   flex: none;
   display: flex;
@@ -2325,9 +2329,7 @@ body.tl-drawer-open .tl-work {
 }
 .tl-color input[type="color"]:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Tableau de bord : frises et modale « Nouvelle frise » ─── */
-.tl-home__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
-.tl-home__head h3 { margin-bottom: 0; }
+/* ── Tableau de bord : modale « Nouvelle frise » ───────────── */
 .tl-modal {
   width: min(560px, 94vw);
   max-height: min(760px, 92dvh);

@@ -423,7 +423,6 @@
   "timeline.ui.field_color": "Couleur",
   "timeline.ui.field_color_auto": "Automatique",
   "timeline.ui.timelines": "Frises chronologiques",
-  "timeline.ui.timelines_count": "{n} frise(s)",
   "timeline.ui.timelines_empty": "Aucune frise pour l'instant.",
   "timeline.ui.new_timeline": "Nouvelle frise",
   "timeline.ui.open": "Ouvrir",

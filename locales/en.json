@@ -423,7 +423,6 @@
   "timeline.ui.field_color": "Color",
   "timeline.ui.field_color_auto": "Automatic",
   "timeline.ui.timelines": "Timelines",
-  "timeline.ui.timelines_count": "{n} timeline(s)",
   "timeline.ui.timelines_empty": "No timeline yet.",
   "timeline.ui.new_timeline": "New timeline",
   "timeline.ui.open": "Open",

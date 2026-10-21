@@ -55,104 +55,118 @@
       </form>
     </section>
 
-    <section class="home-projects" aria-labelledby="projects-title">
-      <div class="home-projects__head">
-        <h3 id="projects-title">{{ t('upload.resume') }}</h3>
-        {% if projects %}<span class="muted">{{ t('upload.projects_count', n=projects|length) }}</span>{% endif %}
-      </div>
-
-      {% if projects %}
-      <ul class="project-list">
-        {% for proj in projects %}
-        {% set pct = ((proj.progress.done / proj.progress.total) * 100)|int if proj.progress.total else 0 %}
-        {% set complete = proj.progress.total and proj.progress.done == proj.progress.total %}
-        <li class="project-row{% if complete %} is-done{% endif %}">
-          <a class="project-row__link" href="{{ url_for('work', project_id=proj.id) }}">
-            <span class="project-row__top">
-              <span class="project-row__title" title="{{ proj.id }}">{{ proj.id }}</span>
-              {% if complete %}
-              <span class="badge-done">{{ t('upload.done') }}</span>
-              {% else %}
-              <span class="project-row__pct">{{ pct }} %</span>
-              {% endif %}
-            </span>
-            <span class="project-row__meta">
-              {{ proj.deck or t('project.no_deck') }}
-              &middot; {{ t('upload.sections', n=proj.progress.total) }}
-              {% if proj.images %} &middot; {{ t('upload.meta_images', n=proj.images) }}{% endif %}
-              {% if proj.tables %} &middot; {{ t('upload.meta_tables', n=proj.tables) }}{% endif %}
-              &middot; {{ t('upload.updated', when=proj.updated|ago) }}
-            </span>
-            <span class="project-row__foot">
-              <span class="mini-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
-                aria-valuenow="{{ pct }}"><span style="width: {{ pct }}%"></span></span>
-              <span class="project-row__go">
-                {{ t('project.continue') }}
-                <svg width="14" height="14" aria-hidden="true"><use href="#i-next"></use></svg>
-              </span>
-            </span>
-          </a>
-          <details class="row-menu">
-            <summary title="{{ t('upload.more_actions') }}" aria-label="{{ t('upload.more_actions') }} — {{ proj.id }}">
-              <svg width="16" height="16" aria-hidden="true"><use href="#i-more"></use></svg>
-            </summary>
-            <div class="row-menu__panel">
-              <form action="{{ url_for('delete_project', project_id=proj.id) }}" method="post"
-                onsubmit="return confirm(window.T('js.delete_confirm'));">
-                <button type="submit" class="row-menu__item is-danger">
-                  <svg width="15" height="15" aria-hidden="true"><use href="#i-trash"></use></svg>
-                  {{ t('project.delete') }}
-                </button>
-              </form>
-            </div>
-          </details>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}
-      <div class="empty-state">
-        <svg width="24" height="24" aria-hidden="true"><use href="#i-logo"></use></svg>
-        <p>{{ t('upload.empty_state') }}</p>
-      </div>
-      {% endif %}
-    </section>
-
-    <section class="card tl-home" aria-labelledby="timelines-title">
-      <div class="tl-home__head">
-        <h3 id="timelines-title">{{ t('timeline.ui.timelines') }}</h3>
-        <button type="button" class="btn sm" id="tl-new-open">
-          <svg width="14" height="14" aria-hidden="true"><use href="#i-edit"></use></svg>
-          <span>{{ t('timeline.ui.new_timeline') }}</span>
-        </button>
-      </div>
-      <p class="muted">{{ t('timeline.ui.timelines_count', n=(timelines or [])|length) }}</p>
-
-      {% if timelines %}
-      <div class="project-list">
-        {% for tl in timelines %}
-        <div class="project-row">
-          <div class="project-row__main">
-            <h4>{{ tl.title or t('timeline.ui.untitled') }}</h4>
-            <div class="muted">
-              {{ t('timeline.ui.source_' ~ tl.source_kind) }}{% if tl.project_id %} · {{ tl.project_id }}{% endif %}
-              &middot; {{ t('timeline.ui.elements_count', events=tl.events, periods=tl.periods) }}
-              {% if tl.updated_at %}&middot; {{ t('timeline.ui.updated', date=tl.updated_at[:10]) }}{% endif %}
-            </div>
-          </div>
-          <div class="project-row__actions">
-            <a href="{{ url_for('timeline_page', tid=tl.id) }}" class="btn sm">{{ t('timeline.ui.open') }}</a>
-            <form action="{{ url_for('timeline_delete', tid=tl.id) }}" method="post"
-              onsubmit="return confirm(window.T('timeline.ui.delete_timeline_confirm'));">
-              <button type="submit" class="btn danger sm">{{ t('project.delete') }}</button>
-            </form>
-          </div>
+    <div class="home-side">
+      <section class="home-projects" aria-labelledby="projects-title">
+        <div class="home-projects__head">
+          <h3 id="projects-title">{{ t('upload.resume') }}</h3>
+          {% if projects %}<span class="muted">{{ t('upload.projects_count', n=projects|length) }}</span>{% endif %}
         </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="empty-state">{{ t('timeline.ui.timelines_empty') }}</div>
-      {% endif %}
-    </section>
+
+        {% if projects %}
+        <ul class="project-list">
+          {% for proj in projects %}
+          {% set pct = ((proj.progress.done / proj.progress.total) * 100)|int if proj.progress.total else 0 %}
+          {% set complete = proj.progress.total and proj.progress.done == proj.progress.total %}
+          <li class="project-row{% if complete %} is-done{% endif %}">
+            <a class="project-row__link" href="{{ url_for('work', project_id=proj.id) }}">
+              <span class="project-row__top">
+                <span class="project-row__title" title="{{ proj.id }}">{{ proj.id }}</span>
+                {% if complete %}
+                <span class="badge-done">{{ t('upload.done') }}</span>
+                {% else %}
+                <span class="project-row__pct">{{ pct }} %</span>
+                {% endif %}
+              </span>
+              <span class="project-row__meta">
+                {{ proj.deck or t('project.no_deck') }}
+                &middot; {{ t('upload.sections', n=proj.progress.total) }}
+                {% if proj.images %} &middot; {{ t('upload.meta_images', n=proj.images) }}{% endif %}
+                {% if proj.tables %} &middot; {{ t('upload.meta_tables', n=proj.tables) }}{% endif %}
+                &middot; {{ t('upload.updated', when=proj.updated|ago) }}
+              </span>
+              <span class="project-row__foot">
+                <span class="mini-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100"
+                  aria-valuenow="{{ pct }}"><span style="width: {{ pct }}%"></span></span>
+                <span class="project-row__go">
+                  {{ t('project.continue') }}
+                  <svg width="14" height="14" aria-hidden="true"><use href="#i-next"></use></svg>
+                </span>
+              </span>
+            </a>
+            <details class="row-menu">
+              <summary title="{{ t('upload.more_actions') }}" aria-label="{{ t('upload.more_actions') }} — {{ proj.id }}">
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-more"></use></svg>
+              </summary>
+              <div class="row-menu__panel">
+                <form action="{{ url_for('delete_project', project_id=proj.id) }}" method="post"
+                  onsubmit="return confirm(window.T('js.delete_confirm'));">
+                  <button type="submit" class="row-menu__item is-danger">
+                    <svg width="15" height="15" aria-hidden="true"><use href="#i-trash"></use></svg>
+                    {{ t('project.delete') }}
+                  </button>
+                </form>
+              </div>
+            </details>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <div class="empty-state">
+          <svg width="24" height="24" aria-hidden="true"><use href="#i-logo"></use></svg>
+          <p>{{ t('upload.empty_state') }}</p>
+        </div>
+        {% endif %}
+      </section>
+
+      <section class="home-projects home-timelines" aria-labelledby="timelines-title">
+        <div class="home-projects__head">
+          <h3 id="timelines-title">{{ t('timeline.ui.timelines') }}</h3>
+          <button type="button" class="btn ghost sm" id="tl-new-open">
+            <svg width="14" height="14" aria-hidden="true"><use href="#i-plus"></use></svg>
+            <span>{{ t('timeline.ui.new_timeline') }}</span>
+          </button>
+        </div>
+
+        {% if timelines %}
+        <ul class="project-list">
+          {% for tl in timelines %}
+          <li class="project-row">
+            <a class="project-row__link" href="{{ url_for('timeline_page', tid=tl.id) }}">
+              <span class="project-row__top">
+                <span class="project-row__title">{{ tl.title or t('timeline.ui.untitled') }}</span>
+                <span class="project-row__go">
+                  {{ t('timeline.ui.open') }}
+                  <svg width="14" height="14" aria-hidden="true"><use href="#i-next"></use></svg>
+                </span>
+              </span>
+              <span class="project-row__meta">
+                {{ t('timeline.ui.source_' ~ tl.source_kind) }}{% if tl.project_id %} · {{ tl.project_id }}{% endif %}
+                &middot; {{ t('timeline.ui.elements_count', events=tl.events, periods=tl.periods) }}
+                {% if tl.updated_at %}&middot; {{ t('timeline.ui.updated', date=tl.updated_at[:10]) }}{% endif %}
+              </span>
+            </a>
+            <details class="row-menu">
+              <summary title="{{ t('upload.more_actions') }}" aria-label="{{ t('upload.more_actions') }} — {{ tl.title or t('timeline.ui.untitled') }}">
+                <svg width="16" height="16" aria-hidden="true"><use href="#i-more"></use></svg>
+              </summary>
+              <div class="row-menu__panel">
+                <form action="{{ url_for('timeline_delete', tid=tl.id) }}" method="post"
+                  onsubmit="return confirm(window.T('timeline.ui.delete_timeline_confirm'));">
+                  <button type="submit" class="row-menu__item is-danger">
+                    <svg width="15" height="15" aria-hidden="true"><use href="#i-trash"></use></svg>
+                    {{ t('project.delete') }}
+                  </button>
+                </form>
+              </div>
+            </details>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="home-empty muted">{{ t('timeline.ui.timelines_empty') }}</p>
+        {% endif %}
+      </section>
+    </div>
   </div>
 </main>
 

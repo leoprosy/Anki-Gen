@@ -37,6 +37,8 @@ MEDIA_DIR = DATA_DIR / "media"
 EXPORT_DIR = DATA_DIR / "exports"
 # Jamais sous projects/ : list_projects() y prend tous les *.json pour des projets.
 TIMELINES_DIR = DATA_DIR / "timelines"
+# Le modèle local (local_llm.py), téléchargé à la demande : hors de app/, il survit aux mises à jour.
+MODELS_DIR = DATA_DIR / "models"
 
 
 def ensure_dirs() -> None:

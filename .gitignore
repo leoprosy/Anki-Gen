@@ -26,3 +26,4 @@ version.json
 /analytics_config.json
 /.posthog-admin-key
 /scripts/__pycache__/
+/models

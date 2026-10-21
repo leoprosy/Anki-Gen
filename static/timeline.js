@@ -71,6 +71,9 @@
     correctionWarnings: $("tl-correction-warnings"), correctionBack: $("tl-correction-back"),
     copyPrompt: $("tl-copy-prompt"), copyPromptLabel: $("tl-copy-prompt-label"),
     dockCounter: $("tl-dock-counter"), jsonCorrection: $("tl-json-correction"),
+    local: $("tl-local"), localLabel: $("tl-local-label"),
+    gen: $("tl-gen"), genStage: $("tl-gen-stage"), genTime: $("tl-gen-time"), genSteps: $("tl-gen-steps"),
+    genMeta: $("tl-gen-meta"), genItems: $("tl-gen-items"), genRaw: $("tl-gen-raw"),
   };
 
   // ── Requêtes ─────────────────────────────────────────────────
@@ -959,12 +962,17 @@
   /** L'URL du prompt à montrer : correction du dernier collage raté, ou extraction. */
   function promptUrl() {
     if (!hasSource) return null;
-    const params = new URLSearchParams();
     if (state.correction) {
+      const params = new URLSearchParams();
       if (state.correction.chunk !== null) params.set("chunk_id", state.correction.chunk);
       if (els.correctionWarnings.checked) params.set("warnings", "1");
       return `${URLS.correction}?${params}`;
     }
+    return extractionUrl();
+  }
+
+  function extractionUrl() {
+    const params = new URLSearchParams();
     params.set("mode", state.extraction.mode);
     params.set("skill", state.extraction.skill ? "1" : "0");
     if (perChunk() && state.currentChunk !== null) params.set("chunk_id", state.currentChunk);
@@ -1181,9 +1189,9 @@
     pasteText(text);
   });
 
-  async function pasteText(text) {
+  async function pasteText(text, chunkId = state.currentChunk) {
     if (!text.trim()) { toast(T("timeline.ui.clipboard_empty"), "err"); return; }
-    if (perChunk()) { await pasteChunk(text); return; }
+    if (perChunk()) { await pasteChunk(text, chunkId); return; }
     if (isDirty() && !window.confirm(T("timeline.ui.paste_replace_confirm"))) return;
     // Le collage part au serveur : il est gardé (audit, prompt de correction) et
     // enregistré s'il est valide.
@@ -1214,8 +1222,7 @@
     if (first) focusPath(first.path, first.params);
   }
 
-  async function pasteChunk(text) {
-    const chunkId = state.currentChunk;
+  async function pasteChunk(text, chunkId) {
     if (isDirty() && !window.confirm(T("timeline.ui.merge_unsaved_confirm"))) return;
     let { status, data } = await postJson(URLS.api, { raw: text, chunk_id: chunkId });
     if (!data || !data.chunk) { toast((data && data.error) || T("timeline.ui.network_error"), "err"); return; }
@@ -1248,6 +1255,119 @@
     if (activeTab === "prompt" || activeTab === "json") setTab("preview");
   }
   $("tl-paste").addEventListener("click", paste);
+
+  // Modèle local : il reçoit toujours le prompt d'extraction (il corrige lui-même
+  // ses réponses refusées, côté serveur), et sa réponse suit le chemin d'un collage.
+  // Pendant ce temps, la carte de l'aperçu montre où il en est : l'état du modèle
+  // est relu toutes les demi-secondes.
+  const GEN_STEPS = ["reading", "writing", "checking"];
+  // part : morceau en cours quand le serveur a dû couper le texte ; partStart : ses éléments dans la liste.
+  const gen = { started: 0, part: null, parts: null, attempt: 1, shown: 0, partStart: 0, seen: false, hide: 0 };
+
+  function genStep(stage) {
+    els.gen.dataset.stage = stage;
+    const at = GEN_STEPS.indexOf(stage === "loading" ? "reading" : stage);
+    els.genSteps.querySelectorAll("li").forEach((li, i) => {
+      li.classList.toggle("is-done", stage === "done" || i < at);
+      li.classList.toggle("is-active", i === at);
+    });
+  }
+
+  function renderGen(progress, gpu) {
+    // Pas de génération en cours : le prompt se prépare, ou le serveur vérifie la réponse.
+    if (!progress) {
+      if (gen.seen) { genStep("checking"); els.genStage.textContent = T("timeline.ui.local_stage_checking"); }
+      return;
+    }
+    gen.seen = true;
+    if (progress.part !== gen.part) {         // un nouveau morceau s'ajoute aux précédents
+      Object.assign(gen, { part: progress.part, parts: progress.parts, attempt: progress.attempt, shown: 0,
+                           partStart: els.genItems.children.length });
+    } else if (progress.attempt !== gen.attempt || progress.parts !== gen.parts) {
+      // Une correction réécrit le morceau ; un morceau recoupé (le total change) repart de zéro.
+      Object.assign(gen, { parts: progress.parts, attempt: progress.attempt, shown: 0 });
+      while (els.genItems.children.length > gen.partStart) els.genItems.lastChild.remove();
+    }
+    genStep(progress.stage);
+    els.genStage.textContent = progress.stage === "writing" && progress.attempt > 1
+      ? T("timeline.ui.local_stage_correcting", { n: progress.attempt })
+      : T(`timeline.ui.local_stage_${progress.stage}`);
+    const meta = [gpu || T("timeline.ui.local_cpu")];
+    if (progress.tokens) meta.unshift(T("timeline.ui.local_tokens", { n: progress.tokens }));
+    if (progress.speed) meta.splice(1, 0, T("timeline.ui.local_speed", { n: Math.round(progress.speed) }));
+    if (progress.parts > 1) meta.unshift(T("timeline.ui.local_part", { n: progress.part, total: progress.parts }));
+    els.genMeta.textContent = meta.join(" · ");
+    const items = C.partialItems(progress.text);
+    for (const item of items.slice(gen.shown)) {
+      const li = document.createElement("li");
+      const date = document.createElement("span");
+      date.className = "tl-gen__date";
+      date.textContent = item.date;
+      li.append(date, document.createTextNode(item.label));
+      els.genItems.append(li);
+    }
+    if (items.length > gen.shown) els.genItems.scrollTop = els.genItems.scrollHeight;
+    gen.shown = items.length;
+    els.genRaw.textContent = progress.text.slice(-240);
+  }
+
+  function tickGen() {
+    const time = C.clock((performance.now() - gen.started) / 1000);
+    els.genTime.textContent = time;
+    els.localLabel.textContent = `${T("timeline.ui.local_running")} ${time}`;
+    return time;
+  }
+
+  async function runLocal() {
+    if (!hasSource || els.local.disabled) return;
+    els.local.disabled = true;
+    els.local.setAttribute("aria-busy", "true");
+    clearTimeout(gen.hide);
+    Object.assign(gen, { started: performance.now(), part: null, attempt: 1, shown: 0, partStart: 0, seen: false });
+    els.genItems.replaceChildren();
+    els.genRaw.textContent = els.genMeta.textContent = "";
+    els.genStage.textContent = T("timeline.ui.local_stage_reading");
+    genStep("reading");
+    els.gen.hidden = false;
+    if (activeTab !== "preview") setTab("preview");   // la carte vit sur l'aperçu
+    tickGen();
+    let polling = false, done = false;
+    const timer = setInterval(async () => {
+      tickGen();
+      if (polling) return;
+      polling = true;
+      try {
+        const status = await (await fetch(URLS.localStatus)).json();
+        if (!done) renderGen(status.progress, status.gpu);
+      } catch (e) { /* l'état reviendra au prochain tour */ } finally { polling = false; }
+    }, 500);
+    // Le paragraphe est figé au départ : l'utilisateur peut naviguer pendant la génération.
+    const chunkId = state.currentChunk;
+    try {
+      // Le serveur construit lui-même le prompt, et coupe le texte s'il est trop long pour le modèle.
+      const { data } = await postJson(URLS.local, { chunk_id: perChunk() ? chunkId : null, mode: state.extraction.mode });
+      if (data && data.ok) {
+        done = true;
+        clearInterval(timer);
+        genStep("done");
+        const summary = [T("timeline.ui.local_done", { time: tickGen() })];
+        if (data.parts > 1) summary.push(T("timeline.ui.local_parts", { n: data.parts }));
+        els.genStage.textContent = summary.join(" · ");
+        await pasteText(data.raw, chunkId);
+        if (data.failed) toast(T("timeline.ui.local_parts_failed", { n: data.failed, total: data.parts }), "err", 6000);
+      } else toast((data && data.error) || T("timeline.ui.network_error"), "err", 6000);
+    } catch (e) {
+      toast(T("timeline.ui.network_error"), "err");
+    } finally {
+      clearInterval(timer);
+      // Le bilan reste un instant sur l'aperçu, le temps de voir la frise arriver dessous.
+      gen.hide = setTimeout(() => { els.gen.hidden = true; }, done ? 2500 : 0);
+      els.local.disabled = false;
+      els.local.removeAttribute("aria-busy");
+      els.localLabel.textContent = T("timeline.ui.local");
+    }
+  }
+  if (els.local) els.local.addEventListener("click", runLocal);
   $("tl-empty-paste").addEventListener("click", paste);
   $("tl-empty-json").addEventListener("click", () => { setTab("json"); els.json.focus(); });
 

@@ -74,7 +74,9 @@ fix(parser): keep the alt text of images inside table cells
 docs(readme): add the Windows install section
 ```
 
-**Dependencies.** The runtime set is small on purpose — Flask, Waitress, python-docx, lxml, Pillow.
+**Dependencies.** The runtime set is small on purpose — Flask, Waitress, python-docx, lxml, Pillow,
+and llama-cpp-python (with numpy) for the local model. Its CPU wheel comes from the extra index
+named at the top of `requirements.txt`, because PyPI has no Windows wheel.
 Adding one is a discussion, not a detail of a PR. The standard library is preferred everywhere else.
 A new runtime dependency also means a new installer for every user, because updates only replace
 the app's code: run `python scripts/runtime_contract.py --bump` in the same PR, or the tests fail.
@@ -115,6 +117,7 @@ comments and docstrings are in French — keep writing them in the language of t
 | `timeline_dates.py`, `timeline_schema.py` | timeline dates (astronomical years, precisions, fr/en formatting) and the `ankigen.timeline/1` contract with its error report |
 | `timeline_store.py` | timeline JSON files, their source snapshot and extraction state |
 | `timeline_prompt.py`, `timeline_extract.py` | scopes (paragraph, chapter, course), extraction and correction prompts, pasted answers |
+| `local_llm.py` | the embedded model: verified on-demand download into `models/`, schema-constrained generation, unload when idle |
 | `timeline_quotes.py`, `timeline_merge.py` | quotations checked against the course; per-paragraph answers merged into one timeline |
 | `timeline_fonts.py`, `timeline_layout.py` | text measurement with the embedded Inter, and the collision-free layout as a display list |
 | `timeline_render_svg.py`, `timeline_render_raster.py` | the two renderers of that display list: SVG, and PNG/JPEG/WebP/PDF with Pillow |

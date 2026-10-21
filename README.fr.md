@@ -125,6 +125,11 @@ l'identifie sans ambiguïté, le passage associé à un événement.
 - **Chapitres longs, paragraphe par paragraphe.** Au-delà d'environ 25 000 caractères, Ankigen
   propose un prompt par paragraphe et fusionne les réponses : les pistes de même nom sont
   rapprochées, et un évènement trouvé deux fois n'en fait plus qu'un, séparable à nouveau.
+- **Ou un modèle local, sans Claude.** Réglages → *Modèle local* télécharge une fois un petit
+  modèle (Qwen3-4B, 2,5 Go) qui tourne dans Ankigen, sur le processeur, sans compte ni connexion.
+  *Générer en local* extrait alors le paragraphe courant, et le modèle corrige lui-même ses réponses
+  refusées. C'est lent — plusieurs minutes par paragraphe sur processeur — et pensé pour l'extraction
+  paragraphe par paragraphe ; Claude reste meilleur sur les chapitres longs ou délicats.
 - **Exports.** PNG, JPEG, WebP, PDF (A4, A3 ou page ajustée, à 300 dpi), SVG avec la police
   incorporée, JSON, ou copie dans le presse-papiers.
 - **Cartes.** La frise écrit ses propres cartes, sans Claude : « En quelle année… ? », bornes des
@@ -205,7 +210,8 @@ l'exécutable de la release précédente ([`scripts/check_runtime_compat.py`](sc
   fermeture.
 
 Chaque frise est un fichier JSON dans `timelines/`. Les images de ses cartes sont rendues à la
-demande dans `media/_timelines/<frise>/` et supprimées avec la frise.
+demande dans `media/_timelines/<frise>/` et supprimées avec la frise. Le modèle local, une fois
+téléchargé, vit dans `models/` (2,5 Go) ; Réglages le supprime.
 
 ---
 

@@ -56,7 +56,7 @@
   const hasSource = !!DATA.has_source_text;
 
   const els = {
-    editor: $("tl-editor"), rail: $("rail"), railToggle: $("rail-toggle"), railClose: $("rail-close"),
+    editor: $("tl-editor"), search: $("tl-search"), chips: $("tl-chips"), rail: $("rail"), railToggle: $("rail-toggle"), railClose: $("rail-close"),
     railScrim: $("rail-scrim"), name: $("tl-name"), stateLabel: $("tl-state"),
     tabs: $("tl-tabs"), panelPreview: $("tl-panel-preview"), panelJson: $("tl-panel-json"),
     viewport: $("tl-viewport"), canvas: $("tl-canvas"), empty: $("tl-empty"), tooltip: $("tl-tooltip"),
@@ -267,8 +267,47 @@
     const group = ev.target.closest("[data-ref]");
     if (!group) return;
     const found = findElement(group.getAttribute("data-ref").split("+")[0]);
-    if (found) openDrawer(found.kind, found.index);
+    if (!found) return;
+    openDrawer(found.kind, found.index);
+    revealRow();
   });
+
+  // ── Rail ⇄ aperçu : montrer l'élément choisi de l'autre côté ──
+  let locateTimer = 0;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function revealInPreview(id) {
+    if (els.panelPreview.hidden || els.viewport.hidden) return;
+    const group = [...els.canvas.querySelectorAll("[data-ref]")]
+      .find((g) => g.getAttribute("data-ref").split("+").includes(id));
+    if (!group) return;
+    for (const other of els.canvas.querySelectorAll(".is-located")) other.classList.remove("is-located");
+    group.classList.add("is-located");
+    els.canvas.classList.add("has-located");
+    clearTimeout(locateTimer);
+    locateTimer = setTimeout(() => {
+      group.classList.remove("is-located");
+      els.canvas.classList.remove("has-located");
+    }, 1600);
+    // Le tiroir vient de s'ouvrir : l'aperçu n'a sa nouvelle largeur qu'à la prochaine image.
+    requestAnimationFrame(() => {
+      const box = group.getBoundingClientRect();
+      const view = els.viewport.getBoundingClientRect();
+      els.viewport.scrollBy({
+        left: box.left + box.width / 2 - (view.left + view.width / 2),
+        top: box.top + box.height / 2 - (view.top + view.height / 2),
+        behavior: reducedMotion.matches ? "auto" : "smooth",
+      });
+    });
+  }
+
+  /** La ligne de l'élément ouvert, sections dépliées et défilée dans le rail. */
+  function revealRow() {
+    const row = els.editor.querySelector(".tl-item.active");
+    if (!row) return;
+    for (let d = row.closest("details"); d; d = d.parentElement.closest("details")) d.open = true;
+    row.scrollIntoView({ block: "nearest" });
+  }
 
   // ── Infobulle ────────────────────────────────────────────────
   function hideTooltip() { els.tooltip.hidden = true; }
@@ -350,14 +389,37 @@
       + `<span class="tl-row__badges">${badges(item)}</span></button></li>`;
   }
 
-  function section(kind, title, body, count) {
+  function section(kind, title, body, count, shown = count) {
     const open = sectionOpen[kind] !== false;
+    const empty = !count ? "timeline.ui.empty_section" : !shown ? "timeline.ui.no_match" : "";
     return `<details class="tl-section" data-section="${kind}"${open ? " open" : ""}>`
-      + `<summary><span>${escapeHtml(title)}</span><span class="tl-section__count">${count}</span></summary>`
-      + (count ? body : `<p class="tl-section__empty">${escapeHtml(T("timeline.ui.empty_section"))}</p>`)
+      + `<summary><span>${escapeHtml(title)}</span>`
+      + `<span class="tl-section__count">${shown === count ? count : `${shown}/${count}`}</span></summary>`
+      + (empty ? `<p class="tl-section__empty">${escapeHtml(T(empty))}</p>` : body)
       + "</details>";
   }
   const sectionOpen = { course: false };
+
+  // Recherche et pistes masquées : ne filtrent que le rail, la frise reste entière.
+  const filter = { query: "", hidden: [] };
+  const shownIndexes = (kind, indexes, dateOf) =>
+    indexes.filter((i) => C.matchesFilter(state.doc[kind][i], dateOf(state.doc[kind][i]), filter));
+  const spanDate = (item) => state.dates[item.id] || `${item.start}–${item.end}`;
+  const eventDate = (item) => state.dates[item.id] || item.date;
+
+  function renderChips(tracks) {
+    filter.hidden = filter.hidden.filter((id) => tracks.some((t) => t.id === id));
+    const focused = els.chips.contains(document.activeElement) ? document.activeElement.dataset.track : null;
+    els.chips.hidden = tracks.length < 2;
+    els.chips.innerHTML = tracks.map((track) =>
+      `<button type="button" class="tl-chip" data-track="${escapeHtml(track.id)}"`
+      + ` aria-pressed="${!filter.hidden.includes(track.id)}">${swatch(track.id)}`
+      + `<span>${escapeHtml(track.label)}</span></button>`).join("");
+    if (focused) {
+      const chip = [...els.chips.children].find((c) => c.dataset.track === focused);
+      if (chip) chip.focus();
+    }
+  }
 
   function updateCourseLinks(course, document = state.doc) {
     DATA.course = course;
@@ -437,7 +499,8 @@
     const tracks = doc.tracks || [];
     const parts = [];
     if (perChunk()) parts.push(sourcesSection());
-    else if (DATA.course && DATA.course.paragraphs.length) {
+    // Pendant une recherche, les paragraphes du cours laissent la place aux résultats.
+    else if (DATA.course && DATA.course.paragraphs.length && !filter.query.trim()) {
       const rows = DATA.course.paragraphs.map((p) =>
         '<li class="tl-item"><a class="tl-row tl-course-paragraph" href="' + escapeHtml(p.url)
         + '" title="' + escapeHtml(p.label) + '"><span class="mono">#' + p.id
@@ -448,7 +511,9 @@
     }
 
     // Pistes : renommer, couleur, ordre (flèches, accessibles au clavier).
-    const trackRows = tracks.map((track, index) => {
+    const shownTracks = tracks.filter((track) => C.matchesFilter(track, "", { query: filter.query, hidden: [] }));
+    const trackRows = shownTracks.map((track) => {
+      const index = tracks.indexOf(track);
       const active = state.editing && state.editing.kind === "tracks" && state.editing.index === index;
       return `<li class="tl-item${active ? " active" : ""}"><div class="tl-track">`
         + `<button type="button" class="tl-row" data-kind="tracks" data-index="${index}">${swatch(track.id)}`
@@ -460,42 +525,52 @@
         + `<svg width="14" height="14" aria-hidden="true"><use href="#i-down"></use></svg></button>`
         + "</div></li>";
     }).join("");
-    parts.push(section("tracks", T("timeline.ui.section_tracks"), `<ul class="tl-list">${trackRows}</ul>`, tracks.length));
+    parts.push(section("tracks", T("timeline.ui.section_tracks"), `<ul class="tl-list">${trackRows}</ul>`, tracks.length,
+                       shownTracks.length));
 
     const eras = doc.eras || [];
+    const shownEras = shownIndexes("eras", sortedIndexes(eras, "start"), spanDate);
     parts.push(section("eras", T("timeline.ui.section_eras"),
-      `<ul class="tl-list">${sortedIndexes(eras, "start").map((i) =>
-        row("eras", i, state.dates[eras[i].id] || `${eras[i].start}–${eras[i].end}`,
+      `<ul class="tl-list">${shownEras.map((i) =>
+        row("eras", i, spanDate(eras[i]),
             `<span class="tl-swatch tl-swatch--era"${state.eraStyles[eras[i].id]
               ? ` style="--swatch:${escapeHtml(state.eraStyles[eras[i].id].color)}"` : ""} aria-hidden="true"></span>`
-        )).join("")}</ul>`, eras.length));
+        )).join("")}</ul>`, eras.length, shownEras.length));
 
     const periods = doc.periods || [];
+    const shownPeriods = shownIndexes("periods", sortedIndexes(periods, "start"), spanDate);
     parts.push(section("periods", T("timeline.ui.section_periods"),
       `<p class="tl-section__help">${escapeHtml(T("timeline.ui.period_container_help"))}</p>`
-      + `<ul class="tl-list">${sortedIndexes(periods, "start").map((i) =>
-        row("periods", i, state.dates[periods[i].id] || `${periods[i].start}–${periods[i].end}`,
-            tracks.length ? swatch(periods[i].track) : "")).join("")}</ul>`, periods.length));
+      + `<ul class="tl-list">${shownPeriods.map((i) =>
+        row("periods", i, spanDate(periods[i]),
+            tracks.length ? swatch(periods[i].track) : "")).join("")}</ul>`, periods.length, shownPeriods.length));
 
-    // Évènements : regroupés par piste, triés par date.
+    // Évènements : regroupés par piste (chaque groupe se replie), triés par date.
     const events = doc.events || [];
+    const shownEvents = shownIndexes("events", sortedIndexes(events, "date"), eventDate);
     const groups = tracks.length ? tracks.map((t) => ({ id: t.id, label: t.label })) : [{ id: null, label: "" }];
     const orphans = events.some((e) => tracks.length && !tracks.some((t) => t.id === e.track));
     if (orphans) groups.push({ id: undefined, label: T("timeline.ui.no_track") });
     const eventBody = groups.map((group) => {
-      const indexes = sortedIndexes(events, "date").filter((i) => {
+      const indexes = shownEvents.filter((i) => {
         if (!tracks.length) return true;
         if (group.id === undefined) return !tracks.some((t) => t.id === events[i].track);
         return events[i].track === group.id;
       });
       if (!indexes.length) return "";
-      const heading = group.label
-        ? `<li class="tl-group">${swatch(group.id)}<span>${escapeHtml(group.label)}</span></li>` : "";
-      return heading + indexes.map((i) => row("events", i, state.dates[events[i].id] || events[i].date)).join("");
+      const rows = indexes.map((i) => row("events", i, eventDate(events[i]))).join("");
+      if (!group.label) return rows;
+      const key = `track:${group.id}`;
+      return `<li><details class="tl-group" data-section="${escapeHtml(key)}"${sectionOpen[key] !== false ? " open" : ""}>`
+        + `<summary>${swatch(group.id)}<span class="tl-group__label">${escapeHtml(group.label)}</span>`
+        + `<span class="tl-section__count">${indexes.length}</span></summary>`
+        + `<ul class="tl-list">${rows}</ul></details></li>`;
     }).join("");
-    parts.push(section("events", T("timeline.ui.section_events"), `<ul class="tl-list">${eventBody}</ul>`, events.length));
+    parts.push(section("events", T("timeline.ui.section_events"), `<ul class="tl-list">${eventBody}</ul>`,
+                       events.length, shownEvents.length));
 
     els.editor.innerHTML = parts.join("");
+    renderChips(tracks);
   }
 
   els.editor.addEventListener("toggle", (ev) => {
@@ -520,8 +595,26 @@
     const button = ev.target.closest(".tl-row[data-kind]");
     if (button) {
       setRail(false);           // en fenêtre étroite, le rail en tiroir laisse place à l'édition
-      openDrawer(button.dataset.kind, Number(button.dataset.index));
+      const kind = button.dataset.kind;
+      const index = Number(button.dataset.index);
+      openDrawer(kind, index);
+      revealInPreview(state.doc[kind][index].id);
     }
+  });
+
+  els.search.addEventListener("input", () => { filter.query = els.search.value; renderEditor(); });
+  els.search.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape" || !els.search.value) return;
+    ev.stopPropagation();       // Échap vide d'abord la recherche, sans fermer le tiroir
+    els.search.value = filter.query = "";
+    renderEditor();
+  });
+  els.chips.addEventListener("click", (ev) => {
+    const chip = ev.target.closest("[data-track]");
+    if (!chip) return;
+    const id = chip.dataset.track;
+    filter.hidden = filter.hidden.includes(id) ? filter.hidden.filter((h) => h !== id) : filter.hidden.concat(id);
+    renderEditor();
   });
 
   function moveTrack(index, delta) {
@@ -1410,6 +1503,12 @@
     if (ev.altKey && perChunk() && (ev.key === "ArrowLeft" || ev.key === "ArrowRight")) {
       ev.preventDefault();
       stepChunk(ev.key === "ArrowLeft" ? -1 : 1);
+      return;
+    }
+    if (ev.key === "/" && !ev.target.closest("input, textarea, select, [contenteditable]")) {
+      ev.preventDefault();
+      setRail(true);
+      els.search.focus();
       return;
     }
     if (ev.key === "Escape") {

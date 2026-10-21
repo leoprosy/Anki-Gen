@@ -235,7 +235,7 @@
 
   function slug(text) {
     return String(text || "")
-      .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+      .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
       .toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40);
   }
 
@@ -287,6 +287,23 @@
     return items;
   }
 
+  /** Texte comparable : sans accents ni casse. */
+  function fold(text) {
+    return String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+
+  /**
+   * Filtre du rail : l'élément est-il montré ? `filter.hidden` liste les pistes
+   * masquées ; chaque mot de `filter.query` doit se trouver dans le libellé, l'id,
+   * la date affichée (`dateText`) ou la date telle qu'écrite dans le cours.
+   */
+  function matchesFilter(item, dateText, filter) {
+    if (item.track && filter.hidden.includes(item.track)) return false;
+    const words = fold(filter.query).split(/\s+/).filter(Boolean);
+    const haystack = fold([item.label, item.id, dateText, item.date_text].join(" "));
+    return words.every((word) => haystack.includes(word));
+  }
+
   /** Secondes → « m:ss ». */
   function clock(seconds) {
     const s = Math.max(0, Math.floor(seconds));
@@ -294,5 +311,6 @@
   }
 
   return { ORDER, serialize, debounce, singleFlight, parsePointer, elementAt, pointerRange, lineColumnOffset,
-           dateKey, compareDates, uniqueId, slug, renameId, trackUsage, nextPendingChunk, partialItems, clock };
+           dateKey, compareDates, uniqueId, slug, renameId, trackUsage, nextPendingChunk, partialItems, clock,
+           matchesFilter };
 });

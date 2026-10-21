@@ -207,3 +207,16 @@ test('clock : minutes et secondes', () => {
   assert.equal(core.clock(0), '0:00');
   assert.equal(core.clock(65.9), '1:05');
 });
+
+test('matchesFilter : recherche sans accents ni casse, sur le libellé, l\'id et la date', () => {
+  const item = { id: 'bastille', track: 'pol', label: 'Prise de la Bastille', date_text: 'le 14 juillet' };
+  const filter = (query, hidden) => ({ query, hidden: hidden || [] });
+  assert.equal(core.matchesFilter(item, '14 juil. 1789', filter('')), true);
+  assert.equal(core.matchesFilter(item, '14 juil. 1789', filter('  PRISE  bastille ')), true);
+  assert.equal(core.matchesFilter(item, '14 juil. 1789', filter('1789')), true);
+  assert.equal(core.matchesFilter(item, '', filter('juillet')), true);
+  assert.equal(core.matchesFilter({ id: 'e', label: 'Révolution' }, '', filter('revolution')), true);
+  assert.equal(core.matchesFilter(item, '14 juil. 1789', filter('varennes')), false);
+  assert.equal(core.matchesFilter(item, '', filter('bastille', ['pol'])), false);
+  assert.equal(core.matchesFilter({ id: 'era', label: 'Ère' }, '', filter('', ['pol'])), true);
+});

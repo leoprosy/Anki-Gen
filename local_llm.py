@@ -66,9 +66,14 @@ class PromptTooLong(Exception):
         self.tokens = tokens
 
 
+# Mis de côté : la génération passe désormais par Claude via le serveur MCP
+# d'Ankigen. Le code reste en place ; True le rallume (interface, téléchargement, frise).
+ENABLED = False
+
+
 def available() -> bool:
-    """L'exécutable embarque-t-il llama.cpp ?"""
-    return importlib.util.find_spec("llama_cpp") is not None
+    """Le modèle local est-il activé, et l'exécutable embarque-t-il llama.cpp ?"""
+    return ENABLED and importlib.util.find_spec("llama_cpp") is not None
 
 
 def model_path():
@@ -241,7 +246,7 @@ def _run_download():
 
 def start_download() -> bool:
     """Lance le téléchargement en arrière-plan ; False s'il tourne déjà ou si le modèle est là."""
-    if _download["running"] or model_path().is_file():
+    if not ENABLED or _download["running"] or model_path().is_file():
         return False
     _download.update(running=True, done=0, error=None)
     threading.Thread(target=_run_download, name="model-download", daemon=True).start()
@@ -335,7 +340,7 @@ def complete(messages: list, schema: dict) -> str:
     paragraphe donnent la même frise.
     """
     global _llm
-    if not model_path().is_file():
+    if not ENABLED or not model_path().is_file():
         raise ModelMissing()
     with _lock:
         # 1 message, puis 2 de plus par correction (la réponse refusée et la consigne).

@@ -105,10 +105,15 @@ def _local_llm():
     if b"CPU" not in llama_cpp.llama_print_system_info():
         raise ValueError("llama.cpp sans backend CPU")
     if local_llm._vulkan_build():
-        ggml = ctypes.CDLL(str(Path(llama_cpp.__file__).parent / "lib" / "ggml.dll"))
-        ggml.ggml_backend_reg_by_name.restype = ctypes.c_void_p
-        if not ggml.ggml_backend_reg_by_name(b"Vulkan"):
-            raise ValueError("llama.cpp sans backend Vulkan")
+        lib = Path(llama_cpp.__file__).parent / "lib"
+        ctypes.CDLL(str(lib / "ggml-vulkan.dll")).ggml_backend_vk_reg   # la DLL et ses dépendances se chargent
+        # ggml n'enregistre Vulkan que si un pilote répond (pas sur un runner CI
+        # sans carte) : on n'exige l'enregistrement que là où une carte est visible.
+        if local_llm.vulkan_devices():
+            ggml = ctypes.CDLL(str(lib / "ggml.dll"))
+            ggml.ggml_backend_reg_by_name.restype = ctypes.c_void_p
+            if not ggml.ggml_backend_reg_by_name(b"Vulkan"):
+                raise ValueError("llama.cpp sans backend Vulkan")
     LlamaGrammar.from_string(json_schema_to_gbnf(json.dumps(timeline_extract.local_schema())), verbose=False)
 
 

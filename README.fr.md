@@ -142,6 +142,31 @@ qu'écrit, sans conversion depuis le julien) et un Skill Claude facultatif pour 
 
 ---
 
+## Utiliser depuis Claude (MCP)
+
+Ankigen peut tourner comme serveur [MCP](https://modelcontextprotocol.io) local : Claude importe un
+cours, écrit les cartes de chaque paragraphe, construit les frises et les exporte lui-même, sans
+copier-coller. Il travaille sur les mêmes données que l'app, même fermée, et ses outils se mettent
+à jour avec elle.
+
+À enregistrer une fois (Claude Code ; pour Claude Desktop, mettre la même commande dans
+`claude_desktop_config.json`) :
+
+```bash
+claude mcp add --scope user ankigen -- "%LOCALAPPDATA%\Ankigen\flask-server.exe" --mcp
+```
+
+Depuis les sources, le pointer sur le dépôt (il utilise alors les dossiers de données du dépôt) :
+
+```bash
+claude mcp add --scope local ankigen-dev -- ".venv/Scripts/python.exe" "launcher.py" --mcp
+```
+
+Outils : `guide`, `list_projects`, `import_docx`, `get_paragraphs`, `save_cards`, `export_project`,
+`list_timelines`, `create_timeline`, `update_timeline`, `export_timeline`.
+
+---
+
 ## Lancer depuis les sources
 
 ```bash

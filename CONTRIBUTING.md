@@ -106,7 +106,8 @@ comments and docstrings are in French — keep writing them in the language of t
 | Path | What it holds |
 |---|---|
 | `app.py` | Flask routes and the glue between every module |
-| `launcher.py` | packaged entry point; resolves `APP_DIR` / `DATA_DIR` under `%APPDATA%` |
+| `launcher.py` | packaged entry point; resolves `APP_DIR` / `DATA_DIR` under `%APPDATA%`; `--mcp` serves `mcp_server.py` instead of Waitress |
+| `mcp_server.py` | stdlib MCP server (stdio JSON-RPC): each tool calls an app route through `app.test_client()`; nothing may print to stdout |
 | `paths.py` | where projects, uploads, media, exports and timelines live |
 | `parse_cours.py` | `.docx` → chunks, one per section |
 | `docx_blocks.py` | low-level block walking: headings, images, tables, alt text |

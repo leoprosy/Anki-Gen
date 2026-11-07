@@ -181,6 +181,11 @@ def run_self_check(argv):
 if '--self-check' in sys.argv:
     sys.exit(run_self_check(sys.argv))
 
+# En mode MCP, stdout est le canal JSON-RPC : tout print() (bootstrap compris) va sur stderr.
+MCP_MODE = '--mcp' in sys.argv
+if MCP_MODE:
+    _mcp_stdout, sys.stdout = sys.stdout, sys.stderr
+
 
 # ── Bootstrap : première exécution en mode frozen ─────────────
 if getattr(sys, 'frozen', False):
@@ -207,6 +212,10 @@ if getattr(sys, 'frozen', False):
     except Exception as e:
         print(f"[bootstrap] Échec de l'application de la mise à jour : {e}")
 
+
+if MCP_MODE:
+    import mcp_server
+    sys.exit(mcp_server.serve(sys.stdin.buffer, _mcp_stdout.buffer))
 
 from app import app
 

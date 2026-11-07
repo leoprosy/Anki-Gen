@@ -128,6 +128,29 @@ no Julian conversion) and an optional Claude Skill for timelines.
 
 ---
 
+## Use from Claude (MCP)
+
+Ankigen can run as a local [MCP](https://modelcontextprotocol.io) server, so Claude imports a course,
+writes the cards of each paragraph, builds timelines and exports them itself — no copy-paste.
+It works on the same data as the app, even when the app is closed, and its tools update with the app.
+
+Register it once (Claude Code; for Claude Desktop, put the same command in `claude_desktop_config.json`):
+
+```bash
+claude mcp add --scope user ankigen -- "%LOCALAPPDATA%\Ankigen\flask-server.exe" --mcp
+```
+
+From source, point it at the repo instead (it then uses the repo's data folders):
+
+```bash
+claude mcp add --scope local ankigen-dev -- ".venv/Scripts/python.exe" "launcher.py" --mcp
+```
+
+Tools: `guide`, `list_projects`, `import_docx`, `get_paragraphs`, `save_cards`, `export_project`,
+`list_timelines`, `create_timeline`, `update_timeline`, `export_timeline`.
+
+---
+
 ## Run from source
 
 ```bash

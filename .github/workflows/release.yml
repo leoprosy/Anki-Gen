@@ -67,7 +67,16 @@ jobs:
           workspaces: src-tauri
 
       - name: Installer les dépendances Python
-        run: python -m pip install -r requirements.txt
+        # Le lien public des releases de llama-cpp-python renvoie 504 (l'API, elle, sert le fichier) :
+        # on prend la roue via `gh`, et pip la trouve déjà installée.
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v=$(sed -n 's/^llama_cpp_python==//p' requirements.txt)
+          gh release download "v$v" --repo abetlen/llama-cpp-python --dir wheels             --pattern "llama_cpp_python-$v-py3-none-win_amd64.whl"
+          python -m pip install --no-deps wheels/*.whl
+          python -m pip install -r requirements.txt
 
       # Modèle local mis de côté (local_llm.ENABLED) : plus de llama.cpp Vulkan,
       # l'exe garde la roue processeur de requirements.txt (retirer la roue

@@ -677,5 +677,8 @@
   "timeline.ui.local_parts_failed": "{n} morceau(x) sur {total} n'ont pas pu être extraits : la frise est incomplète.",
   "local_model.missing": "Le modèle local n'est pas installé : téléchargez-le dans Réglages.",
   "local_model.too_long": "Un passage du texte est trop long pour le modèle local ({tokens} jetons), même coupé au plus court.",
-  "local_model.failed": "Le modèle local a échoué. Le détail est dans le journal de l'app."
+  "local_model.failed": "Le modèle local a échoué. Le détail est dans le journal de l'app.",
+  "settings.about_title": "À propos",
+  "settings.about_version": "Version",
+  "settings.about_updated_at": "Dernière mise à jour"
 }

@@ -277,8 +277,20 @@ def work(project_id):
 
 @app.route("/settings")
 def settings_page():
+    import datetime
+    import os
     import local_llm
-    return render_template("settings.html", local_model=local_llm.status())
+    import updater
+    # ponytail: date du dernier déploiement = mtime de version.json (écrit à
+    # l'extraction d'app.zip ou du bundle de l'exe) ; un marqueur explicite si ça dérive.
+    try:
+        stamp = os.path.getmtime(os.path.join(updater._get_app_dir(), "version.json"))
+        updated_at = datetime.datetime.fromtimestamp(stamp).strftime("%Y-%m-%d %H:%M")
+    except OSError:
+        updated_at = None
+    app_info = {"version": updater.get_local_version(),
+                "commit": updater.get_local_commit()[:7], "updated_at": updated_at}
+    return render_template("settings.html", local_model=local_llm.status(), app_info=app_info)
 
 
 def load_skill_template(lang):

@@ -162,7 +162,7 @@ Depuis les sources, le pointer sur le dépôt (il utilise alors les dossiers de 
 claude mcp add --scope local ankigen-dev -- ".venv/Scripts/python.exe" "launcher.py" --mcp
 ```
 
-Outils : `guide`, `list_projects`, `import_docx`, `get_paragraphs`, `save_cards`, `export_project`,
+Outils : `guide`, `list_projects`, `import_docx`, `set_deck_prefix`, `get_paragraphs`, `save_cards`, `export_project`,
 `list_timelines`, `create_timeline`, `update_timeline`, `export_timeline`.
 
 ---

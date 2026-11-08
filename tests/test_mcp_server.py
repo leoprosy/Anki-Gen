@@ -65,6 +65,26 @@ class TestMcpServer(unittest.TestCase):
         self.assertTrue(result["isError"])
         self.assertTrue(result["content"][0]["text"])
 
+    def test_set_deck_prefix_rewrites_every_deck(self):
+        import project_store
+        tmp = Path(tempfile.mkdtemp(prefix="ankigen-mcp-proj-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        patcher = mock.patch.object(project_store, "project_path", lambda pid: tmp / f"{pid}.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        project_store.save_project("p", {"deck_prefix": "ESH", "prompts": [
+            {"id": 0, "deck": "ESH::CH1::I"}, {"id": 1, "deck": "ESH::CH1::II"}]})
+
+        result = self.call("set_deck_prefix", project_id="p", deck_prefix="Éco::Prépa")
+        self.assertFalse(result["isError"], result)
+        self.assertEqual([p["deck"] for p in project_store.load_project("p")["prompts"]],
+                         ["Éco::Prépa::CH1::I", "Éco::Prépa::CH1::II"])
+
+        self.call("set_deck_prefix", project_id="p", deck_prefix="")
+        project = project_store.load_project("p")
+        self.assertEqual((project["deck_prefix"], project["prompts"][0]["deck"]), ("", "CH1::I"))
+        self.assertTrue(self.call("set_deck_prefix", project_id="nope", deck_prefix="x")["isError"])
+
     def test_unknown_tool_and_bad_arguments(self):
         reply, = self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "nope"}})
         self.assertIn("error", reply)

@@ -4,22 +4,7 @@
 {% block body_class %}course-workspace{% endblock %}
 
 {% block topbar %}
-<button type="button" class="icon-btn rail-toggle" id="rail-toggle" aria-label="{{ t('work.chunk_list') }}" aria-expanded="false"
-  title="{{ t('work.chunk_list') }}">
-  <svg width="18" height="18" aria-hidden="true"><use href="#i-list"></use></svg>
-</button>
-
-<div class="topbar__context">
-  <span class="crumb-sep" aria-hidden="true">/</span>
-  <span class="project-name" title="{{ project_id }}">{{ project_id }}</span>
-  <div class="topbar__spacer"></div>
-  <div class="progress" title="{{ t('work.progress_title') }}">
-    <span id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
-    <div class="progress-bar" role="progressbar" aria-label="{{ t('work.progress_title') }}">
-      <div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
-    </div>
-  </div>
-</div>
+<div class="topbar__spacer"></div>
 
 <div class="topbar__actions">
   {% include "_course_navigation.html" %}
@@ -64,34 +49,42 @@
   <symbol id="i-timeline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><circle cx="7" cy="12" r="2"></circle><circle cx="15" cy="12" r="2"></circle><line x1="7" y1="5" x2="7" y2="10"></line><line x1="15" y1="14" x2="15" y2="19"></line></symbol>
 </svg>
 <main class="work">
-  <!-- ── Rail des chunks (tiroir sous 1180px) ─────────────────── -->
-  <aside class="rail" id="rail" aria-label="{{ t('work.chunk_list') }}">
-    <div class="rail__head">
-      <span class="rail__title">{{ t('work.chunk_list') }}</span>
-      <button type="button" class="icon-btn rail__close" id="rail-close" aria-label="{{ t('work.close_list') }}">
-        <svg width="16" height="16" aria-hidden="true"><use href="#i-x"></use></svg>
-      </button>
+  <!-- ── Titre + progression du .docx ─────────────────────────── -->
+  <header class="work-head">
+    <div class="work-head__row">
+      <h1 class="work-title">{{ project_id }}</h1>
+      <span class="work-progress" id="progress-label">{{ progress.done }}/{{ progress.total }}</span>
     </div>
-    <ol class="chunk-list" id="chunk-list">
-      {% for p in prompts %}
-      <li data-id="{{ p.id }}" data-status="{{ p.status }}" class="chunk-item">
-        <button type="button" class="chunk-btn">
-          <span class="dot-wrapper">
-            <svg class="icon-pending" width="12" height="12" aria-hidden="true"><use href="#i-circle"></use></svg>
-            <svg class="icon-done" width="14" height="14" aria-hidden="true"><use href="#i-check"></use></svg>
-          </span>
-          <span class="chunk-id">#{{ p.id }}</span>
-          <span class="chunk-deck">{{ p.deck }}</span>
-          <span class="chunk-badges">
-            {% if p.images %}<span class="badge" title="{{ t('work.images_n', n=p.images|length) }}">🖼️{{ p.images|length }}</span>{% endif %}
-            {% if p.tables %}<span class="badge" title="{{ t('work.tables_n', n=p.tables|length) }}">▦{{ p.tables|length }}</span>{% endif %}
-          </span>
-        </button>
-      </li>
-      {% endfor %}
-    </ol>
-  </aside>
-  <div class="rail-scrim" id="rail-scrim"></div>
+    <div class="progress-line" id="progress-bar" role="progressbar" aria-label="{{ t('work.progress_title') }}"
+      aria-valuemin="0" aria-valuemax="{{ progress.total }}" aria-valuenow="{{ progress.done }}">
+      <div id="progress-fill" style="width: {{ (100 * progress.done / progress.total) if progress.total else 0 }}%"></div>
+    </div>
+  </header>
+
+  <!-- ── Sélecteur de paragraphe : une ligne, la liste en menu ── -->
+  <div class="picker" id="picker">
+    <button type="button" class="icon-btn picker__step" id="prev-btn" title="{{ t('work.prev') }} (Alt+←)" aria-label="{{ t('work.prev') }}">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-prev"></use></svg>
+    </button>
+    <button type="button" class="picker__current" id="picker-toggle" aria-expanded="false" aria-controls="picker-panel">
+      <span class="picker__num" id="cur-id"></span>
+      <span class="picker__text">
+        <span class="picker__title" id="cur-title"></span>
+        <span class="picker__path" id="cur-path"></span>
+      </span>
+      <span class="sr-only">{{ t('work.all_paragraphs') }}</span>
+      <svg class="picker__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+    </button>
+    <button type="button" class="icon-btn picker__step" id="next-btn" title="{{ t('work.next') }} (Alt+→)" aria-label="{{ t('work.next') }}">
+      <svg width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
+    </button>
+    <div class="picker__panel" id="picker-panel" hidden>
+      <input type="search" class="picker__search" id="picker-search" autocomplete="off"
+        placeholder="{{ t('work.search_paragraphs') }}" aria-label="{{ t('work.search_paragraphs') }}">
+      <ol class="chunk-list" id="chunk-list" aria-label="{{ t('work.chunk_list') }}"></ol>
+    </div>
+  </div>
 
   <!-- ── Panneaux ─────────────────────────────────────────────── -->
   <section class="panes">
@@ -114,8 +107,7 @@
       <article class="pane" data-pane="source" role="tabpanel" aria-label="{{ t('work.tab_source') }}">
         <header class="pane__head">
           <div class="pane__title">
-            <span class="chunk-index" id="cur-id">#0</span>
-            <span class="deck-name" id="cur-deck"></span>
+            <span class="pane__label">{{ t('work.tab_source') }}</span>
           </div>
           <div class="pane__tools">
             <div class="seg" id="view-toggle">
@@ -166,18 +158,6 @@
 
 <!-- ── Dock d'actions : visible à toutes les tailles ──────────── -->
 <footer class="dock" aria-label="{{ t('work.actions') }}">
-  <div class="dock__group">
-    <button type="button" class="icon-btn" id="prev-btn" title="{{ t('work.prev') }} (Alt+←)" aria-label="{{ t('work.prev') }}">
-      <svg width="18" height="18" aria-hidden="true"><use href="#i-prev"></use></svg>
-    </button>
-    <span class="counter" id="dock-counter"></span>
-    <button type="button" class="icon-btn" id="next-btn" title="{{ t('work.next') }} (Alt+→)" aria-label="{{ t('work.next') }}">
-      <svg width="18" height="18" aria-hidden="true"><use href="#i-next"></use></svg>
-    </button>
-  </div>
-
-  <div class="dock__sep"></div>
-
   <div class="dock__group">
     <button type="button" class="btn" id="copy-btn" title="{{ t('work.copy_title') }} (Ctrl+Maj+C)">
       <svg width="16" height="16" aria-hidden="true"><use href="#i-copy"></use></svg>

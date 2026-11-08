@@ -98,6 +98,8 @@ def _local_llm():
     import local_llm
     import timeline_extract
 
+    if not local_llm.available():   # modèle éteint, ou exe sans llama.cpp : rien à vérifier
+        return
     local_llm._device()     # chargeur Vulkan de secours, comme avant le chargement du modèle
     import llama_cpp
     from llama_cpp.llama_grammar import LlamaGrammar, json_schema_to_gbnf

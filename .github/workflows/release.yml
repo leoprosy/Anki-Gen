@@ -69,9 +69,9 @@ jobs:
       - name: Installer les dépendances Python
         run: python -m pip install -r requirements.txt
 
-      # Modèle local mis de côté (local_llm.ENABLED) : plus de llama.cpp Vulkan,
-      # l'exe garde la roue processeur de requirements.txt (retirer la roue
-      # changerait le runtime et forcerait une réinstallation). Pour le rallumer :
+      # Modèle local mis de côté (local_llm.ENABLED) : llama.cpp n'est plus dans
+      # requirements.txt. Pour le rallumer, y remettre llama_cpp_python (+ numpy,
+      # diskcache et l'index de la roue CPU), `runtime_contract.py --bump`, puis :
       # - uses: actions/cache@v4
       #   with:
       #     path: build/llama-vulkan

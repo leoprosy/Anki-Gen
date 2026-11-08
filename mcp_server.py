@@ -22,7 +22,11 @@ PROTOCOL_VERSION = "2025-06-18"
 INSTRUCTIONS = (
     "Ankigen turns .docx courses into Anki decks and builds timelines. "
     "Before writing cards or a timeline, call `guide` once for the expected format. "
-    "Cards: import_docx → get_paragraphs → save_cards per paragraph → export_project. "
+    "Cards: import_docx (optional deck_prefix; change it later with set_deck_prefix) → get_paragraphs "
+    "→ save_cards per paragraph → export_project. "
+    "To write each paragraph's cards, use the `anki-flashcard-apprentissage` skill when your client has it "
+    "(its Recto<TAB>Verso output and {{IMG:n}}/{{TABLE:n}} markers are what save_cards expects; "
+    "its CSS classes need the 'ESH Basic' note type in Anki); otherwise follow `guide`. "
     "Timelines: create_timeline with a JSON document; fix it with update_timeline if the report has errors."
 )
 
@@ -80,16 +84,38 @@ def list_projects():
     return json.dumps(projects(), ensure_ascii=False), False
 
 
-def import_docx(path, deck_prefix=""):
+def import_docx(path, deck_prefix=None):
     source = Path(path)
     if source.suffix.lower() != ".docx" or not source.is_file():
         return f"Not a readable .docx file: {path}", True
+    if deck_prefix is None:   # comme le formulaire d'import : préfixe des réglages par défaut
+        from settings import load_settings
+        deck_prefix = load_settings()["deck_prefix"]
     with source.open("rb") as handle:
         resp = client().post("/upload", data={"docx": (handle, source.name), "deck_prefix": deck_prefix},
                              content_type="multipart/form-data")
     if resp.status_code == 302:   # succès : redirection vers /work/<id>
         return json.dumps({"ok": True, "project_id": unquote(resp.headers["Location"].rsplit("/", 1)[-1])}), False
     return f"Import failed (HTTP {resp.status_code})", True
+
+
+def set_deck_prefix(project_id, deck_prefix):
+    """Remplace le préfixe en tête du deck de chaque paragraphe (« ESH::CH1::I » → « Éco::CH1::I »)."""
+    from project_store import load_project, save_project
+    from timeline_prompt import deck_segments
+    project = load_project(project_id)
+    if not project:
+        return f"Unknown project: {project_id}", True
+    old, new = deck_segments(project.get("deck_prefix")), deck_segments(deck_prefix)
+    for p in project["prompts"]:
+        segments = deck_segments(p.get("deck"))
+        if segments[:len(old)] == old:
+            segments = segments[len(old):]
+        p["deck"] = "::".join(new + segments)
+    project["deck_prefix"] = "::".join(new)
+    save_project(project_id, project)
+    decks = sorted({p["deck"] for p in project["prompts"]})
+    return json.dumps({"ok": True, "deck_prefix": project["deck_prefix"], "decks": decks}, ensure_ascii=False), False
 
 
 def get_paragraphs(project_id, only_pending=False):
@@ -141,8 +167,12 @@ TOOLS = {
     "guide": (guide, "Format rules for Anki cards (kind=cards) or timeline JSON (kind=timeline). Read before generating.",
               _schema(["kind"], kind={"type": "string", "enum": ["cards", "timeline"]})),
     "list_projects": (list_projects, "List Ankigen course projects with their progress.", _schema()),
-    "import_docx": (import_docx, "Import a .docx course from an absolute path; returns the new project_id.",
+    "import_docx": (import_docx, "Import a .docx course from an absolute path; returns the new project_id. "
+                                 "deck_prefix defaults to the app's setting; pass \"\" for none.",
                     _schema(["path"], path=_S, deck_prefix=_S)),
+    "set_deck_prefix": (set_deck_prefix, "Change the deck prefix of an imported project (\"\" removes it); "
+                                         "rewrites every paragraph's deck and returns the new deck list.",
+                        _schema(["project_id", "deck_prefix"], project_id=_S, deck_prefix=_S)),
     "get_paragraphs": (get_paragraphs, "Paragraphs of a project (id, deck, prompt text, status, saved cards).",
                        _schema(["project_id"], project_id=_S, only_pending=_B)),
     "save_cards": (save_cards, "Save the cards of one paragraph as TSV lines (question<TAB>answer). Empty tsv resets it.",

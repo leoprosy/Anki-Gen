@@ -146,7 +146,7 @@ From source, point it at the repo instead (it then uses the repo's data folders)
 claude mcp add --scope local ankigen-dev -- ".venv/Scripts/python.exe" "launcher.py" --mcp
 ```
 
-Tools: `guide`, `list_projects`, `import_docx`, `get_paragraphs`, `save_cards`, `export_project`,
+Tools: `guide`, `list_projects`, `import_docx`, `set_deck_prefix`, `get_paragraphs`, `save_cards`, `export_project`,
 `list_timelines`, `create_timeline`, `update_timeline`, `export_timeline`.
 
 ---

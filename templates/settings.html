@@ -107,6 +107,19 @@
       <p>{{ t('settings.analytics_withdrawal') }}</p>
     </details>
   </section>
+  <section class="card settings-section" aria-labelledby="about-title">
+    <div class="settings-section-heading">
+      <h3 id="about-title">{{ t('settings.about_title') }}</h3>
+    </div>
+    <div class="settings-row">
+      <div class="settings-description"><span>{{ t('settings.about_version') }}</span></div>
+      <span>{{ app_info.version }}{% if app_info.commit %} ({{ app_info.commit }}){% endif %}</span>
+    </div>
+    <div class="settings-row">
+      <div class="settings-description"><span>{{ t('settings.about_updated_at') }}</span></div>
+      <span>{{ app_info.updated_at or '—' }}</span>
+    </div>
+  </section>
   <div class="settings-footer">
     <p class="settings-feedback" id="settings-status" role="status"></p>
     <button type="submit" class="btn primary" id="save-settings-btn">

@@ -84,6 +84,23 @@
     </div>
   </section>
   {% endif %}
+  {% if mcp_status.available %}
+  <section class="card settings-section" aria-labelledby="mcp-title">
+    <div class="settings-section-heading">
+      <h3 id="mcp-title">{{ t('settings.mcp_title') }}</h3>
+    </div>
+    <div class="settings-row">
+      <div class="settings-description">
+        <p id="mcp-help">{{ t('settings.mcp_help') }}</p>
+      </div>
+      <div class="settings-folder-control">
+        <button type="button" class="btn sm" id="mcp-install-btn" aria-describedby="mcp-help">{{ t('settings.mcp_install') }}</button>
+        <p class="settings-feedback{% if mcp_status.installed %} is-success{% endif %}" id="mcp-status" role="status">
+          {%- if mcp_status.installed %}{{ t('js.mcp_installed') }}{% endif -%}</p>
+      </div>
+    </div>
+  </section>
+  {% endif %}
   <section class="card settings-section" aria-labelledby="privacy-title">
     <div class="settings-section-heading">
       <h3 id="privacy-title">{{ t('settings.privacy_title') }}</h3>

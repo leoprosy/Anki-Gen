@@ -115,7 +115,15 @@ def inject_i18n():
         "prefs": prefs,
         "js_i18n": catalog_for_js(lang),
         "languages": available_languages(),
+        "mcp_offer": _mcp_offer,
     }
+
+
+def _mcp_offer():
+    """Proposer l'installation MCP : app packagée, client Claude détecté, pas encore fait."""
+    import mcp_install
+    status = mcp_install.status()
+    return status["available"] and not status["installed"]
 
 
 @app.template_filter("ago")
@@ -278,7 +286,9 @@ def work(project_id):
 @app.route("/settings")
 def settings_page():
     import local_llm
-    return render_template("settings.html", local_model=local_llm.status())
+    import mcp_install
+    return render_template("settings.html", local_model=local_llm.status(),
+                           mcp_status=mcp_install.status())
 
 
 def load_skill_template(lang):
@@ -323,6 +333,16 @@ def api_settings_check_dir():
     data = request.get_json(silent=True) or {}
     ok, message_key = user_settings.check_dir(data.get("path") or "")
     return jsonify(ok=ok, message=tr(message_key))
+
+
+@app.route("/api/mcp", methods=["GET", "POST"])
+def api_mcp():
+    """GET : Ankigen est-il enregistré chez Claude ? POST : l'enregistrer."""
+    import mcp_install
+    if request.method == "POST":
+        errors = mcp_install.install()["errors"]
+        return jsonify(ok=not errors, errors=errors, **mcp_install.status())
+    return jsonify(ok=True, **mcp_install.status())
 
 
 # ──────────────────────────────────────────────────────────────

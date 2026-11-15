@@ -134,7 +134,9 @@ Ankigen can run as a local [MCP](https://modelcontextprotocol.io) server, so Cla
 writes the cards of each paragraph, builds timelines and exports them itself — no copy-paste.
 It works on the same data as the app, even when the app is closed, and its tools update with the app.
 
-Register it once (Claude Code; for Claude Desktop, put the same command in `claude_desktop_config.json`):
+The app offers to register itself in Claude Desktop and Claude Code (a panel on first launch, or
+**Settings → Use from Claude**). By hand (Claude Code; for Claude Desktop, put the same command in
+`claude_desktop_config.json`):
 
 ```bash
 claude mcp add --scope user ankigen -- "%LOCALAPPDATA%\Ankigen\flask-server.exe" --mcp

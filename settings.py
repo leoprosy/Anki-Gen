@@ -42,6 +42,7 @@ def defaults():
         "analytics_usage_enabled": False,
         "analytics_product_enabled": False,
         "analytics_decided": False,
+        "mcp_prompt_dismissed": False,
     }
 
 
@@ -64,6 +65,8 @@ def _clean(raw):
     out["analytics_enabled"] = out["analytics_usage_enabled"] or out["analytics_product_enabled"]
     # Une acceptation enregistrée avant l'ajout du panneau reste acquise.
     out["analytics_decided"] = raw.get("analytics_decided") is True or out["analytics_enabled"]
+
+    out["mcp_prompt_dismissed"] = raw.get("mcp_prompt_dismissed") is True
 
     language = raw.get("language")
     if isinstance(language, str) and language in LANGUAGES:

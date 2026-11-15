@@ -149,8 +149,9 @@ cours, écrit les cartes de chaque paragraphe, construit les frises et les expor
 copier-coller. Il travaille sur les mêmes données que l'app, même fermée, et ses outils se mettent
 à jour avec elle.
 
-À enregistrer une fois (Claude Code ; pour Claude Desktop, mettre la même commande dans
-`claude_desktop_config.json`) :
+L'app propose de s'enregistrer elle-même dans Claude Desktop et Claude Code (panneau au premier
+lancement, ou **Paramètres → Utiliser depuis Claude**). À la main (Claude Code ; pour Claude Desktop,
+mettre la même commande dans `claude_desktop_config.json`) :
 
 ```bash
 claude mcp add --scope user ankigen -- "%LOCALAPPDATA%\Ankigen\flask-server.exe" --mcp

@@ -115,7 +115,15 @@ def inject_i18n():
         "prefs": prefs,
         "js_i18n": catalog_for_js(lang),
         "languages": available_languages(),
+        "mcp_offer": _mcp_offer,
     }
+
+
+def _mcp_offer():
+    """Proposer l'installation MCP : app packagée, client Claude détecté, pas encore fait."""
+    import mcp_install
+    status = mcp_install.status()
+    return status["available"] and not status["installed"]
 
 
 @app.template_filter("ago")
@@ -280,6 +288,7 @@ def settings_page():
     import datetime
     import os
     import local_llm
+    import mcp_install
     import updater
     # ponytail: date du dernier déploiement = mtime de version.json (écrit à
     # l'extraction d'app.zip ou du bundle de l'exe) ; un marqueur explicite si ça dérive.
@@ -290,7 +299,8 @@ def settings_page():
         updated_at = None
     app_info = {"version": updater.get_local_version(),
                 "commit": updater.get_local_commit()[:7], "updated_at": updated_at}
-    return render_template("settings.html", local_model=local_llm.status(), app_info=app_info)
+    return render_template("settings.html", local_model=local_llm.status(), app_info=app_info,
+                           mcp_status=mcp_install.status())
 
 
 def load_skill_template(lang):
@@ -335,6 +345,16 @@ def api_settings_check_dir():
     data = request.get_json(silent=True) or {}
     ok, message_key = user_settings.check_dir(data.get("path") or "")
     return jsonify(ok=ok, message=tr(message_key))
+
+
+@app.route("/api/mcp", methods=["GET", "POST"])
+def api_mcp():
+    """GET : Ankigen est-il enregistré chez Claude ? POST : l'enregistrer."""
+    import mcp_install
+    if request.method == "POST":
+        errors = mcp_install.install()["errors"]
+        return jsonify(ok=not errors, errors=errors, **mcp_install.status())
+    return jsonify(ok=True, **mcp_install.status())
 
 
 # ──────────────────────────────────────────────────────────────

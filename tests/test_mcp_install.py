@@ -64,6 +64,12 @@ class McpInstallTest(Sandbox):
         mcp_install.install()
         self.assertTrue((store / "claude_desktop_config.json").is_file())
 
+    def test_claude_data_install_is_found(self):
+        data_dir = self.tmp / "local" / "Claude-Data" / "claude_abc123"
+        data_dir.mkdir(parents=True)
+        mcp_install.install()
+        self.assertTrue((data_dir / "claude_desktop_config.json").is_file())
+
     def test_unreadable_config_is_left_untouched(self):
         self.config.parent.mkdir(parents=True)
         self.config.write_text("{ broken")

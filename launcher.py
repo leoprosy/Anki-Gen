@@ -48,11 +48,11 @@ def get_data_dir():
         return os.path.dirname(os.path.abspath(__file__))
 
 
-def read_version(path):
-    """Version déclarée par un version.json, ou None s'il est absent/illisible."""
+def read_version(path, key='version'):
+    """Champ `key` d'un version.json, ou None s'il est absent/illisible."""
     try:
         with open(path, encoding='utf-8') as handle:
-            return json.load(handle).get('version')
+            return json.load(handle).get(key)
     except (OSError, ValueError, AttributeError):
         return None
 
@@ -62,14 +62,30 @@ DATA_DIR = get_data_dir()
 
 
 def deploy_bundle(bundle_dir, app_dir):
-    """Deploy only a newer bundled version; preserve downloaded updates."""
+    """
+    Deploy the bundle when it is newer, or when a new executable was installed
+    (its commit differs from the last bundle deployed) and the live code is not
+    a strictly newer version. Downloaded updates of the same exe are preserved.
+    """
     from updater import is_newer_version
 
     installed = read_version(os.path.join(app_dir, 'version.json'))
     shipped = read_version(os.path.join(bundle_dir, 'version.json'))
+    commit = read_version(os.path.join(bundle_dir, 'version.json'), 'commit')
+    # Hors du dossier live : apply_staged_update() remplace ce dossier en bloc.
+    marker = app_dir.rstrip('\\/') + '.bundle-commit'
+    try:
+        with open(marker, encoding='utf-8') as handle:
+            new_exe = bool(commit) and handle.read().strip() != commit
+    except OSError:
+        new_exe = bool(commit)
     if shipped and (not installed or installed == '0.0.0'
-                    or is_newer_version(shipped, installed)):
+                    or is_newer_version(shipped, installed)
+                    or (new_exe and not is_newer_version(installed, shipped))):
         shutil.copytree(bundle_dir, app_dir, dirs_exist_ok=True)
+        if commit:
+            with open(marker, 'w', encoding='utf-8') as handle:
+                handle.write(commit)
         return True
     return False
 

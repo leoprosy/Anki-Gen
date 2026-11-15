@@ -12,15 +12,16 @@
 
   const els = {
     list: $("chunk-list"),
-    rail: $("rail"),
-    railToggle: $("rail-toggle"),
-    railClose: $("rail-close"),
-    railScrim: $("rail-scrim"),
+    picker: $("picker"),
+    pickerToggle: $("picker-toggle"),
+    pickerPanel: $("picker-panel"),
+    pickerSearch: $("picker-search"),
     tabbar: $("tabbar"),
     tabFlag: $("tab-flag"),
     panesGrid: $("panes-grid"),
     curId: $("cur-id"),
-    curDeck: $("cur-deck"),
+    curTitle: $("cur-title"),
+    curPath: $("cur-path"),
     curPrompt: $("cur-prompt"),
     curPreview: $("cur-preview"),
     altPanel: $("alt-panel"),
@@ -33,7 +34,7 @@
     answerToggle: $("answer-toggle"),
     progressLabel: $("progress-label"),
     progressFill: $("progress-fill"),
-    counter: $("dock-counter"),
+    progressBar: $("progress-bar"),
     prevBtn: $("prev-btn"),
     nextBtn: $("next-btn"),
     copyBtn: $("copy-btn"),
@@ -43,7 +44,6 @@
     saveNextBtn: $("save-next-btn"),
   };
 
-  const mqDrawer = window.matchMedia("(max-width: 1180px)");
   const mqTabs = window.matchMedia("(max-width: 900px)");
 
   const firstPending = prompts.findIndex((p) => p.status !== "done");
@@ -57,15 +57,62 @@
 
   const toast = (msg, kind, ms) => window.toast && window.toast(msg, kind, ms);
 
-  // ── Tiroir (rail) ──────────────────────────────────────────
-  function setRail(open) {
-    document.body.classList.toggle("rail-open", open);
-    if (els.railToggle) els.railToggle.setAttribute("aria-expanded", String(open));
+  // ── Sélecteur de paragraphe ────────────────────────────────
+  // Le deck d'un chunk = préfixe::titres du .docx. On retire les segments
+  // communs à tous les chunks (préfixe, titre du cours) : il reste le titre
+  // du paragraphe (dernier segment) et son chemin (les titres entre les deux).
+  const segs = prompts.map((p) => (p.deck || "").split("::").map((s) => s.trim()));
+  let common = 0;
+  while (segs.every((s) => common < s.length - 1 && s[common] === segs[0][common])) common++;
+  prompts.forEach((p, i) => {
+    const s = segs[i];
+    p.title = s[s.length - 1] || `#${p.id}`;
+    p.heads = s.slice(common, -1);
+    p.path = p.heads.join(" › ");
+  });
+  const num = (p) => String(p.id).padStart(2, "0");
+
+  function renderList() {
+    const q = els.pickerSearch.value.trim().toLowerCase();
+    // Plan indenté : chaque titre n'apparaît qu'une fois, au niveau où il change.
+    let prev = [], html = "";
+    for (const p of prompts) {
+      if (q && !`${p.title} ${p.path}`.toLowerCase().includes(q)) continue;
+      let d = 0;
+      while (d < p.heads.length && p.heads[d] === prev[d]) d++;
+      for (; d < p.heads.length; d++) {
+        html += `<li class="chunk-group" style="--depth:${d}" aria-hidden="true">${escapeHtml(p.heads[d])}</li>`;
+      }
+      prev = p.heads;
+      const badges = (p.images && p.images.length ? `<span class="badge">🖼️${p.images.length}</span>` : "")
+        + (p.tables && p.tables.length ? `<span class="badge">▦${p.tables.length}</span>` : "");
+      html += `<li class="chunk-item${p === prompts[currentIdx] ? " active" : ""}" style="--depth:${p.heads.length}" data-id="${p.id}" data-status="${p.status}">
+        <button type="button" class="chunk-btn" title="${escapeHtml(p.path ? p.path + " › " + p.title : p.title)}">
+          <span class="chunk-id">${num(p)}</span>
+          <span class="chunk-title">${escapeHtml(p.title)}</span>
+          ${badges ? `<span class="chunk-badges">${badges}</span>` : ""}
+          <span class="chunk-done" aria-hidden="true"></span>
+        </button></li>`;
+    }
+    els.list.innerHTML = html || `<li class="chunk-empty">${escapeHtml(window.T("js.no_paragraph_match"))}</li>`;
   }
-  els.railToggle && els.railToggle.addEventListener("click", () =>
-    setRail(!document.body.classList.contains("rail-open")));
-  els.railClose && els.railClose.addEventListener("click", () => setRail(false));
-  els.railScrim && els.railScrim.addEventListener("click", () => setRail(false));
+
+  function setPicker(open) {
+    els.pickerPanel.hidden = !open;
+    els.pickerToggle.setAttribute("aria-expanded", String(open));
+    // Toujours la liste complète une fois fermé : timeline-scope.js y lit .chunk-item.active.
+    els.pickerSearch.value = "";
+    renderList();
+    if (!open) return;
+    const active = els.list.querySelector(".chunk-item.active");
+    if (active) active.scrollIntoView({ block: "center" });
+    els.pickerSearch.focus();
+  }
+  els.pickerToggle.addEventListener("click", () => setPicker(els.pickerPanel.hidden));
+  els.pickerSearch.addEventListener("input", renderList);
+  document.addEventListener("click", (ev) => {
+    if (!els.pickerPanel.hidden && !els.picker.contains(ev.target)) setPicker(false);
+  });
 
   // ── Onglets (petites fenêtres) ─────────────────────────────
   function setTab(tab) {
@@ -138,9 +185,11 @@
       url.searchParams.set("chunk_id", p.id);
       link.href = url.href;
     }
-    els.curId.textContent = `#${p.id}`;
-    els.curDeck.textContent = p.deck;
-    els.curDeck.title = p.deck;
+    els.curId.textContent = num(p);
+    els.curTitle.textContent = p.title;
+    els.curPath.textContent = p.path;
+    els.curPath.hidden = !p.path;
+    els.pickerToggle.title = p.deck;
     els.curPrompt.textContent = p.prompt;
     els.curPreview.innerHTML = p.preview_html || `<p class="pv-text">${escapeHtml(p.prompt)}</p>`;
     els.response.value = p.response || "";
@@ -149,16 +198,10 @@
     updateCardsInfo();
     setDirty(false);
 
-    for (const li of els.list.querySelectorAll(".chunk-item")) {
-      li.classList.toggle("active", parseInt(li.dataset.id, 10) === p.id);
-    }
+    renderList();
 
     els.prevBtn.disabled = currentIdx === 0;
     els.nextBtn.disabled = currentIdx === prompts.length - 1;
-    els.counter.textContent = `${currentIdx + 1}/${prompts.length}`;
-
-    const activeLi = els.list.querySelector(".chunk-item.active");
-    if (activeLi) activeLi.scrollIntoView({ block: "nearest" });
 
     els.panesGrid.querySelectorAll(".pane__body").forEach((b) => { b.scrollTop = 0; });
     if (answerMode === "cards") refreshCardsPreview();
@@ -173,8 +216,10 @@
   function updateProgress() {
     const total = prompts.length;
     const done = prompts.filter((p) => p.status === "done").length;
-    els.progressLabel.textContent = `${done}/${total}`;
+    const pct = total ? Math.round(100 * done / total) : 0;
+    els.progressLabel.textContent = `${window.T("js.progress_of", { done, total })} · ${pct} %`;
     els.progressFill.style.width = total ? `${(100 * done / total).toFixed(1)}%` : "0%";
+    els.progressBar.setAttribute("aria-valuenow", String(done));
   }
 
   function updateCardsInfo() {
@@ -252,8 +297,7 @@
       p.status = data.status;
       setDirty(false);
 
-      const li = els.list.querySelector(`.chunk-item[data-id="${p.id}"]`);
-      if (li) li.dataset.status = p.status;
+      renderList();
       updateProgress();
       toast("✓ " + window.T("js.chunk_saved", { id: p.id, n: data.cards_detected }), "ok");
 
@@ -501,7 +545,8 @@
     const idx = prompts.findIndex((p) => p.id === id);
     if (idx >= 0) {
       navigateTo(idx);
-      if (mqDrawer.matches) setRail(false);
+      setPicker(false);
+      els.pickerToggle.focus();
     }
   });
 
@@ -603,8 +648,9 @@
   document.addEventListener("keydown", (ev) => {
     const mod = ev.ctrlKey || ev.metaKey;
 
-    if (ev.key === "Escape" && document.body.classList.contains("rail-open")) {
-      setRail(false);
+    if (ev.key === "Escape" && !els.pickerPanel.hidden) {
+      setPicker(false);
+      els.pickerToggle.focus();
       return;
     }
     if (mod && ev.key === "Enter") { ev.preventDefault(); save({ advance: true }); return; }
@@ -626,7 +672,6 @@
 
   // Repasse en vue double quand la fenêtre s'élargit
   mqTabs.addEventListener("change", (e) => { if (!e.matches) setTab("source"); });
-  mqDrawer.addEventListener("change", (e) => { if (!e.matches) setRail(false); });
 
   render();
   updateProgress();

@@ -324,7 +324,7 @@ code {
 .tl-item:has(> .tl-course-link) { display: flex; align-items: center; }
 .tl-item:has(> .tl-course-link) > .tl-row { flex: 1; min-width: 0; }
 @media (max-width: 760px) {
-  .course-workspace .topbar { flex-wrap: wrap; }
+  .course-workspace .topbar { flex-wrap: wrap; height: auto; min-height: 52px; padding-top: 6px; padding-bottom: 6px; }
   .course-workspace .topbar__actions { flex-basis: 100%; justify-content: flex-end; }
   .course-workspace .topbar__nav { display: none; }
   .course-workspace .course-nav { margin-right: auto; }
@@ -472,15 +472,176 @@ button:disabled:hover { background: var(--surface-alt); }
 /* ============================================================
    3. Page « travail »
    ============================================================ */
+/* Style « épuré » : pas de cartes, l'espace sépare les zones. */
 .work {
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  gap: var(--gap);
-  padding: var(--pad);
-  padding-bottom: 0;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 24px 32px 0;
 }
+
+/* ── Titre du cours + progression du .docx ─────────────────── */
+.work-head { flex: none; display: flex; flex-direction: column; gap: 14px; }
+.work-head__row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 24px; }
+.work-title {
+  flex: 1 1 360px;
+  min-width: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.work-progress { font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.progress-line { height: 2px; background: var(--surface-alt-2); border-radius: 1px; overflow: hidden; }
+.progress-line #progress-fill { height: 100%; background: var(--text-primary); transition: width 0.4s var(--ease); }
+
+/* ── Sélecteur de paragraphe ────────────────────────────────── */
+.picker { position: relative; flex: none; display: flex; align-items: center; gap: 4px; margin: 0 -12px; }
+.picker__step { flex: none; color: var(--text-secondary); }
+.picker__step:disabled { opacity: 0.35; }
+.picker__current {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 8px 12px;
+  background: transparent;
+  border-radius: var(--r-md);
+  color: var(--text-primary);
+  text-align: left;
+  white-space: normal;
+}
+.picker .chunk-btn { white-space: normal; text-align: left; justify-content: flex-start; }
+.picker__current:hover, .picker__current[aria-expanded="true"] { background: var(--surface-alt); transform: none; }
+.picker__num { flex: none; font-size: 14px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.picker__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.picker__title { font-size: 18px; font-weight: 500; letter-spacing: -0.015em; line-height: 1.3; overflow-wrap: anywhere; }
+.picker__path { font-size: 12px; color: var(--text-secondary); line-height: 1.45; overflow-wrap: anywhere; }
+.picker__chevron { flex: none; align-self: center; color: var(--text-secondary); transition: transform 0.2s var(--ease); }
+.picker__current[aria-expanded="true"] .picker__chevron { transform: rotate(180deg); }
+
+.picker__panel {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 6px);
+  left: 48px;
+  right: 48px;
+  max-height: min(460px, 60dvh);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+  animation: fadeUp 0.2s var(--ease) both;
+}
+.picker__panel[hidden] { display: none; }
+.picker__search {
+  flex: none;
+  height: var(--tap);
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+.picker .chunk-list { padding: 0; }
+/* Plan indenté : --depth = niveau du titre (posé par app.js), plafonné pour les plans profonds. */
+.chunk-group {
+  padding: 10px 10px 2px calc(10px + min(var(--depth, 0), 4) * 14px);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.chunk-group:first-child { padding-top: 4px; }
+.picker .chunk-item { padding-left: calc(min(var(--depth, 0), 4) * 14px); }
+.picker .chunk-btn { align-items: baseline; gap: 12px; padding: 10px; min-height: var(--tap); font-size: 14px; }
+.picker .chunk-item.active .chunk-btn { background: var(--surface-alt); color: var(--text-primary); font-weight: 500; }
+.picker .chunk-id { width: 2.2ch; color: var(--text-tertiary); font-weight: 400; }
+.chunk-title { flex: 1; min-width: 0; line-height: 1.45; overflow-wrap: anywhere; }
+.chunk-done { flex: none; width: 6px; height: 6px; border-radius: 50%; align-self: center; }
+.chunk-item[data-status="done"] .chunk-done { background: var(--text-primary); }
+.chunk-empty { padding: 16px 10px; font-size: 13px; color: var(--text-secondary); }
+
+/* Panneaux posés sur le fond, sans carte. */
+.work .pane { background: transparent; box-shadow: none; border-radius: 0; }
+.work .pane__head { padding-left: 0; padding-right: 0; }
+.work .pane__body { padding-left: 0; padding-right: 0; }
+.work .panes { flex: 1 1 auto; }
+.work .panes__grid { gap: 24px; }
+/* Même cadre pour les deux panneaux : le corps entier est la boîte, la barre
+   « Insérer » et la zone de réponse vivent dedans. */
+.work .pane__body { padding: 14px 16px; background: var(--surface-alt); border-radius: var(--r-lg); }
+/* La barre de défilement est dessinée par-dessus les coins : on découpe tout, elle comprise. */
+.work .pane__body { clip-path: inset(0 round var(--r-lg)); }
+.work .pane__body--flush:focus-within { clip-path: none; }
+.work .pane__body--flush:focus-within { box-shadow: 0 0 0 1.5px var(--accent); }
+.work .insert-bar { padding: 0; }
+.work .response-container { margin: 0; }
+.work textarea#response, .work textarea#response:focus { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+.work .cards-preview { margin: 0; padding: 0; }
+
+/* ── Style « Épuré » de l'éditeur ──────────────────────────────
+   Palette pierre chaude, aucune boîte : les contrôles sont du texte,
+   un seul bouton plein (Enregistrer et suivant), en encre et non en bleu. */
+body.course-workspace {
+  --bg: #FAFAF9; --bg-blur: rgba(250, 250, 249, 0.9);
+  --surface: #FFFFFF; --surface-hover: #F5F5F4;
+  --surface-alt: #F5F5F4; --surface-alt-2: #E7E5E4;
+  --text-primary: #1C1917; --text-secondary: #78716C; --text-tertiary: #A8A29E;
+  --course-nav-bg: transparent;
+  --course-nav-active-bg: transparent;
+  --course-nav-active-fg: var(--text-primary);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) body.course-workspace {
+    --bg: #0C0A09; --bg-blur: rgba(12, 10, 9, 0.9);
+    --surface: #1C1917; --surface-hover: #292524;
+    --surface-alt: #1C1917; --surface-alt-2: #292524;
+    --text-primary: #F5F5F4; --text-secondary: #A8A29E; --text-tertiary: #8A817C;
+  }
+}
+:root[data-theme="dark"] body.course-workspace {
+  --bg: #0C0A09; --bg-blur: rgba(12, 10, 9, 0.9);
+  --surface: #1C1917; --surface-hover: #292524;
+  --surface-alt: #1C1917; --surface-alt-2: #292524;
+  --text-primary: #F5F5F4; --text-secondary: #A8A29E; --text-tertiary: #8A817C;
+}
+
+.course-workspace .topbar { background: var(--bg); box-shadow: none; }
+.course-workspace .course-nav { padding: 0; gap: var(--space-md); }
+.course-workspace .course-nav__tab,
+.course-workspace .course-nav .course-nav__menu > summary { padding: 0 var(--space-xs); color: var(--text-secondary); }
+.course-workspace .course-nav [aria-current="page"] { box-shadow: none; color: var(--text-primary); }
+
+/* Interrupteurs Aperçu/Texte, Texte/Cartes, onglets mobiles : du texte, l'actif en encre. */
+.work .seg, .work .tabbar { background: transparent; padding: 0; gap: var(--space-md); }
+.work .seg button, .work .tabbar button { padding: 4px 0; min-height: 32px; font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+.work .seg button.active, .work .tabbar button.active { background: transparent; box-shadow: none; color: var(--text-primary); font-weight: 600; }
+.work .tabbar { justify-content: flex-start; }
+.work .tabbar button { flex: none; }
+
+.work .pane__label { font-size: 13px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-secondary); }
+.work .chunk-preview { padding: 0; background: transparent; border-radius: 0; font-size: 16px; line-height: 1.75; }
+
+/* Dock : actions en texte, un seul bouton plein. */
+.course-workspace .dock { background: var(--bg); box-shadow: none; }
+.course-workspace .dock .btn:not(.primary) { background: transparent; color: var(--text-secondary); }
+.course-workspace .dock .btn:not(.primary):hover { color: var(--text-primary); background: var(--surface-alt); }
+.course-workspace .dock .btn.primary { background: var(--text-primary); color: var(--bg); border-radius: 999px; }
+.course-workspace .dock .btn.primary:hover { background: var(--text-primary); box-shadow: none; opacity: 0.88; }
 
 /* ── Rail des chunks ────────────────────────────────────────── */
 .rail {
@@ -1731,8 +1892,6 @@ textarea#response:focus {
 
 /* Rail en tiroir */
 @media (max-width: 1180px) {
-  .work { grid-template-columns: minmax(0, 1fr); }
-
   .rail {
     position: fixed;
     top: 0;
@@ -1765,6 +1924,13 @@ textarea#response:focus {
 
   .pane { border-radius: var(--r-lg); }
   .project-name, .crumb-sep { display: none; }
+
+  .work { padding: 16px var(--pad) 0; gap: 12px; }
+  .work-title { font-size: 22px; }
+  .picker { margin: 0 -8px; }
+  .picker__title { font-size: 16px; }
+  .picker__path { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .picker__panel { left: 0; right: 0; }
 }
 
 /* Petites fenêtres : le dock passe en icônes */

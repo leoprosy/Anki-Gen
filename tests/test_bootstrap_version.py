@@ -97,6 +97,23 @@ class TestRedeployDecision(unittest.TestCase):
             self.assertFalse(updater.is_update_available(
                 manifest, installed['version'], installed['commit']))
 
+    def test_new_exe_with_same_version_redeploys_once(self):
+        """Un exe reconstruit sans bump de version apporte quand même son code (frise absente sinon)."""
+        bundle = self.tmp / 'bundle'
+        live = self.tmp / 'app'
+        bundle.mkdir()
+        live.mkdir()
+        (bundle / 'version.json').write_text(json.dumps({'version': '1.2.1', 'commit': 'new-exe'}))
+        (live / 'version.json').write_text(json.dumps({'version': '1.2.1', 'commit': 'old'}))
+        self.assertTrue(deploy_bundle(str(bundle), str(live)))
+        self.assertEqual(json.loads((live / 'version.json').read_text())['commit'], 'new-exe')
+        # Mise à jour téléchargée sur la même version : le même exe ne l'écrase plus.
+        (live / 'version.json').write_text(json.dumps({'version': '1.2.1', 'commit': 'downloaded'}))
+        self.assertFalse(deploy_bundle(str(bundle), str(live)))
+        # Un exe plus ancien ne rétrograde jamais une version plus récente.
+        (bundle / 'version.json').write_text(json.dumps({'version': '1.1.0', 'commit': 'older-exe'}))
+        self.assertFalse(deploy_bundle(str(bundle), str(live)))
+
     def test_unreadable_bundle_version_changes_nothing(self):
         """Sans version livrée lisible, on ne touche pas à une install qui marche."""
         self.assertFalse(self.redeploys(None, "1.1.0"))

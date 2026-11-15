@@ -72,6 +72,22 @@ fn show_window_on(window: tauri::WebviewWindow, url: String) {
     });
 }
 
+/// Le sidecar PyInstaller « onefile » est un chargeur qui lance le vrai
+/// serveur Python comme process *enfant*. `child.kill()` n'arrête que le
+/// chargeur : l'enfant survivait et chaque relance laissait un serveur de plus.
+#[cfg(windows)]
+fn kill_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let _ = std::process::Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+#[cfg(not(windows))]
+fn kill_tree(_pid: u32) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let sidecar_child: Arc<Mutex<Option<CommandChild>>> = Arc::new(Mutex::new(None));
@@ -135,6 +151,7 @@ pub fn run() {
             // Au lancement suivant, `find_free_port` en prend un autre pendant
             // qu'un serveur périmé continue de répondre sur le premier.
             if let Some(child) = child_for_exit.lock().unwrap().take() {
+                kill_tree(child.pid());
                 let _ = child.kill();
             }
         }

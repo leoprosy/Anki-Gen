@@ -99,6 +99,8 @@
   "js.orphan_placeholders": "{n} placeholder(s) orphelin(s)",
   "js.paragraph_copied": "Paragraphe copié",
   "js.preview": "Aperçu",
+  "js.progress_of": "{done} sur {total}",
+  "js.no_paragraph_match": "Aucun paragraphe trouvé",
   "js.restart_app": "Redémarrer l’application",
   "js.restarting": "Redémarrage…",
   "js.restart_failed": "Le redémarrage automatique est indisponible. Fermez et rouvrez l’application pour appliquer la mise à jour.",
@@ -173,8 +175,9 @@
   "upload.meta_tables": "{n} tableau(x)",
   "work.actions": "Actions",
   "work.answer_cards": "Cartes",
-  "work.answer_format": "QUESTION⇥RÉPONSE",
-  "work.answer_label": "Réponse de Claude",
+  "work.answer_label": "Réponse",
+  "work.all_paragraphs": "Tous les paragraphes",
+  "work.search_paragraphs": "Rechercher un paragraphe…",
   "work.chunk_list": "Chunks",
   "work.close_list": "Fermer la liste",
   "work.copy": "Copier",
@@ -687,5 +690,8 @@
   "timeline.ui.local_parts_failed": "{n} morceau(x) sur {total} n'ont pas pu être extraits : la frise est incomplète.",
   "local_model.missing": "Le modèle local n'est pas installé : téléchargez-le dans Réglages.",
   "local_model.too_long": "Un passage du texte est trop long pour le modèle local ({tokens} jetons), même coupé au plus court.",
-  "local_model.failed": "Le modèle local a échoué. Le détail est dans le journal de l'app."
+  "local_model.failed": "Le modèle local a échoué. Le détail est dans le journal de l'app.",
+  "settings.about_title": "À propos",
+  "settings.about_version": "Version",
+  "settings.about_updated_at": "Dernière mise à jour"
 }

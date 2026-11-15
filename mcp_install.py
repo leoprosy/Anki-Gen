@@ -34,9 +34,13 @@ def command():
 
 
 def desktop_configs():
-    """Configs Claude Desktop dont le dossier existe (Claude installé) : classique et Microsoft Store."""
+    """
+    Configs Claude Desktop dont le dossier existe (Claude installé) : classique, Microsoft Store
+    (ancien emplacement virtualisé) et Claude-Data (là où les versions récentes du Store lisent).
+    """
     candidates = [APPDATA / "Claude"]
     candidates += sorted(LOCALAPPDATA.glob("Packages/Claude_*/LocalCache/Roaming/Claude"))
+    candidates += sorted(LOCALAPPDATA.glob("Claude-Data/claude_*"))
     return [d / "claude_desktop_config.json" for d in candidates if d.is_dir()]
 
 

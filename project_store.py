@@ -255,10 +255,10 @@ def set_asset_alt(project: dict, asset_id: str, alt: str,
 # ──────────────────────────────────────────────────────────────
 # Export
 # ──────────────────────────────────────────────────────────────
-def export_rows(project: dict, only_done: bool = False, media_prefix: str = ""):
+def export_rows(project: dict, only_done: bool = False, media_prefix: str = "", with_tags: bool = False):
     """
     Construit les lignes (deck, recto, verso) prêtes pour Anki, placeholders
-    {{IMG:n}} / {{TABLE:n}} résolus.
+    {{IMG:n}} / {{TABLE:n}} résolus. Avec `with_tags`, 4e élément : les étiquettes.
 
     Retourne (rows, report) avec report = {
         "cards", "skipped", "media" (noms de fichiers utilisés),
@@ -281,12 +281,12 @@ def export_rows(project: dict, only_done: bool = False, media_prefix: str = ""):
             continue
 
         deck = prompt.get("deck") or project.get("deck_prefix") or DEFAULT_DECK_NAME
-        for question, answer in parse_tsv_response(response):
+        for question, answer, tags in parse_tsv_response(response, with_tags=True):
             q, used_q, unk_q = resolve_placeholders(question, prompt, assets, media_prefix)
             a, used_a, unk_a = resolve_placeholders(answer, prompt, assets, media_prefix)
             used_asset_ids |= used_q | used_a
             unknown.extend(f"#{prompt['id']} {u}" for u in unk_q + unk_a)
-            rows.append([deck, q, a])
+            rows.append([deck, q, a, tags] if with_tags else [deck, q, a])
 
     media_files = sorted(
         assets[aid]["file"] for aid in used_asset_ids

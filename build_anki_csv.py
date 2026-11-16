@@ -29,10 +29,11 @@ ANKI_HEADER_LINES = [
 ]
 
 
-def parse_tsv_response(raw_response: str):
+def parse_tsv_response(raw_response: str, with_tags: bool = False):
     """
-    Parse la réponse brute de Claude : une carte par ligne, QUESTION<TAB>RÉPONSE.
-    Retourne une liste de (question, réponse).
+    Parse la réponse brute de Claude : une carte par ligne, QUESTION<TAB>RÉPONSE[<TAB>ÉTIQUETTES].
+    Retourne une liste de (question, réponse), ou (question, réponse, étiquettes) avec
+    `with_tags` : étiquettes Anki séparées par des espaces (ex. le palier « découverte »).
 
     Tolérances :
       * lignes vides, clôtures markdown (```) et lignes de directive (#) ignorées ;
@@ -49,10 +50,10 @@ def parse_tsv_response(raw_response: str):
         if not line or line.startswith("```") or line.startswith("#"):
             continue
 
+        tags = ""
         if "\t" in line:
-            question, answer = line.split("\t", 1)
-            # Une 3e colonne éventuelle reste dans la réponse : on neutralise les tabs
-            answer = answer.replace("\t", " ")
+            question, answer, *rest = line.split("\t")
+            tags = " ".join(_unquote(t) for t in rest)   # 3e colonne (et suivantes) = étiquettes
         elif "," in line:
             question, answer = line.split(",", 1)
         else:
@@ -60,7 +61,7 @@ def parse_tsv_response(raw_response: str):
 
         question, answer = _unquote(question), _unquote(answer)
         if question and answer:
-            cards.append((question, answer))
+            cards.append((question, answer, " ".join(tags.split())) if with_tags else (question, answer))
     return cards
 
 

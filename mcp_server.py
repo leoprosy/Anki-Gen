@@ -23,7 +23,8 @@ INSTRUCTIONS = (
     "Ankigen turns .docx courses into Anki decks and builds timelines. "
     "Before writing cards or a timeline, call `guide` once for the expected format. "
     "Cards: import_docx (optional deck_prefix; change it later with set_deck_prefix) → get_paragraphs "
-    "→ save_cards per paragraph → export_project. "
+    "→ save_cards per paragraph → push_to_anki (straight into the running Anki, only the paragraphs "
+    "you name: use it to update a deck without duplicates) or export_project (.zip to import by hand). "
     "To write each paragraph's cards, use the `anki-flashcard-apprentissage` skill when your client has it "
     "(its Recto<TAB>Verso output and {{IMG:n}}/{{TABLE:n}} markers are what save_cards expects; "
     "its CSS classes need the 'ESH Basic' note type in Anki); otherwise follow `guide`. "
@@ -134,6 +135,67 @@ def save_cards(project_id, paragraph_id, tsv):
     return _result(client().post(f"/api/save/{project_id}", json={"id": paragraph_id, "response": tsv}))
 
 
+ANKICONNECT_URL = "http://127.0.0.1:8765"
+
+
+def anki(action, **params):
+    """Un appel AnkiConnect (module complémentaire 2055492159, Anki ouvert)."""
+    import urllib.request
+    request = urllib.request.Request(ANKICONNECT_URL, json.dumps(
+        {"action": action, "version": 6, "params": params}).encode("utf-8"))
+    with urllib.request.urlopen(request, timeout=30) as resp:
+        body = json.loads(resp.read())
+    if body.get("error"):
+        raise RuntimeError(f"AnkiConnect {action}: {body['error']}")
+    return body["result"]
+
+
+def push_to_anki(project_id, paragraph_ids, tags=None, note_type="ESH Basic"):
+    """
+    Envoie dans Anki (via AnkiConnect) les cartes des seuls paragraphes indiqués, avec leurs
+    images, dans leurs sous-decks. Les cartes déjà présentes (même recto, même deck) sont
+    sautées : renvoyer un paragraphe n'ajoute que ses cartes nouvelles ou modifiées.
+    """
+    from project_store import export_rows, load_project
+    from paths import project_media_dir
+    project = load_project(project_id)
+    if not project:
+        return f"Unknown project: {project_id}", True
+    wanted = {int(i) for i in paragraph_ids}
+    chosen = [p for p in project["prompts"] if p["id"] in wanted]
+    if missing := sorted(wanted - {p["id"] for p in chosen}):
+        return f"Unknown paragraph id(s): {missing}", True
+    rows, report = export_rows({**project, "prompts": chosen}, with_tags=True)
+    if not rows:
+        return "No cards saved for these paragraphs.", True
+
+    try:
+        fields = anki("modelFieldNames", modelName=note_type)
+    except OSError:
+        return "Anki is not reachable: open Anki with the AnkiConnect add-on (code 2055492159).", True
+    if len(fields) < 2:
+        return f"Note type {note_type!r} not found in Anki (or has fewer than 2 fields).", True
+
+    media_dir = project_media_dir(project_id)
+    for name in report["media"]:   # noms = SHA-1 du contenu : réécrire le même fichier est sans risque
+        if (media_dir / name).is_file():
+            anki("storeMediaFile", filename=name, path=str((media_dir / name).resolve()))
+    for deck in sorted({row[0] for row in rows}):
+        anki("createDeck", deck=deck)
+
+    notes = [{"deckName": deck, "modelName": note_type,
+              "fields": {fields[0]: q, fields[1]: a},
+              "tags": tag_line.split() + list(tags or []),
+              "options": {"allowDuplicate": False, "duplicateScope": "deck"}}
+             for deck, q, a, tag_line in rows]
+    addable = anki("canAddNotes", notes=notes)
+    new = [n for n, ok in zip(notes, addable) if ok]
+    added = anki("addNotes", notes=new) if new else []
+    return json.dumps({"ok": True, "added": sum(1 for i in added if i), "skipped_duplicates": len(notes) - len(new),
+                       "decks": sorted({row[0] for row in rows}), "images": len(report["media"]),
+                       "unknown_placeholders": report["unknown_placeholders"]}, ensure_ascii=False), False
+
+
 def export_project(project_id, format="zip"):
     fmt = "tsv" if format == "tsv" else "zip"
     return _saved(client().get(f"/export.{fmt}/{project_id}"), f"{project_id}_export.{fmt}")
@@ -175,8 +237,16 @@ TOOLS = {
                         _schema(["project_id", "deck_prefix"], project_id=_S, deck_prefix=_S)),
     "get_paragraphs": (get_paragraphs, "Paragraphs of a project (id, deck, prompt text, status, saved cards).",
                        _schema(["project_id"], project_id=_S, only_pending=_B)),
-    "save_cards": (save_cards, "Save the cards of one paragraph as TSV lines (question<TAB>answer). Empty tsv resets it.",
+    "save_cards": (save_cards, "Save the cards of one paragraph as TSV lines (question<TAB>answer[<TAB>tags]); "
+                               "the optional 3rd column holds space-separated Anki tags (e.g. the level). "
+                               "Empty tsv resets it.",
                    _schema(["project_id", "paragraph_id", "tsv"], project_id=_S, paragraph_id=_I, tsv=_S)),
+    "push_to_anki": (push_to_anki, "Send the saved cards of the given paragraphs straight into the running Anki "
+                                   "(AnkiConnect add-on), with their images, into their sub-decks. Cards already "
+                                   "in the deck are skipped. tags are added to every card, after each card's own tags.",
+                     _schema(["project_id", "paragraph_ids"], project_id=_S,
+                             paragraph_ids={"type": "array", "items": _I},
+                             tags={"type": "array", "items": _S}, note_type=_S)),
     "export_project": (export_project, "Export a project's cards for Anki; returns the file path.",
                        _schema(["project_id"], project_id=_S, format={"type": "string", "enum": ["zip", "tsv"]})),
     "list_timelines": (list_timelines, "List saved timelines.", _schema()),

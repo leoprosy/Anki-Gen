@@ -269,9 +269,10 @@ class TestTsvParsing(unittest.TestCase):
         raw = "```csv\n#separator:tab\nQ1\tR1\n\nQ2\tR2\n```"
         self.assertEqual(parse_tsv_response(raw), [("Q1", "R1"), ("Q2", "R2")])
 
-    def test_troisieme_colonne_neutralisee(self):
-        cards = parse_tsv_response("Q\tR\textra")
-        self.assertEqual(cards, [("Q", "R extra")])
+    def test_troisieme_colonne_etiquettes(self):
+        self.assertEqual(parse_tsv_response("Q\tR\tdécouverte"), [("Q", "R")])
+        self.assertEqual(parse_tsv_response("Q\tR\tdécouverte  ch1\nQ2\tR2", with_tags=True),
+                         [("Q", "R", "découverte ch1"), ("Q2", "R2", "")])
 
 
 class TestPlaceholders(unittest.TestCase):

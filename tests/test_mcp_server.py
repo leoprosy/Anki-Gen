@@ -85,6 +85,36 @@ class TestMcpServer(unittest.TestCase):
         self.assertEqual((project["deck_prefix"], project["prompts"][0]["deck"]), ("", "CH1::I"))
         self.assertTrue(self.call("set_deck_prefix", project_id="nope", deck_prefix="x")["isError"])
 
+    def test_push_to_anki_sends_only_chosen_paragraphs_with_tags(self):
+        import project_store
+        tmp = Path(tempfile.mkdtemp(prefix="ankigen-mcp-push-"))
+        self.addCleanup(shutil.rmtree, tmp, True)
+        patcher = mock.patch.object(project_store, "project_path", lambda pid: tmp / f"{pid}.json")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        project_store.save_project("p", {"deck_prefix": "ESH", "prompts": [
+            {"id": 0, "deck": "ESH::I", "response": "Q0\tR0\tdécouverte\nQ1\tR1", "status": "done"},
+            {"id": 1, "deck": "ESH::II", "response": "Q2\tR2", "status": "done"}]})
+
+        calls = []
+
+        def fake_anki(action, **params):
+            calls.append((action, params))
+            return {"modelFieldNames": ["Recto", "Verso"],
+                    "canAddNotes": [True, False],   # Q1 déjà dans Anki
+                    "addNotes": [42]}.get(action)
+
+        with mock.patch.object(mcp_server, "anki", fake_anki):
+            result = self.call("push_to_anki", project_id="p", paragraph_ids=[0], tags=["CH1"])
+        self.assertFalse(result["isError"], result)
+        body = json.loads(result["content"][0]["text"])
+        self.assertEqual((body["added"], body["skipped_duplicates"], body["decks"]), (1, 1, ["ESH::I"]))
+        sent = dict(calls)["addNotes"]["notes"]
+        self.assertEqual(sent, [{"deckName": "ESH::I", "modelName": "ESH Basic",
+                                 "fields": {"Recto": "Q0", "Verso": "R0"}, "tags": ["découverte", "CH1"],
+                                 "options": {"allowDuplicate": False, "duplicateScope": "deck"}}])
+        self.assertTrue(self.call("push_to_anki", project_id="p", paragraph_ids=[9])["isError"])
+
     def test_unknown_tool_and_bad_arguments(self):
         reply, = self.rpc({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "nope"}})
         self.assertIn("error", reply)
